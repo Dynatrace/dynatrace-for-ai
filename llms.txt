@@ -16,8 +16,15 @@ This repository contains agent skills — portable knowledge packages that teach
 AI coding agents how to work with Dynatrace. Skills provide domain-specific
 instructions, DQL query patterns, and best practices.
 
-For API tool access (live queries, entity lookups, problem retrieval), use the
-Dynatrace MCP server (separate repository).
+Skills are knowledge-only. To run live queries and manage your Dynatrace
+environment, pair them with one of these tools:
+
+- dtctl (https://github.com/dynatrace-oss/dtctl) — Full CLI for the Dynatrace
+  platform: DQL queries, SLOs, dashboards, workflows, settings, and more. Works
+  in any agent that can run shell commands. Recommended for most use cases.
+- Dynatrace MCP server (https://github.com/dynatrace-oss/dynatrace-mcp-server)
+  — MCP server for Dynatrace API access. Use this if your agent supports MCP
+  natively and you only need query and API access.
 
 ## Available skills
 
