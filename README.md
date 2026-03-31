@@ -1,6 +1,6 @@
 # Dynatrace for AI
 
-Everything AI agents need to work with [Dynatrace](https://www.dynatrace.com) — starting with skills.
+Everything AI agents need to work with [Dynatrace](https://www.dynatrace.com), starting with skills.
 
 **Skills** are portable knowledge packages following the [Agent Skills](https://agentskills.io) open format. They give AI coding agents the domain-specific context to query, analyze, and interpret Dynatrace data. They work with Claude Code, GitHub Copilot, Cursor, OpenCode, Gemini CLI, and [30+ other compatible tools](https://agentskills.io).
 
@@ -61,9 +61,9 @@ cp -r skills/dt-dql-essentials .cursor/skills/
 | [dt-obs-services](skills/dt-obs-services/SKILL.md) | Service RED metrics and runtime telemetry for .NET, Java, Node.js, Python, PHP, and Go. |
 | [dt-obs-frontends](skills/dt-obs-frontends/SKILL.md) | Real User Monitoring, Web Vitals, user sessions, mobile crashes, and frontend errors. |
 | [dt-obs-tracing](skills/dt-obs-tracing/SKILL.md) | Distributed traces, spans, service dependencies, and failure detection. |
-| [dt-obs-hosts](skills/dt-obs-hosts/SKILL.md) | Host and process metrics — CPU, memory, disk, network, and containers. |
+| [dt-obs-hosts](skills/dt-obs-hosts/SKILL.md) | Host and process metrics: CPU, memory, disk, network, and containers. |
 | [dt-obs-kubernetes](skills/dt-obs-kubernetes/SKILL.md) | Kubernetes clusters, pods, nodes, workloads, labels, and resource relationships. |
-| [dt-obs-aws](skills/dt-obs-aws/SKILL.md) | AWS resources — EC2, RDS, Lambda, ECS/EKS, VPC, load balancers, and cost optimization. |
+| [dt-obs-aws](skills/dt-obs-aws/SKILL.md) | AWS resources: EC2, RDS, Lambda, ECS/EKS, VPC, load balancers, and cost optimization. |
 | [dt-obs-logs](skills/dt-obs-logs/SKILL.md) | Log queries, filtering, pattern analysis, and log correlation. |
 | [dt-obs-problems](skills/dt-obs-problems/SKILL.md) | Problem entities, root cause analysis, impact assessment, and problem correlation. |
 | [dt-obs-extensions](skills/dt-obs-extensions/SKILL.md) | Extension status and troubleshooting. |
@@ -72,9 +72,9 @@ cp -r skills/dt-dql-essentials .cursor/skills/
 
 | Skill | Description |
 |-------|-------------|
-| [dt-platform](skills/dt-platform/SKILL.md) | Platform operations — billing analytics, audit trail, query performance, workflow automation, and GenAI usage. |
-| [dt-app-dashboards](skills/dt-app-dashboards/SKILL.md) | Create, modify, and analyze Dynatrace dashboards — tiles, layouts, variables, and visualizations. |
-| [dt-app-notebooks](skills/dt-app-notebooks/SKILL.md) | Create, modify, and analyze Dynatrace notebooks — sections, DQL queries, and analytics workflows. |
+| [dt-platform](skills/dt-platform/SKILL.md) | Platform operations: billing analytics, audit trail, query performance, workflow automation, and GenAI usage. |
+| [dt-app-dashboards](skills/dt-app-dashboards/SKILL.md) | Create, modify, and analyze Dynatrace dashboards: tiles, layouts, variables, and visualizations. |
+| [dt-app-notebooks](skills/dt-app-notebooks/SKILL.md) | Create, modify, and analyze Dynatrace notebooks: sections, DQL queries, and analytics workflows. |
 
 ### Migration
 
@@ -86,11 +86,11 @@ cp -r skills/dt-dql-essentials .cursor/skills/
 
 Skills follow the [Agent Skills specification](https://agentskills.io/specification) and use progressive disclosure:
 
-1. **Catalog** — Agents load only `name` + `description` (~100 tokens per skill) to know what's available.
-2. **Instructions** — When relevant, the full `SKILL.md` is loaded (<5000 tokens).
-3. **Resources** — Detailed reference files in `references/` are loaded on demand.
+1. **Catalog** - Agents load only `name` + `description` (~100 tokens per skill) to know what's available.
+2. **Instructions** - When relevant, the full `SKILL.md` is loaded (<5000 tokens).
+3. **Resources** - Detailed reference files in `references/` are loaded on demand.
 
-Install all skills without penalty — agents only load what they need.
+Install all skills without penalty. Agents only load what they need.
 
 ## Contributing
 
