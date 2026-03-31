@@ -15,6 +15,7 @@
     "../../skills/dt-obs-extensions",
     "../../skills/dt-app-dashboards",
     "../../skills/dt-app-notebooks",
-    "../../skills/dt-migration"
+    "../../skills/dt-migration",
+    "../../skills/dt-platform"
   ]
 }

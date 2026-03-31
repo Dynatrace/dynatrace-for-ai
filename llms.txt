@@ -42,6 +42,9 @@ Dynatrace Apps:
 Migration:
 - dt-migration: Migrate classic entities to Smartscape.
 
+Platform Operations:
+- dt-platform: Billing analytics, audit trail, query analytics, workflow automation, GenAI usage via dt.system.events.
+
 ## Installation
 
 Claude Code:  claude plugin marketplace add dynatrace/dynatrace-for-ai

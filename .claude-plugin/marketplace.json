@@ -1,9 +1,9 @@
 {
-  "name": "dynatrace-skills",
+  "name": "dynatrace-for-ai",
   "plugins": [
     {
       "name": "dynatrace",
-      "description": "Dynatrace observability skills — DQL queries, application monitoring, infrastructure, log analysis, problem investigation.",
+      "description": "Dynatrace observability skills and MCP integration for AI agents.",
       "source": "./plugins/dynatrace"
     }
   ]
