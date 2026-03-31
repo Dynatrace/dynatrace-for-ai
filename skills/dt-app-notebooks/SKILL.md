@@ -177,3 +177,8 @@ This skill uses **progressive disclosure** - load only what you need:
 
 - **dt-dql-essentials** - DQL query syntax, functions, and optimization
 - **dt-app-dashboards** - Dashboard creation for operational monitoring (vs notebooks for investigation)
+
+---
+
+**Version**: 2.0.0  
+**Last Updated**: 2026-02-06
