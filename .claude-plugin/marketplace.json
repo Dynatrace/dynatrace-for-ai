@@ -3,7 +3,7 @@
   "plugins": [
     {
       "name": "dynatrace",
-      "description": "Dynatrace observability skills and MCP integration for AI agents.",
+      "description": "Dynatrace observability skills for AI agents.",
       "source": "./plugins/dynatrace"
     }
   ]

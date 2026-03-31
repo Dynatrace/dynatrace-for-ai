@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "dynatrace": {
-      "command": "npx",
-      "args": ["@dynatrace/mcp-server"]
-    }
-  }
-}

@@ -7,7 +7,7 @@ Everything AI agents need to work with [Dynatrace](https://www.dynatrace.com), s
 Skills provide knowledge only. To run live queries and manage your Dynatrace environment, pair them with a tool:
 
 - **[dtctl](https://github.com/dynatrace-oss/dtctl)** — Full CLI for the Dynatrace platform: DQL queries, SLOs, dashboards, workflows, settings, and more. Works in any agent that can run shell commands.
-- **[Dynatrace MCP server](https://github.com/dynatrace-oss/dynatrace-mcp-server)** — MCP server for Dynatrace API access. Use this if your agent supports MCP natively and you only need query and API access.
+- **[Dynatrace MCP server](https://www.dynatrace.com/hub/detail/dynatrace-mcp-server/)** — Official MCP server for Dynatrace API access. Use this if your agent supports MCP natively.
 
 ## Installation
 
