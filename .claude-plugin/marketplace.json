@@ -1,0 +1,10 @@
+{
+  "name": "dynatrace-skills",
+  "plugins": [
+    {
+      "name": "dynatrace",
+      "description": "Dynatrace observability skills — DQL queries, application monitoring, infrastructure, log analysis, problem investigation.",
+      "source": "./plugins/dynatrace"
+    }
+  ]
+}

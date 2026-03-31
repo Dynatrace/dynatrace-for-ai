@@ -1,0 +1,61 @@
+# Dynatrace Skills
+
+> Source: https://github.com/Dynatrace/dynatrace-for-ai
+> Format: Agent Skills (https://agentskills.io)
+
+## What is Dynatrace
+
+Dynatrace is an observability and security platform that provides full-stack
+monitoring including application performance, infrastructure, logs, digital
+experience, and AI-powered root cause analysis (Davis AI). It uses a unified
+data lakehouse (Grail) queried with DQL (Dynatrace Query Language).
+
+## What this repository provides
+
+This repository contains agent skills — portable knowledge packages that teach
+AI coding agents how to work with Dynatrace. Skills provide domain-specific
+instructions, DQL query patterns, and best practices.
+
+For API tool access (live queries, entity lookups, problem retrieval), use the
+Dynatrace MCP server (separate repository).
+
+## Available skills
+
+DQL & Query Language:
+- dt-dql-essentials: DQL syntax rules, pitfalls, patterns. Required before writing DQL.
+
+Observability:
+- dt-obs-services: Service RED metrics, runtime telemetry (.NET, Java, Node.js, Python, PHP, Go).
+- dt-obs-frontends: RUM, Web Vitals, user sessions, mobile, frontend errors.
+- dt-obs-tracing: Distributed traces, spans, dependencies, failure detection.
+- dt-obs-hosts: Host/process CPU, memory, disk, network, containers.
+- dt-obs-kubernetes: K8s clusters, pods, nodes, workloads, labels.
+- dt-obs-aws: AWS EC2, RDS, Lambda, ECS/EKS, VPC, cost optimization.
+- dt-obs-logs: Log queries, filtering, pattern analysis, correlation.
+- dt-obs-problems: Problem entities, root cause, impact assessment.
+- dt-obs-extensions: Extension status and troubleshooting.
+
+Dynatrace Apps:
+- dt-app-dashboards: Dashboard JSON, tiles, layouts, DQL queries, variables.
+- dt-app-notebooks: Notebook JSON, sections, analytics workflows.
+
+Migration:
+- dt-migration: Migrate classic entities to Smartscape.
+
+## Installation
+
+Claude Code:  claude plugin marketplace add dynatrace/dynatrace-for-ai
+Skills.sh:    npx skills add dynatrace/dynatrace-for-ai
+Manual:       Copy skill directories into .agents/skills/
+
+## Skill format
+
+Each skill is a directory with a SKILL.md file (YAML frontmatter + markdown).
+Skills use progressive disclosure: name+description loaded at startup (~100
+tokens), full instructions loaded on activation (<5000 tokens), reference
+files loaded on demand.
+
+## Naming convention
+
+All skills use the pattern dt-<domain>[-<usecase>] with kebab-case.
+Domains: obs, appsec, biz, setup, migration, dql, sdlc, platform, fleet

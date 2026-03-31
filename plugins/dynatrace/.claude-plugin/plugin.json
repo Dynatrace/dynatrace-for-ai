@@ -1,0 +1,20 @@
+{
+  "name": "dynatrace",
+  "version": "0.1.0",
+  "description": "Dynatrace observability skills with MCP integration. DQL query patterns, application and infrastructure monitoring, log analysis, problem investigation, and incident response workflows.",
+  "skills": [
+    "../../skills/dt-dql-essentials",
+    "../../skills/dt-obs-services",
+    "../../skills/dt-obs-frontends",
+    "../../skills/dt-obs-tracing",
+    "../../skills/dt-obs-hosts",
+    "../../skills/dt-obs-kubernetes",
+    "../../skills/dt-obs-aws",
+    "../../skills/dt-obs-logs",
+    "../../skills/dt-obs-problems",
+    "../../skills/dt-obs-extensions",
+    "../../skills/dt-app-dashboards",
+    "../../skills/dt-app-notebooks",
+    "../../skills/dt-migration"
+  ]
+}
