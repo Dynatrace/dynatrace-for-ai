@@ -75,7 +75,6 @@ cp -r skills/dt-dql-essentials .cursor/skills/
 
 | Skill | Description |
 |-------|-------------|
-| [dt-platform](skills/dt-platform/SKILL.md) | Platform operations: billing analytics, audit trail, query performance, workflow automation, and GenAI usage. |
 | [dt-app-dashboards](skills/dt-app-dashboards/SKILL.md) | Create, modify, and analyze Dynatrace dashboards: tiles, layouts, variables, and visualizations. |
 | [dt-app-notebooks](skills/dt-app-notebooks/SKILL.md) | Create, modify, and analyze Dynatrace notebooks: sections, DQL queries, and analytics workflows. |
 
