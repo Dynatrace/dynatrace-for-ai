@@ -4,7 +4,10 @@ Everything AI agents need to work with [Dynatrace](https://www.dynatrace.com), s
 
 **Skills** are portable knowledge packages following the [Agent Skills](https://agentskills.io) open format. They give AI coding agents the domain-specific context to query, analyze, and interpret Dynatrace data. They work with Claude Code, GitHub Copilot, Cursor, OpenCode, Gemini CLI, and [30+ other compatible tools](https://agentskills.io).
 
-> For **tool capabilities** (API access, live queries), see the [Dynatrace MCP server](https://github.com/dynatrace-oss/dynatrace-mcp-server) and [dtctl](https://github.com/dynatrace-oss/dtctl).
+Skills provide knowledge only. To run live queries and manage your Dynatrace environment, pair them with a tool:
+
+- **[dtctl](https://github.com/dynatrace-oss/dtctl)** — Full CLI for the Dynatrace platform: DQL queries, SLOs, dashboards, workflows, settings, and more. Works in any agent that can run shell commands. Recommended for most use cases.
+- **[Dynatrace MCP server](https://github.com/dynatrace-oss/dynatrace-mcp-server)** — MCP server for Dynatrace API access. Use this if your agent supports MCP natively and you only need query and API access.
 
 ## Installation
 
