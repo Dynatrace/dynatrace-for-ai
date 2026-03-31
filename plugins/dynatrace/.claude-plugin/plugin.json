@@ -1,7 +1,7 @@
 {
   "name": "dynatrace",
   "version": "0.1.0",
-  "description": "Dynatrace observability skills. DQL query patterns, application and infrastructure monitoring, log analysis, problem investigation, and incident response workflows. Use with dtctl or the Dynatrace MCP server (https://www.dynatrace.com/hub/detail/dynatrace-mcp-server/) for live platform access.",
+  "description": "Dynatrace observability skills. DQL query patterns, application and infrastructure monitoring, log analysis, problem investigation, and incident response workflows. Use with dtctl or the Dynatrace MCP server (https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server) for live platform access.",
   "skills": [
     "../../skills/dt-dql-essentials",
     "../../skills/dt-obs-services",

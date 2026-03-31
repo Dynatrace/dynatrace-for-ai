@@ -22,7 +22,7 @@ environment, pair them with one of these tools:
 - dtctl (https://github.com/dynatrace-oss/dtctl) — Full CLI for the Dynatrace
   platform: DQL queries, SLOs, dashboards, workflows, settings, and more. Works
   in any agent that can run shell commands. Recommended for most use cases.
-- Dynatrace MCP server (https://www.dynatrace.com/hub/detail/dynatrace-mcp-server/)
+- Dynatrace MCP server (https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server)
   — Official MCP server for Dynatrace API access. Use this if your agent
   supports MCP natively.
 
