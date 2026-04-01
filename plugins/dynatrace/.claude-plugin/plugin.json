@@ -17,12 +17,12 @@
     "../../skills/dt-app-notebooks",
     "../../skills/dt-migration"
   ],
-  "prompts": [
-    "../../prompts/daily-standup.prompt.md",
-    "../../prompts/health-check.prompt.md",
-    "../../prompts/incident-response.prompt.md",
-    "../../prompts/investigate-error.prompt.md",
-    "../../prompts/performance-regression.prompt.md",
-    "../../prompts/troubleshoot-problem.prompt.md"
+  "commands": [
+    "../../commands/daily-standup.prompt.md",
+    "../../commands/health-check.prompt.md",
+    "../../commands/incident-response.prompt.md",
+    "../../commands/investigate-error.prompt.md",
+    "../../commands/performance-regression.prompt.md",
+    "../../commands/troubleshoot-problem.prompt.md"
   ]
 }
