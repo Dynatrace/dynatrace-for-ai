@@ -15,5 +15,13 @@
     "../../skills/dt-app-dashboards",
     "../../skills/dt-app-notebooks",
     "../../skills/dt-migration"
+  ],
+  "prompts": [
+    "../../prompts/daily-standup.prompt.md",
+    "../../prompts/health-check.prompt.md",
+    "../../prompts/incident-response.prompt.md",
+    "../../prompts/investigate-error.prompt.md",
+    "../../prompts/performance-regression.prompt.md",
+    "../../prompts/troubleshoot-problem.prompt.md"
   ]
 }
