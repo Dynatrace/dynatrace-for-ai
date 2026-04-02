@@ -1,0 +1,10 @@
+{
+  "name": "dynatrace-for-ai",
+  "plugins": [
+    {
+      "name": "dynatrace",
+      "description": "Dynatrace observability skills for AI agents.",
+      "source": "./plugins/dynatrace"
+    }
+  ]
+}
