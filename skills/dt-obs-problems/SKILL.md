@@ -16,7 +16,7 @@ Dynatrace automatically detects anomalies, performance degradations, and failure
 
 Problems are automatically detected, software and infrastructure health and resilience issues that:
 
-- **Automatically correlate** related alert, warning, and info-level events across services, infrastructure, and frontend applicationuser sessions
+- **Automatically correlate** related alert, warning, and info-level events across services, infrastructure, frontend applications, and user sessions
 - **Identify root causes** using causal analysis of Smartscape dependencies
 - **Assess business impact** by tracking affected users and services
 - **Reduce alert noise** by grouping related symptoms into single problems that share the same root cause and impact
@@ -45,7 +45,7 @@ Common `event.category` values:
 | **ERROR** | Increased error rates beyond baseline | API error rate jumped from 0.1% to 15% |
 | **SLOWDOWN** | Performance degradation | Response time increased from 200ms to 5000ms |
 | **RESOURCE** | Resource saturation | Container memory at 95%, causing OOM kills |
-| **CUSTOM** | Custom anomaly detections | Business KPI (orders/minute) dropped below threshold | Customer defined abnormal behavior patterns |
+| **CUSTOM** | Custom anomaly detections | Business KPI (orders/minute) dropped below threshold |
 
 ## Problem Lifecycle
 
@@ -333,6 +333,6 @@ fetch dt.davis.problems
 
 ## Related Skills
 
-- **dql-essentials** - Core DQL syntax and query structure for problem queries
-- **log-analysis** - Correlate problems with application and infrastructure logs
-- **application-tracing** - Investigate problems through distributed trace analysis
+- **dt-dql-essentials** - Core DQL syntax and query structure for problem queries
+- **dt-obs-logs** - Correlate problems with application and infrastructure logs
+- **dt-obs-tracing** - Investigate problems through distributed trace analysis

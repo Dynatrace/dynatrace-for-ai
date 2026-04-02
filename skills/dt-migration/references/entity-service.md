@@ -26,7 +26,7 @@ Use this guide when the migration centers on `dt.entity.service` or service-rela
 
 ```dql
 smartscapeNodes HOST
-| filter `tags:azure`[dt_owner_email] == "team-dok@dynatrace.com"
+| filter `tags:azure`[dt_owner_email] == "team-ops@example.com"
 | traverse runs_on, SERVICE, direction:backward
 | fields id, entity.name = name
 ```

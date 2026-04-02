@@ -379,10 +379,3 @@ This skill uses **progressive disclosure**. Start here for 80% of use cases. Loa
 - [inventory-discovery.md](references/inventory-discovery.md) - Host/process discovery, technology inventory, cost attribution, and data quality
 
 ---
-
-
-## Source Documentation
-
-**Location:** `knowledge-base/dynatrace/documentation-archived/dql/infrastructure-observability/host_process/` (archived)
-
-19 comprehensive documentation files covering all aspects of host and process monitoring.

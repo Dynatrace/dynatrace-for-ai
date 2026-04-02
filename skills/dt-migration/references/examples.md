@@ -80,7 +80,7 @@ smartscapeEdges runs_on
 
 ```dql
 fetch dt.entity.service
-| filter in(id, classicEntitySelector("type(service), fromRelationship.runsOnHost(type(host), tag([Azure]dt_owner_email:team-dok@dynatrace.com))"))
+| filter in(id, classicEntitySelector("type(service), fromRelationship.runsOnHost(type(host), tag([Azure]dt_owner_email:team-ops@example.com))"))
 | fields id, entity.name
 ```
 
@@ -88,7 +88,7 @@ fetch dt.entity.service
 
 ```dql
 smartscapeNodes HOST
-| filter `tags:azure`[dt_owner_email] == "team-dok@dynatrace.com"
+| filter `tags:azure`[dt_owner_email] == "team-ops@example.com"
 | traverse runs_on, SERVICE, direction:backward
 | fields id, entity.name = name
 ```

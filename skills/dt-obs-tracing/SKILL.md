@@ -635,6 +635,6 @@ Detailed documentation for specific topics:
 
 ## Related Skills
 
-- **dql-essentials** - Core DQL syntax for querying trace data
-- **dynatrace-dashboard** - Embed trace queries in dashboards
-- **entity-model** - Understanding Dynatrace Smartscape node relationships
+- **dt-dql-essentials** - Core DQL syntax for querying trace data
+- **dt-app-dashboards** - Embed trace queries in dashboards
+- **dt-migration** - Smartscape entity model and relationship navigation

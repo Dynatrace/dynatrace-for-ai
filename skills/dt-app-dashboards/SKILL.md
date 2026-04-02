@@ -112,8 +112,8 @@ Follow this exact order (do not reorder):
 3. Plan dashboard structure: logic, variables, tiles and layout
 4. Design and validate all variable/tile DQL with `dtctl query "<DQL>" --plain`
 5. Construct/update dashboard JSON
-6. Run `scripts/validate_dashboard.sh`
-7. Deploy with `scripts/deploy_dashboard.sh`
+6. Validate the dashboard JSON structure and queries
+7. Deploy the dashboard via the Dynatrace API
 
 Full requirements and examples: `references/create-update.md`.
 
@@ -200,8 +200,8 @@ usage patterns**
 
 ## Validation
 
-**⚠️ MANDATORY for create/update workflows:** Run `scripts/validate_dashboard.sh`
-before deploying. It validates:
+**⚠️ MANDATORY for create/update workflows:** Validate the dashboard JSON
+before deploying. Check:
 
 - **Schema structure** — required top-level keys (`name`, `type`, `content`)
   and content keys (`version`, `variables`, `tiles`, `layouts`)

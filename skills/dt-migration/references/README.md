@@ -26,10 +26,6 @@ Use these references with `SKILL.md`.
 | [`entity-kubernetes.md`](entity-kubernetes.md) | The migration centers on Kubernetes cluster, node, service, namespace, pod, or workload entities |
 | [`entity-cloud-application.md`](entity-cloud-application.md) | The migration centers on `cloud_application`, `cloud_application_instance`, or `cloud_application_namespace` |
 
-## Source Material
-
-These references were derived from the `smartscape-query-migration` repository, which contains the original prompt-pack materials, mapping tables, and examples used to translate classic entity DQL into Smartscape DQL.
-
 ## Related Skills
 
 - Load `dt-dql-essentials` before writing final DQL.

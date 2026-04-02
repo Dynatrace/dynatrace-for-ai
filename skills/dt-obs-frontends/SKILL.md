@@ -112,8 +112,8 @@ Full event model: https://docs.dynatrace.com/docs/semantic-dictionary/model/rum/
 - `characteristics.has_replay` — Session replay available
 
 **User identity:**
-- `dt.rum.user_tag` — User identifier (typically email, username or custimerId), set via `dtrum.identifyUser()` API call in the instrumented frontend. **Not always populated** — only present when the frotend explicitly calls `identifyUser()`. 
-- When `dt.rum.user_tag` is empty, `dt.rum.instance.id` is often the only user differentiator. the value is a random id assigned by the RUM agent on the client side, so it is not personally identifiable but can be used to distinguish unique users when `user_tag` is not set. on web this is based on persistent cookie, so can be deleted by the user .
+- `dt.rum.user_tag` — User identifier (typically email, username or customerId), set via `dtrum.identifyUser()` API call in the instrumented frontend. **Not always populated** — only present when the frontend explicitly calls `identifyUser()`.
+- When `dt.rum.user_tag` is empty, `dt.rum.instance.id` is often the only user differentiator. The value is a random ID assigned by the RUM agent on the client side, so it is not personally identifiable but can be used to distinguish unique users when `user_tag` is not set. On web this is based on a persistent cookie, so it can be deleted by the user.
 - The user tag is a **session-level field** — query it from `user.sessions`, not `user.events` (where it may be empty even if the session has one).
 
 **Client/device context:**
@@ -607,5 +607,3 @@ Query returns unexpected results
 - `references/mobile-monitoring.md` - Mobile app performance and crashes
 - `references/performance-analysis.md` - Advanced performance diagnostics
 
-### Source Files (Full Documentation)
-All 20 original documentation files are preserved in the skill's asset directory for complete reference.

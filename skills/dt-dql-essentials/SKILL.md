@@ -23,7 +23,7 @@ ______________________________________________________________________
 | Query optimization (filter early, time ranges, field selection, performance)                                       | [references/optimization.md](references/optimization.md)                                     |
 
 
-# DQL Reference Index
+## DQL Reference Index
 
 | Description | Items |
 |-------------|-------|

@@ -4,7 +4,7 @@ description: Log queries, filtering, pattern analysis, and log correlation. Sear
 license: Apache-2.0
 ---
 
-# log-analysis
+# Log Analysis Skill
 
 Query, filter, and analyze Dynatrace log data using DQL for troubleshooting and monitoring.
 
