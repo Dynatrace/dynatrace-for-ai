@@ -1,5 +1,8 @@
 {
   "name": "dynatrace-for-ai",
+  "owner": {
+    "name": "Dynatrace"
+  },
   "plugins": [
     {
       "name": "dynatrace",
