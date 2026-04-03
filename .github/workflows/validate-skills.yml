@@ -1,0 +1,44 @@
+name: Validate skills
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - "skills/**"
+      - "plugins/**"
+      - ".claude-plugin/**"
+      - "tests/**"
+      - "scripts/**"
+      - "AGENTS.md"
+      - "README.md"
+      - "CONTRIBUTING.md"
+      - "llms.txt"
+  pull_request:
+    branches: [main]
+    paths:
+      - "skills/**"
+      - "plugins/**"
+      - ".claude-plugin/**"
+      - "tests/**"
+      - "scripts/**"
+      - "AGENTS.md"
+      - "README.md"
+      - "CONTRIBUTING.md"
+      - "llms.txt"
+
+jobs:
+  test:
+    name: Run test suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run tests
+        run: ./tests/run-all.sh
