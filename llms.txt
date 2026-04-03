@@ -22,11 +22,17 @@ environment, pair them with one of these tools:
 - dtctl (https://github.com/dynatrace-oss/dtctl) — Full CLI for the Dynatrace
   platform: DQL queries, SLOs, dashboards, workflows, settings, and more. Works
   in any agent that can run shell commands. Recommended for most use cases.
+  Ships with its own Agent Skill (https://github.com/dynatrace-oss/dtctl/tree/main/skills/dtctl)
+  that teaches agents how to operate it. Install it alongside these knowledge
+  skills for the full experience: npx skills add dynatrace-oss/dtctl
 - Dynatrace MCP server (https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server)
   — Official MCP server for Dynatrace API access. Use this if your agent
   supports MCP natively.
 
 ## Available skills
+
+CLI & Tooling (separate install: npx skills add dynatrace-oss/dtctl):
+- dtctl: Operate dtctl, the kubectl-style CLI for Dynatrace. Command patterns, output modes, authentication, resource management. From https://github.com/dynatrace-oss/dtctl
 
 DQL & Query Language:
 - dt-dql-essentials: DQL syntax rules, pitfalls, patterns. Required before writing DQL.

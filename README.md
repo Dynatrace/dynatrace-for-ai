@@ -4,50 +4,50 @@ Everything AI agents need to work with [Dynatrace](https://www.dynatrace.com), s
 
 **Skills** are portable knowledge packages following the [Agent Skills](https://agentskills.io) open format. They give AI coding agents the domain-specific context to query, analyze, and interpret Dynatrace data. They work with Claude Code, GitHub Copilot, Cursor, OpenCode, Gemini CLI, and [30+ other compatible tools](https://agentskills.io).
 
-Skills provide knowledge only. To run live queries and manage your Dynatrace environment, pair them with a tool:
-
-- **[dtctl](https://github.com/dynatrace-oss/dtctl)** — Full CLI for the Dynatrace platform: DQL queries, SLOs, dashboards, workflows, settings, and more. Works in any agent that can run shell commands.
-- **[Dynatrace MCP server](https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server)** — Official MCP server for Dynatrace API access. Use this if your agent supports MCP natively.
-
 ## Installation
 
-### Claude Code
+### Skills Package (skills.sh)
+
+```bash
+npx skills add dynatrace/dynatrace-for-ai
+```
+
+Works with Claude Code, Cursor, Cline, GitHub Copilot, OpenCode, and other [compatible agents](https://agentskills.io).
+
+### Claude Code Plugin
 
 ```bash
 claude plugin marketplace add dynatrace/dynatrace-for-ai
 claude plugin install dynatrace@dynatrace-for-ai
 ```
 
-Restart Claude Code after installation. Skills activate automatically when relevant.
+Update with `claude plugin marketplace update && claude plugin update dynatrace@dynatrace-for-ai`.
 
-**Update:**
+### Manual
 
-```bash
-claude plugin marketplace update
-claude plugin update dynatrace@dynatrace-for-ai
-```
+Copy skill directories into your agent's skills path (`.agents/skills/`, `.claude/skills/`, `.cursor/skills/`, etc.).
 
-### Skills Package (skills.sh)
+## Connecting to Dynatrace
 
-For agents supporting the [skills.sh](https://skills.sh) ecosystem:
+Skills provide knowledge only. To run live queries and manage your environment, pair them with a tool.
 
-```bash
-npx skills add dynatrace/dynatrace-for-ai
-```
+### Dynatrace CLI (dtctl)
 
-Works with Claude Code, Cursor, Cline, GitHub Copilot, and other compatible agents.
-
-### Manual Installation
-
-Copy any skill directory into your agent's skills path:
+**[dtctl](https://github.com/dynatrace-oss/dtctl)** is a kubectl-style CLI for the Dynatrace platform. It ships with its own [Agent Skill](https://github.com/dynatrace-oss/dtctl/tree/main/skills/dtctl) that teaches agents how to operate it.
 
 ```bash
-cp -r skills/dt-dql-essentials .agents/skills/
-
-# Or client-specific
-cp -r skills/dt-dql-essentials .claude/skills/
-cp -r skills/dt-dql-essentials .cursor/skills/
+brew install dynatrace-oss/tap/dtctl                        # Install
+dtctl auth login --context my-env \
+  --environment "https://<env>.apps.dynatrace.com"           # Authenticate
+npx skills add dynatrace-oss/dtctl                           # Install the dtctl skill
+dtctl doctor                                                 # Verify setup
 ```
+
+Or install the dtctl skill with dtctl itself: `dtctl skills install`
+
+### Dynatrace MCP Server
+
+The **[Dynatrace MCP server](https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server)** provides Dynatrace API access via MCP. Use this if your agent supports MCP natively.
 
 ## Skills
 
