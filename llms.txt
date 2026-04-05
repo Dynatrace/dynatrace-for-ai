@@ -53,6 +53,18 @@ Dynatrace Apps:
 Migration:
 - dt-migration: Migrate classic entities to Smartscape.
 
+## Available prompts
+
+Reusable task templates for common Dynatrace workflows. Paste directly into chat,
+or copy into .github/prompts/ for VS Code/Copilot slash command support.
+
+- daily-standup: Generate a daily standup report for one or more services.
+- health-check: Check the health of a service in production.
+- incident-response: Active incident triage — Davis Problems, root cause, user impact, shareable report.
+- investigate-error: Investigate errors via Davis Problems as entry point (problems → logs → traces).
+- performance-regression: Analyze whether a recent deployment caused a performance regression.
+- troubleshoot-problem: Structured problem investigation with log scoping, error classification, and trace analysis.
+
 ## Installation
 
 Claude Code:  claude plugin marketplace add dynatrace/dynatrace-for-ai

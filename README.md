@@ -82,6 +82,21 @@ The **[Dynatrace MCP server](https://docs.dynatrace.com/docs/shortlink/dynatrace
 |-------|-------------|
 | [dt-migration](skills/dt-migration/SKILL.md) | Migrate classic entity-based DQL and topology navigation to Smartscape equivalents. |
 
+## Prompts
+
+**Prompts** are reusable task templates for common Dynatrace workflows. You can copy them from the `/prompts/` directory and paste them directly into any AI chat. For VS Code/GitHub Copilot users, copy prompts into `.github/prompts/` to use as slash commands (e.g. `/troubleshoot-problem`).
+
+Each prompt references the relevant skills above — load those skills first for best results.
+
+| Prompt | Description |
+|--------|-------------|
+| [daily-standup](prompts/daily-standup.prompt.md) | Generate a daily standup report for one or more services. |
+| [health-check](prompts/health-check.prompt.md) | Check the health of a service in production. |
+| [incident-response](prompts/incident-response.prompt.md) | Respond to an active production incident with triage, root cause, and a shareable report. |
+| [investigate-error](prompts/investigate-error.prompt.md) | Investigate recent errors using Davis Problems as the entry point (problems → logs → traces). |
+| [performance-regression](prompts/performance-regression.prompt.md) | Analyze whether a recent deployment caused a performance regression. |
+| [troubleshoot-problem](prompts/troubleshoot-problem.prompt.md) | Troubleshoot an existing Dynatrace problem with structured log and trace investigation. |
+
 ## How Skills Work
 
 Skills follow the [Agent Skills specification](https://agentskills.io/specification) and use progressive disclosure:
