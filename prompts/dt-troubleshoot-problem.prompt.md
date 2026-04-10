@@ -1,6 +1,8 @@
 ---
-description: Troubleshoot an existing Dynatrace problem. Starts by listing active problems, scopes log queries to the problem timeframe, classifies actionable errors, and hands off to trace investigation.
+agent: agent
+description: Troubleshoot an existing Dynatrace problem. Starts with the Root Cause Agent to list problems, scopes log queries to the problem timeframe, classifies actionable errors, and hands off to trace investigation.
 ---
+
 # Troubleshoot a Dynatrace Problem
 
 ## Rules

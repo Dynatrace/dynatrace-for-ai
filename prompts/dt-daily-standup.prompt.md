@@ -1,5 +1,7 @@
 ---
+agent: agent
 description: Generate a daily standup report for one or more services.
+argument-hint: Optional list of services to include in the report
 ---
 Generate a daily standup report for my services.
 If no specific services are provided, infer from current workspace and ask user to confirm.

@@ -1,4 +1,5 @@
 ---
+agent: agent
 description: Respond to an active production incident. Retrieves all active Davis Problems, explains root cause in plain English, surfaces user impact and affected traces, prioritizes by business severity, and generates a shareable incident report.
 ---
 

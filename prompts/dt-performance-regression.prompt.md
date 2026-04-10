@@ -1,5 +1,6 @@
 ---
-description: Analyze whether a recent deployment caused a performance regression.
+agent: agent
+description: Analyze whether a recent deployment caused a performance regression and recommend rollback or hotfix.
 ---
 
 # Performance Regression Analysis

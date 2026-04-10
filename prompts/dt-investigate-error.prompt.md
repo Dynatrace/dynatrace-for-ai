@@ -1,6 +1,9 @@
 ---
+agent: agent
 description: Investigate recent errors in a service using Davis Problems as the starting point (problems → logs → traces).
+argument-hint: Optional specific service or timeframe for the investigation
 ---
+
 Investigate recent errors in my service using Dynatrace Davis Problems as the entry point.
 Infer service-name from the current workspace. Ask user to confirm, or provide a specific timeframe/entity scope if unsure.
 
