@@ -14,7 +14,3 @@ We have a production incident. Help me investigate:
 
 Work through this systematically using Dynatrace.
 Be thorough but concise - this is an active incident.
-
----
-
-**Related skills:** dt-dql-essentials, dt-obs-problems, dt-obs-tracing, dt-obs-logs
