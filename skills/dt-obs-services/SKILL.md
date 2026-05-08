@@ -1,6 +1,6 @@
 ---
 name: dt-obs-services
-description: Service metrics, RED metrics (Rate, Errors, Duration), and runtime-specific telemetry for .NET, Java, Node.js, Python, PHP, and Go applications.
+description: "Query service RED metrics (Rate, Errors, Duration), analyze request throughput, track error rates and response times, assess SLA compliance, monitor messaging queues, and evaluate service mesh overhead. Includes runtime-specific telemetry for Java, .NET, Node.js, Python, PHP, and Go. Use when investigating service performance, latency issues, error spikes, throughput monitoring, APM analysis, or runtime troubleshooting."
 license: Apache-2.0
 ---
 
@@ -159,28 +159,7 @@ Technology-specific runtime performance and resource usage metrics.
 
 ---
 
-## When to Use This Skill
-
-✅ **Use for:**
-- Monitoring service performance (response time, errors, traffic)
-- Calculating SLA compliance
-- Analyzing service mesh performance
-- Monitoring messaging throughput and processing failures
-- Troubleshooting runtime-specific issues (GC, memory, threads)
-- Multi-cluster service comparison
-- Operation/endpoint-level analysis
-
-❌ **Don't use for:**
-- Infrastructure metrics (use infrastructure skills)
-- Log analysis (use logs skills)
-- Distributed tracing workflows (use traces/spans skills)
-- Database performance (use database skills)
-
----
-
 ## Agent Instructions
-
-### Understanding User Intent
 
 **Map user questions to capabilities:**
 
@@ -214,29 +193,15 @@ Technology-specific runtime performance and resource usage metrics.
 - Use `shift: -15m` for time-shifted baselines
 - **Example:** Performance degradation detection
 
-### Response Construction Guidelines
-
-**Always include:**
-1. **Metric name(s)** - Clear metric identifiers
-2. **Aggregation** - How data is aggregated (avg, sum, percentile)
-3. **Grouping** - Dimensions used (`dt.service.name`, `k8s.workload.name`, etc.)
-4. **Unit conversion** - Convert microseconds to milliseconds where appropriate
-5. **Filtering** - Relevant thresholds or conditions
-
-**When referencing runtime-specific content:**
-- **Check** user's technology stack first
-- **Provide** only relevant runtime queries (don't overwhelm with all 6 runtimes)
-- **Explain** runtime-specific metrics (e.g., "OPcache hit ratio" measures PHP opcode cache efficiency)
-
 ---
 
 ## Common Workflows
 
 ### Workflow: Service Health Check
 ```
-1. Check response time (RED metrics)
-2. Check error rate (RED metrics)
-3. Check traffic patterns (RED metrics)
+1. Check response time (RED metrics) → verify data exists for the time window
+2. Check error rate → if error_rate > 5%, escalate to span-based analysis
+3. Check traffic patterns → compare against baseline with shift: -1d
 4. If runtime-specific issues suspected → Load runtime-specific reference
 ```
 
@@ -244,21 +209,25 @@ Technology-specific runtime performance and resource usage metrics.
 ```
 1. Define SLA criteria (e.g., < 3s response time AND < 1% error rate)
 2. Use span-based query for custom SLA logic
-3. Calculate compliance percentage
-4. Filter non-compliant services
+3. Calculate compliance percentage → verify total count is meaningful (> 100 requests)
+4. Filter non-compliant services → cross-check against known maintenance windows
 ```
 
 ### Workflow: Service Mesh Analysis
 ```
-1. Check mesh response time
+1. Check mesh response time → verify mesh metrics exist (not all services use mesh)
 2. Compare mesh vs direct performance
-3. Calculate mesh overhead
+3. Calculate mesh overhead → flag if overhead > 20% of direct response time
 4. Analyze mesh failure rates
 ```
 
 ### Workflow: Runtime Troubleshooting
+```
 1. Identify technology stack → Load runtime-specific reference
-2. Check memory/GC metrics → threads/goroutines → runtime features
+2. Check memory/GC metrics → if GC suspension > 10%, investigate heap sizing
+3. Check threads/goroutines → look for monotonic growth indicating leaks
+4. Correlate with service RED metrics to confirm runtime impact
+```
 
 ---
 
