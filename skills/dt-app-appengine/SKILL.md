@@ -1,5 +1,11 @@
 # AppEngine  Development Skill
 
+
+| Name | Description | License |
+|---|---|---|
+| dt-app-appengine | Skill for building AppEngine for the Dynatrace Platform apps using the dt-app CLI and Claude Code, from ideation to deployment. | Apache-2.0 
+
+
 Create and Improve AppEngine application for the Dynatrace SaaS Platform 
 
 Skill to compliment the Dynatrace Platform 
@@ -501,7 +507,3 @@ Send completion notices to: [your-slack-channel or email]
 ```
 
 This pattern helps Claude Code stay aligned across long builds and compactification events. It is optional, but it pays off quickly on projects that span more than a few sessions.
-
----
-
-*Last updated: May 2026 · Send corrections and improvements to David.Beran@dynatrace.com*
