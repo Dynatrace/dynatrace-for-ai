@@ -47,7 +47,9 @@ Skip when:
 Before scaffolding, run this once and report any failures back to the user:
 
 ```bash
-node --version      # require >= 20.x LTS
+node --version      # require >= NodeJS version 24. 
+
+
 npm --version
 dt-app --version
 dtctl --version
