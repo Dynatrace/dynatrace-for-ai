@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Test: Validate structural consistency between skills/, plugin symlinks, and marketplace.json.
+# Test: Validate structural consistency between skills/, plugin manifests, and marketplace.json.
 #
 # Checks:
 #   1. Every skill dir has SKILL.md
-#   2. Every skill in skills/ has a corresponding symlink in plugins/dynatrace/skills/
-#   3. marketplace.json is valid and references the dynatrace plugin
-#   4. marketplace.json source uses ./ prefix
+#   2. .claude-plugin/plugin.json exists and has name "dynatrace"
+#   3. .cursor-plugin/plugin.json exists and has name "dynatrace"
+#   4. marketplace.json is valid, references the dynatrace plugin, source uses ./ prefix
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -14,7 +14,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 echo "=== test-structure.sh ==="
 
 python3 -c "
-import json, sys, os, re, pathlib
+import json, sys, pathlib
 
 root = pathlib.Path('$ROOT_DIR')
 errors = []
@@ -30,31 +30,23 @@ for d in sorted(skills_dir.iterdir()):
         else:
             errors.append(f'Skill dir {d.name}/ has no SKILL.md')
 
-# --- Check plugin skill symlinks ---
-plugin_skills_dir = root / 'plugins' / 'dynatrace' / 'skills'
-if plugin_skills_dir.exists():
-    linked_skills = set()
-    for entry in sorted(plugin_skills_dir.iterdir()):
-        if entry.name.startswith('dt-') and entry.is_symlink():
-            linked_skills.add(entry.name)
-
-    missing = sorted(disk_skills - linked_skills)
-    extra = sorted(linked_skills - disk_skills)
-    if missing:
-        errors.append(f'Plugin missing skill symlinks: {missing}')
-    if extra:
-        errors.append(f'Plugin has symlinks to non-existent skills: {extra}')
+# --- Check .claude-plugin/plugin.json ---
+claude_plugin_path = root / '.claude-plugin' / 'plugin.json'
+if not claude_plugin_path.exists():
+    errors.append('Missing .claude-plugin/plugin.json')
 else:
-    errors.append('Missing plugins/dynatrace/skills/ directory')
-
-# --- Check plugin.json ---
-plugin_json_path = root / 'plugins' / 'dynatrace' / '.claude-plugin' / 'plugin.json'
-if not plugin_json_path.exists():
-    errors.append('Missing plugins/dynatrace/.claude-plugin/plugin.json')
-else:
-    pj = json.loads(plugin_json_path.read_text())
+    pj = json.loads(claude_plugin_path.read_text())
     if pj.get('name') != 'dynatrace':
-        errors.append(f'plugin.json name is \"{pj.get(\"name\")}\" not \"dynatrace\"')
+        errors.append(f'.claude-plugin/plugin.json name is \"{pj.get(\"name\")}\" not \"dynatrace\"')
+
+# --- Check .cursor-plugin/plugin.json ---
+cursor_plugin_path = root / '.cursor-plugin' / 'plugin.json'
+if not cursor_plugin_path.exists():
+    errors.append('Missing .cursor-plugin/plugin.json')
+else:
+    pj = json.loads(cursor_plugin_path.read_text())
+    if pj.get('name') != 'dynatrace':
+        errors.append(f'.cursor-plugin/plugin.json name is \"{pj.get(\"name\")}\" not \"dynatrace\"')
 
 # --- Check marketplace.json ---
 mp_path = root / '.claude-plugin' / 'marketplace.json'
@@ -63,7 +55,7 @@ if not mp_path.exists():
 else:
     mp = json.loads(mp_path.read_text())
     plugins = mp.get('plugins', [])
-    dynatrace_plugin = next((plugin for plugin in plugins if plugin.get('name') == 'dynatrace'), None)
+    dynatrace_plugin = next((p for p in plugins if p.get('name') == 'dynatrace'), None)
     if dynatrace_plugin is None:
         errors.append('marketplace.json does not reference the \"dynatrace\" plugin')
     elif not dynatrace_plugin.get('source', '').startswith('./'):
@@ -74,7 +66,9 @@ if errors:
         print(f'FAIL: {e}', file=sys.stderr)
     sys.exit(1)
 
-print(f'  {len(disk_skills)} skills on disk, all linked in plugin')
+print(f'  {len(disk_skills)} skills on disk')
+print('  .claude-plugin/plugin.json valid')
+print('  .cursor-plugin/plugin.json valid')
 print('  marketplace.json valid')
 "
 

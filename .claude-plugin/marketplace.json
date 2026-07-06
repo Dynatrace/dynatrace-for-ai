@@ -6,7 +6,7 @@
     {
       "name": "dynatrace",
       "description": "Dynatrace observability skills for AI agents.",
-      "source": "."
+      "source": "./"
     }
   ]
 }
