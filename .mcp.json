@@ -1,10 +1,10 @@
 {
   "mcpServers": {
     "dynatrace": {
-      "command": "npx",
-      "args": ["-y", "@dynatrace-oss/dynatrace-mcp-server@latest"],
-      "env": {
-        "DT_ENVIRONMENT": "${DT_ENVIRONMENT}"
+      "type": "http",
+      "url": "https://${DT_ENVIRONMENT_ID}.apps.dynatrace.com/platform-reserved/mcp-gateway/v0.1/servers/dynatrace-mcp/mcp",
+      "headers": {
+        "Authorization": "Bearer ${DT_PLATFORM_TOKEN}"
       }
     }
   }
