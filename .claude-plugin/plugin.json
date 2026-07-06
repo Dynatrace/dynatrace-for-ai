@@ -5,5 +5,6 @@
   "author": { "name": "Dynatrace" },
   "homepage": "https://www.dynatrace.com",
   "repository": "https://github.com/Dynatrace/dynatrace-for-ai",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "mcpServers": "./.mcp.json"
 }
