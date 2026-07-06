@@ -2,10 +2,8 @@
   "mcpServers": {
     "dynatrace": {
       "type": "http",
-      "url": "https://${DT_ENVIRONMENT_ID:-}.apps.dynatrace.com/platform-reserved/mcp-gateway/v0.1/servers/dynatrace-mcp/mcp",
-      "headers": {
-        "Authorization": "Bearer ${DT_PLATFORM_TOKEN:-}"
-      }
+      "url": "https://${DT_ENVIRONMENT_ID:-not-setup}.apps.dynatrace.com/platform-reserved/mcp-gateway/v0.1/servers/dynatrace-mcp/mcp",
+      "headersHelper": "${CLAUDE_PLUGIN_ROOT}/bin/dt-auth-headers.sh"
     }
   }
 }

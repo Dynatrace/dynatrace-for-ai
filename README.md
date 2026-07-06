@@ -21,14 +21,11 @@ claude plugin marketplace add dynatrace/dynatrace-for-ai
 claude plugin install dynatrace@dynatrace-for-ai
 ```
 
-The plugin includes the Dynatrace MCP server. Set these environment variables before starting Claude Code to connect it to your environment:
-
-```bash
-export DT_ENVIRONMENT_ID=<your-environment-id>   # e.g. abc12345
-export DT_PLATFORM_TOKEN=<your-platform-token>
-```
+The plugin includes the Dynatrace MCP server. After installing, run `/dtsetup` inside Claude Code to connect it to your environment — the skill will ask for your environment ID and a platform token and configure the server automatically.
 
 Update with `claude plugin marketplace update && claude plugin update dynatrace@dynatrace-for-ai`.
+
+> **Advanced:** Set `DT_ENVIRONMENT_ID` and `DT_PLATFORM_TOKEN` as environment variables before launching `claude` to skip `/dtsetup`.
 
 ### Manual
 
@@ -54,7 +51,7 @@ Or install the dtctl skill with dtctl itself: `dtctl skills install`
 
 ### Dynatrace MCP Server
 
-The **[Dynatrace MCP server](https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server)** provides Dynatrace API access via MCP. The Claude Code plugin bundles the MCP server configuration automatically — just set `DT_ENVIRONMENT_ID` and `DT_PLATFORM_TOKEN` as shown above. For other agents that support MCP natively, see the [MCP server docs](https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server).
+The **[Dynatrace MCP server](https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server)** provides Dynatrace API access via MCP. The Claude Code plugin bundles the MCP server and configures it interactively via `/dtsetup`. For other agents that support MCP natively, see the [MCP server docs](https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server).
 
 ## Skills
 
