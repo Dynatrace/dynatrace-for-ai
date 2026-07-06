@@ -1,5 +1,6 @@
 {
   "name": "dynatrace-for-ai",
+  "description": "Dynatrace observability skills and knowledge packages for AI coding agents.",
   "owner": {
     "name": "Dynatrace"
   },
