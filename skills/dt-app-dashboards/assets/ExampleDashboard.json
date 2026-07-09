@@ -15,10 +15,7 @@
         "query": "timeseries avg(dt.service.request.response_time), by:{dt.smartscape.service}",
         "visualization": "lineChart",
         "visualizationSettings": {
-          "chartSettings": {
-            "xAxisScaling": "analyzedTimeframe",
-            "legend": { "position": "right" }
-          },
+          "legend": { "position": "right", "showLegend": true },
           "thresholds": [
             {
               "id": 1,
@@ -26,9 +23,9 @@
               "title": "",
               "isEnabled": true,
               "rules": [
-                { "id": 0, "color": { "Default": "var(--dt-colors-charts-status-ideal-default, #2f6862)" }, "comparator": "≥", "label": "OK", "value": 0 },
-                { "id": 1, "color": { "Default": "var(--dt-colors-charts-status-warning-default, #eea53c)" }, "comparator": "≥", "label": "WARN", "value": 4000000 },
-                { "id": 2, "color": { "Default": "var(--dt-colors-charts-status-critical-default, #c62239)" }, "comparator": "≥", "label": "CRITICAL", "value": 8000000 }
+                { "id": 0, "color": { "Default": "var(--dt-colors-charts-status-ideal-default, #2f6862)" }, "comparator": ">=", "label": "OK", "value": 0 },
+                { "id": 1, "color": { "Default": "var(--dt-colors-charts-status-warning-default, #eea53c)" }, "comparator": ">=", "label": "WARN", "value": 4000000 },
+                { "id": 2, "color": { "Default": "var(--dt-colors-charts-status-critical-default, #c62239)" }, "comparator": ">=", "label": "CRITICAL", "value": 8000000 }
               ]
             }
           ],
@@ -44,9 +41,8 @@
         "query": "fetch dt.davis.events\n| summarize count(), by:{event.category}",
         "visualization": "donutChart",
         "visualizationSettings": {
-          "chartSettings": {
-            "circleChartSettings": { "valueType": "relative" }
-          }
+          "labels": { "showLabels": true },
+          "valueSettings": { "valueRepresentation": "relative" }
         },
         "querySettings": {}
       },
@@ -56,12 +52,9 @@
         "query": "fetch dt.davis.events\n| summarize count=count()",
         "visualization": "singleValue",
         "visualizationSettings": {
-          "singleValue": {
-            "colorThresholdTarget": "value",
-            "recordField": "count",
-            "label": "Number Events",
-            "isIconVisible": true
-          },
+          "colorThresholdTarget": "value",
+          "showIcon": true,
+          "label": { "label": "Number Events", "mode": "custom" },
           "unitsOverrides": [
             { "identifier": "count", "unitCategory": "unspecified", "baseUnit": "count", "displayUnit": null, "decimals": null, "suffix": "", "delimiter": false, "added": 1770205033513 }
           ]
