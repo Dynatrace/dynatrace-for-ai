@@ -28,6 +28,9 @@ export DT_ENVIRONMENT=https://<env>.apps.dynatrace.com   # e.g. https://abc12345
 export DT_PLATFORM_TOKEN=<your-platform-token>
 ```
 
+Please consult the [Dynatrace MCP server docs
+](https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server) for a full list of scopes required for using the MCP Server with a Platform Token.
+
 Update with `claude plugin marketplace update && claude plugin update dynatrace@dynatrace-for-ai`.
 
 ### Manual
