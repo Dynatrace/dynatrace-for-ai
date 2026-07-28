@@ -83,12 +83,19 @@ The **[Dynatrace MCP server](https://docs.dynatrace.com/docs/shortlink/dynatrace
 | [dt-obs-problems](skills/dt-obs-problems/SKILL.md) | Problem entities, root cause analysis, impact assessment, and problem correlation. |
 | [dt-obs-predictive-analytics](skills/dt-obs-predictive-analytics/SKILL.md) | Time series forecasting, capacity saturation planning, and trend/anomaly detection across hosts, services, and infrastructure. |
 | [dt-alerting](skills/dt-alerting/SKILL.md) | End-to-end alerting lifecycle: anomaly detector setup, alert events in Grail, problem grouping, and workflow notification routing. |
+| [dt-obs-analytics](skills/dt-obs-analytics/SKILL.md) | Analyze Dynatrace dashboards and notebooks with Davis analyzers: anomaly detection, novelty scoring, and metric correlation. |
+| [dt-obs-ext-monitors](skills/dt-obs-ext-monitors/SKILL.md) | Ingest third-party test and monitor results into Dynatrace Grail via the platform events ingest API. |
+| [dt-obs-genai](skills/dt-obs-genai/SKILL.md) | Analyze observability signals from GenAI applications: golden signals, LLM cost/token analytics, agent tool-call behavior, and evaluation results. |
+| [dt-obs-log-semantic-mapping](skills/dt-obs-log-semantic-mapping/SKILL.md) | Suggest and validate semantic dictionary mappings for audit log integrations, using vendor log payloads or live ingested events. |
 
 ### Security
 
 | Skill | Description |
 |-------|-------------|
 | [dt-sec-insights](skills/dt-sec-insights/SKILL.md) | Query and analyze security data in `security.events`: Runtime Vulnerability Analytics, Runtime Application Protection, Automated Detections (MITRE ATT&CK), and Security Posture Management (KSPM/CSPM). |
+| [dt-sec-contextualization](skills/dt-sec-contextualization/SKILL.md) | Resolve security signals and IoC matches to runtime entities, and connect findings across topology levels through a shared runtime entity. |
+| [dt-sec-ioc-hunting](skills/dt-sec-ioc-hunting/SKILL.md) | Hunt threat-intelligence indicators of compromise across logs and spans, producing a threat-exposure score. |
+| [dt-sec-semantic-mapping](skills/dt-sec-semantic-mapping/SKILL.md) | Suggest and validate semantic dictionary mappings for new security integrations, using vendor API samples or live events. |
 
 ### Mobile Instrumentation
 
@@ -96,7 +103,7 @@ The **[Dynatrace MCP server](https://docs.dynatrace.com/docs/shortlink/dynatrace
 |-------|-------------|
 | [dt-obs-android](skills/dt-obs-android/SKILL.md) | Instrument an existing Android project (Kotlin or Java) with the Dynatrace Mobile Agent: Gradle plugin, agent config, and user privacy opt-in. |
 | [dt-obs-flutter](skills/dt-obs-flutter/SKILL.md) | Integrate the Dynatrace Flutter Plugin: dependency setup, config, SDK bootstrap, navigation tracking, and verification. |
-| [dt-obs-ios-sdk](skills/dt-obs-ios-sdk/SKILL.md) | Set up the Dynatrace iOS SDK via Swift Package Manager: SPM dependency, Dynatrace.plist config, privacy opt-in, and Xcode build verification. |
+| [dt-obs-ios](skills/dt-obs-ios/SKILL.md) | Set up the Dynatrace iOS SDK via Swift Package Manager: SPM dependency, Dynatrace.plist config, privacy opt-in, and Xcode build verification. |
 | [dt-obs-react-native](skills/dt-obs-react-native/SKILL.md) | Integrate the Dynatrace React Native Plugin for bare React Native and Expo: dependency setup, dynatrace.config.js, Babel registration, navigation tracking, and verification. |
 
 ### Platform
