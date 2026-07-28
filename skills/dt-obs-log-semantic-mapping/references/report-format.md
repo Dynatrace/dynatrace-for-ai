@@ -38,11 +38,12 @@
 ### OpenPipeline Processor Sketch
 
 ```dql-snippet
-| parseJson content, prefix:"c."
-| fieldsAdd audit.identity = c.username
-| fieldsAdd actor.ips = array(c.ip_address)
-| fieldsAdd audit.result = if(c.success == "True", "Succeeded", "Failed")
-| fieldsAdd loglevel = if(c.success == "True", "INFO", "ERROR")
+// parseJson is NOT an OpenPipeline function — use parse content, "json:content" + subscript access instead.
+| parse content, "json:content"                          // turn JSON string into a structured record
+| fieldsAdd audit.identity = content[username]           // subscript access: content[key] for JSON keys
+| fieldsAdd actor.ips = array(toIp(content[ip_address])) // → ipAddress[]
+| fieldsAdd audit.result = if(content[success] == "True", "Succeeded", else: "Failed")
+| fieldsAdd loglevel = if(content[success] == "True", "INFO", else: "ERROR")
 | fieldsAdd status = loglevel
 ```
 

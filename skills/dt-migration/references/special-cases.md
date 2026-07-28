@@ -95,21 +95,25 @@ smartscapeNodes CONTAINER
 
 ## Classic IDs
 
-Classic entity IDs do not carry over automatically to Smartscape IDs. The suffix changes.
+Classic entity IDs do not carry over automatically to Smartscape IDs.
 
 ### Rules
 
-- do not reuse classic entity IDs blindly
-- do not use `id_classic`
-- use Smartscape `id`
-- if the correct Smartscape ID is unknown, add an explicit assumption and a lookup hint
+- `id_classic` is valid **only inside a `smartscapeNodes` lookup predicate** to resolve a classic ID to its Smartscape equivalent
+- do not use `id_classic` as an output field or join key in signal queries
+- use Smartscape `id` with `toSmartscapeId()` in signal filters
 
-Example lookup hint:
+### Lookup query
+
+Use the variadic `in()` form to resolve one or more classic IDs in a single query:
 
 ```dql
-smartscapeNodes HOST
-| fields id, name
+smartscapeNodes "*" | filter in(id_classic, {"$classic-id-placeholder"}) | fields id, id_classic, name, type
 ```
+
+Replace `$classic-id-placeholder` with the actual classic entity ID (e.g. `SERVICE-C55BE95B0B7219CD`). For multiple IDs, add them as additional arguments: `in(id_classic, {"A", "B", "C"})`.
+
+The wildcard `"*"` searches across all node types, which is necessary when the entity type changes between classic and Smartscape (e.g. `CLOUD_APPLICATION-xxx` → `K8S_DEPLOYMENT-yyy`).
 
 ## Missing or planned mappings
 

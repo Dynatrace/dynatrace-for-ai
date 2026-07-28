@@ -63,6 +63,56 @@ smartscapeNodes K8S_POD
   kubernetesClusterName = k8s.cluster.name
 ```
 
+## Signal query migration with hardcoded IDs
+
+When `dt.entity.cloud_application` appears in a `timeseries filter:` with a hardcoded `CLOUD_APPLICATION-xxx` ID, both the dimension field **and the entity ID** change. Unlike SERVICE or HOST migrations, `toSmartscapeId("CLOUD_APPLICATION-xxx")` does not resolve to the correct Smartscape node because the entity type prefix changes (e.g. `CLOUD_APPLICATION-xxx` → `K8S_DEPLOYMENT-yyy`).
+
+### Step 1 — Resolve the new ID
+
+Use the variadic `in()` form to resolve one or more classic IDs in a single query:
+
+```dql
+smartscapeNodes "*" | filter in(id_classic, {"CLOUD_APPLICATION-xxx"}) | fields id, id_classic, name, type
+```
+
+For multiple IDs, add them as additional arguments:
+
+```dql
+smartscapeNodes "*" | filter in(id_classic, {"CLOUD_APPLICATION-aaa", "CLOUD_APPLICATION-bbb", "CLOUD_APPLICATION-ccc"}) | fields id, id_classic, name, type
+```
+
+The result gives the new Smartscape ID (e.g. `K8S_DEPLOYMENT-yyy`). Determine which workload type it belongs to (`K8S_DEPLOYMENT`, `K8S_DAEMONSET`, `K8S_STATEFULSET`, etc.) from the returned ID prefix.
+
+### Step 2 — Rewrite the signal filter
+
+Before:
+
+```dql-snippet
+filter: in(dt.entity.cloud_application, {"CLOUD_APPLICATION-xxx"})
+```
+
+After:
+
+```dql-snippet
+filter: in(dt.smartscape.k8s_deployment, { toSmartscapeId("K8S_DEPLOYMENT-yyy") })
+```
+
+The Smartscape dimension field must match the resolved workload type, so DQL queries must be adopted.
+
+`K8S_DEPLOYMENT` -> `dt.smartscape.k8s_deployment`
+
+`K8S_DAEMONSET` -> `dt.smartscape.k8s_daemonset`
+
+`K8S_STATEFULSET` -> `dt.smartscape.k8s_statefulset`
+
+`K8S_REPLICASET` -> `dt.smartscape.k8s_replicaset`
+
+`K8S_REPLICATIONCONTROLLER` -> `dt.smartscape.k8s_replicationcontroller`
+
+`K8S_JOB` -> `dt.smartscape.k8s_job`
+
+`K8S_DEPLOYMENTCONFIG` -> `dt.smartscape.k8s_deploymentconfig`
+
 ## Related references
 
 - [entity-kubernetes.md](entity-kubernetes.md)

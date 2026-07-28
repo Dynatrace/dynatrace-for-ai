@@ -185,23 +185,24 @@ Classic entity IDs do not automatically carry over to Smartscape.
 
 ### Rule
 
-- never use `id_classic`
-- when comparing to a Smartscape ID literal, wrap it with `toSmartscapeId()`
+- `id_classic` is valid **only inside a `smartscapeNodes` lookup predicate** to resolve a classic ID to its Smartscape equivalent
+- do not use `id_classic` as an output field or join key in signal queries
+- once you have the Smartscape ID, wrap it with `toSmartscapeId()` in signal filters
 
-Example:
+### Lookup query
+
+Use the variadic `in()` form to resolve one or more classic IDs in a single query:
+
+```dql
+smartscapeNodes "*" | filter in(id_classic, {"$classic-id-placeholder"}) | fields id, id_classic, name, type
+```
+
+Replace `$classic-id-placeholder` with the actual classic entity ID (e.g. `HOST-8CBE06F58F5E99DA`). For multiple IDs, add them as additional arguments: `in(id_classic, {"A", "B", "C"})`.
+
+When the entity type changes (e.g. `CLOUD_APPLICATION-xxx` → `K8S_DEPLOYMENT-yyy`), the lookup is mandatory because the new ID has a different prefix — `toSmartscapeId("CLOUD_APPLICATION-xxx")` does not resolve to the correct Smartscape node.
+
+### Usage in signal filter
 
 ```dql-snippet
 | filter in(dt.smartscape.host, { toSmartscapeId("HOST-ABC123") })
-```
-
-### Open assumption pattern
-
-If the classic query filters by a specific classic entity ID and the matching Smartscape ID is unknown, call that out as an assumption and tell the user how to look it up.
-
-Example note:
-
-```dql
-// ASSUMPTION: Replace the old classic host ID with the matching Smartscape host ID.
-// Look it up with:
-smartscapeNodes HOST | fields id, name
 ```

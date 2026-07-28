@@ -3,15 +3,15 @@
 "Most vulnerable hosts / K8s workloads / components" and "which entities are affected
 by CVE X" for **Dynatrace-native RVA**. These build on the canonical RVA snapshot
 pipeline — **Steps 1–3** in
-[vulnerabilities.md § DT RVA: Full Snapshot Queries](vulnerabilities.md#dt-rva-full-snapshot-queries)
+[vulnerabilities-dynatrace.md § DT RVA: Full Snapshot Queries](vulnerabilities-dynatrace.md#dt-rva-full-snapshot-queries)
 — and resolve entity identity via `smartscapeNodes` (DT RVA carries
 `related_entities.*` / `affected_entity.*`, not the external `object.*` identifiers).
 
 > **Related references:** scoping RVA to a *known* entity (filter, not rank) →
-> [vulnerabilities.md § Entity Scoping Workflows](vulnerabilities.md#dt-rva-entity-scoping-workflows) ·
+> [vulnerabilities-dynatrace.md § Entity Scoping Workflows](vulnerabilities-dynatrace.md#dt-rva-entity-scoping-workflows) ·
 > external-scanner component rankings → [vulnerabilities-external.md](vulnerabilities-external.md) ·
 > mapping *external* findings to entities (3-way match / host-by-IP / cloud) →
-> [entity-enrichment.md](entity-enrichment.md).
+> [entity-enrichment.md](../../dt-sec-contextualization/references/entity-enrichment.md).
 
 ## Contents
 
@@ -41,7 +41,7 @@ on RVA events carry *classic* (2nd-gen) entity ids. To rank or list by entity:
 Rank on the resolved Smartscape identity — never on the raw
 `related_entities.<group>.names` array, which can carry stale or duplicate names.
 The host and workload recipes below are concrete instances of this pattern;
-[vulnerabilities.md § Named entity list for a specific vulnerability](vulnerabilities.md#named-entity-list-for-a-specific-vulnerability)
+[vulnerabilities-dynatrace.md § Named entity list for a specific vulnerability](vulnerabilities-dynatrace.md#named-entity-list-for-a-specific-vulnerability)
 (Option B) shows the same shape for an arbitrary entity type via `smartscapeNodes "*"`.
 
 ## Top vulnerable components (libraries) — DT RVA
@@ -88,7 +88,7 @@ id — do not rank on the raw `related_entities.hosts.names` array.
 > (`if(affected_entity.type == "HOST", collectArray(...), else: array())`) is
 > rejected with `INVALID_MIX_OF_AGGREGATIONS_AND_OTHER_EXPRESSIONS`. A plain
 > record-level `fieldsAdd` after the dedup is valid and is the correct place.
-> See [mistakes-and-troubleshooting.md item #43](mistakes-and-troubleshooting.md).
+> See [common-patterns.md § Mistakes #45](common-patterns.md#mistakes-to-avoid).
 
 ```dql-snippet
 // After Step-1 dedup, BEFORE the Step-3 summarize — merge the directly-affected

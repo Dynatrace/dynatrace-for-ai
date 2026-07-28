@@ -20,6 +20,7 @@ entity scoping. Use this as the field dictionary when building any DQL query aga
 - [Vulnerability Fields (external — raw stream)](#vulnerability-fields-external--raw-stream)
 - [Compliance Fields (SPM — post-aggregation)](#compliance-fields-spm--post-aggregation)
 - [Coverage Fields (`VULNERABILITY_SCAN`)](#coverage-fields-vulnerability_scan)
+- [Threat Intelligence Fields (`THREAT_REPORT`)](#threat-intelligence-fields-threat_report)
 - [Finding ID Format Cheatsheet](#finding-id-format-cheatsheet)
 
 ---
@@ -30,6 +31,7 @@ entity scoping. Use this as the field dictionary when building any DQL query aga
 |---|---|---|
 | `DETECTION_FINDING` | Behavioral detection / threat alert | DT RAP (OneAgent — `product.name == "Runtime Application Protection"`), DT Automated Detections (`event.provider == "Dynatrace Automated Detections"`), AutomationEngine, and external detection sources (cloud-security / SIEM / WAF, ingested) |
 | `DETECTION_EXECUTION_SUMMARY` | Audit row emitted **per Automated Detections rule run** — was the rule triggered, how many records scanned, did it succeed or warn | DT Automated Detections only. Both `event.provider == "Dynatrace Automated Detections"` and `product.name == "Automated Detections"` are populated; either filter works equivalently. This skill prefers `event.provider == "Dynatrace Automated Detections"` to keep the filter symmetric with `DETECTION_FINDING` queries. One row per rule execution; carries `execution.id`, scan stats (`eventsWritten`, `scannedRecords`, `scannedBytes`), `analysisTimeframeStart` / `End`, status (`SUCCESS` / `SUCCESS_W_WARNINGS` / `FAILURE`). Not a finding; query separately when investigating "did my rule fire?" |
+| `THREAT_REPORT` | Threat intelligence report (external campaign / adversary report / IOC feed) — **NOT a finding** | External TI platforms — AlienVault OTX (`event.provider == "AlienVault OTX"`), CrowdStrike Falcon Intelligence (`event.provider == "CrowdStrike"`). Describes threats **in the wild**, not on your entities: no `finding.*` / `object.*` / `dt.security.risk.level`, no affected entity, no scan cycle. Dedup by `threat.report.id`. Query via [threat-intelligence.md](threat-intelligence.md) — **excluded from cross-provider finding summaries and the double-counting guard.** |
 | `VULNERABILITY_FINDING` | Software / component vulnerability | **External SCA / SAST / image scanners** (ingested). **Also emitted by Dynatrace's vulnerability-scan-service** as the raw per-scan finding feed — but use the RVA state-report types below for queries about "current Dynatrace vulnerabilities." |
 | `COMPLIANCE_FINDING` | Misconfiguration / policy violation | DT SPM (`product.vendor == "Dynatrace"`) and external compliance / posture tools (ingested) |
 | `VULNERABILITY_SCAN` | Coverage event — a vulnerability scan ran | DT RVA (`product.vendor == "Dynatrace"`) and external. Lowercase `dt.source_entity.type` (`process_group_instance` / `host`). |
@@ -49,6 +51,9 @@ entity scoping. Use this as the field dictionary when building any DQL query aga
   `scan.id`.
 - External vulnerability / compliance findings always use `VULNERABILITY_FINDING`
   / `COMPLIANCE_FINDING`.
+- **`THREAT_REPORT` is threat intelligence, not a finding** — never mix it into the
+  cross-provider `*_FINDING` summary or the DT-inclusive posture overview. It has its own
+  query patterns in [threat-intelligence.md](threat-intelligence.md).
 
 ### RVA cadence
 
@@ -74,6 +79,8 @@ entity scoping. Use this as the field dictionary when building any DQL query aga
 | _external cloud-security / SIEM / SOAR_ | (varies) | (non-`Dynatrace`) | Cloud posture/threat services, identity/sign-in, WAF/edge, SIEM detections — ingested via OpenPipeline |
 | _external SCA / SAST / image scanners_ | (varies) | (non-`Dynatrace`) | Software-composition, code, and container-image scanners — may carry provider-specific namespaces (e.g. `<vendor>.*`) |
 | _custom / OCSF ingest_ | (varies) | (varies) | Anything conforming to the SD `*_FINDING` schema via custom HTTP / OpenPipeline |
+| `AlienVault OTX` | `AlienVault OTX` | `LevelBlue` | **Threat intelligence** (`event.type == "THREAT_REPORT"`) — OTX pulses + IOCs. Not a finding; see [threat-intelligence.md](threat-intelligence.md). |
+| `CrowdStrike` | `Falcon Intelligence` | `CrowdStrike` | **Threat intelligence** (`event.type == "THREAT_REPORT"`) — Falcon Intelligence reports + IOCs. Not a finding; see [threat-intelligence.md](threat-intelligence.md). |
 
 External rows are deliberately not enumerated — discover the active providers and scope to one
 via [all-security-events.md § Scoping to a Specific Provider](all-security-events.md#scoping-to-a-specific-provider-any-finding-type).
@@ -131,7 +138,7 @@ When filtering findings by entity ID/name, use one (or all in an OR chain — se
 > | Event family | Entity namespaces present | Entity namespaces absent |
 > |---|---|---|
 > | `DETECTION_FINDING`, `COMPLIANCE_FINDING`, external `VULNERABILITY_FINDING`, `VULNERABILITY_SCAN`, `COMPLIANCE_SCAN` | `dt.smartscape*` (3rd-gen), `dt.entity*` (2nd-gen); `dt.source_entity` only as a legacy / event-family-specific fallback | `affected_entity.*`, `related_entities.*` (RVA-specific, null here) |
-> | `VULNERABILITY_STATE_REPORT_EVENT`, `VULNERABILITY_STATUS_CHANGE_EVENT`, `VULNERABILITY_TRACKING_LINK_CHANGE_EVENT` (RVA) | `affected_entity.*` (classic ID + name + type, resolved in-event), `related_entities.{kubernetes_workloads,kubernetes_clusters,applications,services,hosts,databases}.{ids,names}` (blast-radius classic IDs + names; `.ids` type prefix ≠ group name — see [vulnerabilities.md § Classic ID prefix gotcha](vulnerabilities.md#classic-id-prefix-gotcha)) | `dt.smartscape*`, `dt.entity*`, `dt.source_entity` (null on RVA events) |
+> | `VULNERABILITY_STATE_REPORT_EVENT`, `VULNERABILITY_STATUS_CHANGE_EVENT`, `VULNERABILITY_TRACKING_LINK_CHANGE_EVENT` (RVA) | `affected_entity.*` (classic ID + name + type, resolved in-event), `related_entities.{kubernetes_workloads,kubernetes_clusters,applications,services,hosts,databases}.{ids,names}` (blast-radius classic IDs + names; `.ids` type prefix ≠ group name — see [vulnerabilities-dynatrace.md § Classic ID prefix gotcha](vulnerabilities-dynatrace.md#classic-id-prefix-gotcha)) | `dt.smartscape*`, `dt.entity*`, `dt.source_entity` (null on RVA events) |
 >
 > For raw-listing projection guidance per event family see [common-patterns.md § 17](common-patterns.md#17-entity-identifier-preservation-on-raw-listings).
 
@@ -277,7 +284,7 @@ limited to SQL/command injection; JNDI/SSRF are Java-only).
 
 The raw `VULNERABILITY_STATE_REPORT_EVENT` carries one row per
 `(vulnerability, affected_entity)` pair. The canonical RVA Stage-3 `fieldsAdd`
-(see [vulnerabilities.md](vulnerabilities.md)) collapses these per-entity rows
+(see [vulnerabilities-dynatrace.md](vulnerabilities-dynatrace.md)) collapses these per-entity rows
 into vulnerability-level verdicts. Some fields below exist only in the raw
 stream, some only post-aggregation, some in both.
 
@@ -425,6 +432,18 @@ They use the cross-provider normalized fields documented in [§ Common Fields](#
 > `Medium → 6.9`, `Low → 3.9`, `Other / unknown → 0.0`. Use
 > `dt.security.risk.level` rather than provider-specific severity fields for
 > cross-provider comparisons.
+
+> **`finding.id` composition.** `finding.id` is a deterministic hash of
+> `object.id` + `vulnerability.id` + `component.name` + `component.version` +
+> `product.name` + `product.vendor`. `dedup finding.id` is the canonical grain for
+> Dynatrace-generated findings — it collapses the same finding re-emitted each scan
+> cycle (~15 min) to a single latest row.
+
+> **DT-generated `VULNERABILITY_FINDING` entity/scope fields.** DT-generated findings
+> carry `dt.security.risk.level` / `dt.security.risk.score`, `software_component.purl`,
+> `finding.time.created`, and `dt.smartscape.process` with `dt.smartscape_source.type`
+> — scope by entity via Smartscape. They do **not** carry the embedded
+> `affected_entity.*` / `related_entities.*` arrays that RVA state reports do.
 
 ---
 
@@ -593,7 +612,7 @@ SBOM scan request. They mark "this entity was assessed at this time."
 
 For coverage queries against `VULNERABILITY_SCAN`:
 `filter product.feature == "Code-level Vulnerability Analytics"` scopes to CLV scans;
-`filterOut product.feature == "Code-level Vulnerability Analytics"` scopes to third-party / OS scans (which have null `product.feature`). See [coverage.md](coverage.md) for canonical patterns.
+`filterOut product.feature == "Code-level Vulnerability Analytics"` scopes to third-party / OS scans (which have null `product.feature`). See [coverage-and-dashboards.md](coverage-and-dashboards.md) for canonical patterns.
 
 > **Scanning is event-driven, not periodic.** Scans run when an agent submits
 > an SBOM. There is no fixed cadence; in practice every monitored process
@@ -601,6 +620,53 @@ For coverage queries against `VULNERABILITY_SCAN`:
 > 24h–7d is a meaningful signal that scanning didn't happen, not just a quiet
 > period. Coverage analysis windows: `7d` for "is this entity ever scanned",
 > `2h–24h` for "recently scanned".
+
+---
+
+## Threat Intelligence Fields (`THREAT_REPORT`)
+
+`THREAT_REPORT` events are **threat intelligence reports** (external campaigns / IOC feeds), **not
+findings**. They carry **none** of the finding/entity/risk fields above — no `finding.*`, `object.*`,
+`dt.security.risk.level`/`score`, `dt.smartscape*`/`dt.entity*`, and no scan events. One event per
+published report; **dedup by `threat.report.id`** (reports re-ingest on update). Full query patterns
+and the threat-exposure correlation workflow → [threat-intelligence.md](threat-intelligence.md).
+
+### Report identity & provenance (required)
+
+| Field | Notes |
+|---|---|
+| `threat.report.id` | Vendor-assigned report ID — **dedup key** (stable across revisions) |
+| `threat.report.name` | Report title (e.g. `CSA-260753 …`, `IMMEDIATE THREAT: …`) |
+| `threat.report.description` | Summary / abstract (≤2 KB) |
+| `threat.report.time.created` / `.updated` | `timestamp` type (nullable) — use `coalesce(toTimestamp(…), timestamp)` |
+| `threat.report.author` | Publishing author / team (optional) |
+| `threat.report.references.urls` / `.tags` | Report URLs / free-form tags (optional arrays) |
+
+### Adversary context (recommended)
+
+| Field | Notes |
+|---|---|
+| `threat.actor.names` | Attributed threat-actor names/aliases (array) |
+| `threat.target.countries.names` / `.iso_codes` | Targeted countries (full names / ISO 3166-1 alpha-2 — use `.iso_codes` for maps) |
+| `threat.target.industries` | Targeted industry verticals (**plural** — `threat.target.industry` singular does not exist) |
+| `threat.malware.families` | Malware family names (array) |
+| `threat.attack.{tactic,technique,subtechnique}.{ids,names}`, `threat.attack.version` | MITRE ATT&CK of the **reported campaign** (separate arrays). Membership via `in(value, array)`. This is intel about threats in the wild — **not** ATT&CK observed on your entities (that's `detections.md`). |
+
+### Observables / IOCs (optional)
+
+| Field | Notes |
+|---|---|
+| `threat.observables.ips` | IOC IPv4/IPv6 (`ipAddress[]`) |
+| `threat.observables.domains` / `.urls` / `.emails` | Domain / URL / email IOCs |
+| `threat.observables.cves` | Referenced CVE IDs |
+| `threat.observables.hashes.md5` / `.sha1` / `.sha256` | File-hash IOCs |
+
+### Vendor extensions (additive — no SD counterpart)
+
+| Field | Notes |
+|---|---|
+| `alienvault.pulse.public` / `alienvault.pulse.tlp` | AlienVault OTX: public flag / TLP (`WHITE` \| `GREEN`) |
+| `crowdstrike.report.slug` / `.type` / `.type.id` / `.type.name` | CrowdStrike: report slug + type (`Notice` \| `Tipper` \| `Periodic Report` \| `Intelligence Report` \| `Recon+`) |
 
 ---
 

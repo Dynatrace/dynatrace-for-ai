@@ -23,6 +23,8 @@ Keep the same pattern when adding more examples:
 - [Example 011: container plus affected-entity mapping](#example-011-container-plus-affected-entity-mapping)
 - [Example 012: mass data migration end-to-end with fieldsSnapshot](#example-012-mass-data-migration-end-to-end-with-fieldssnapshot)
 - [Example 013: `timeseries filter` with tag-based entity sub-query](#example-013-timeseries-filter-with-tag-based-entity-sub-query)
+- [Example 014: `timeseries filter` with related-entity traversal subquery](#example-014-timeseries-filter-with-related-entity-traversal-subquery)
+- [Example 015: Davis Problems entity filter with edge join and dedup](#example-015-davis-problems-entity-filter-with-edge-join-and-dedup)
 
 ## Example 001: `classicEntitySelector` filter without relationships
 
@@ -440,3 +442,85 @@ timeseries usage=avg(dt.host.cpu.usage),
 - `dt.entity.host` → `dt.smartscape.host` (standard dimension migration)
 - `in(dt.entity.host, classicEntitySelector(...))` → `dt.smartscape.host in [...]`: the `in()` function does not accept execution blocks — use the `in` **operator** (`field in [execution block]`) when the right-hand side is a sub-query
 - `tags("BF")` in the classic selector matches hosts tagged with `BF`; in Smartscape, `tags ~ "BF"` uses substring matching on the serialized tag string, which also matches tags whose key or value *contains* `BF` — use an exact match if needed: ``tags[`BF`] == <value>`` or ``isNotNull(tags[`BF`]``
+
+## Example 014: `timeseries filter` with related-entity traversal subquery
+
+A `timeseries` query measuring process-group memory, filtered to only the process groups running a specific service.
+
+**Input**
+
+```dql
+timeseries memory_usage = avg(dt.process.memory.usage),
+  by:{dt.entity.process_group},
+  filter:{
+    dt.entity.process_group in [
+      fetch dt.entity.process_group
+      | expand runs[dt.entity.service], alias: services
+      | filter services in [
+          fetch dt.entity.service
+          | filter in(id, {"SERVICE-C55BE95B0B7219CD"})
+          | fields id
+        ]
+      | fields id
+    ]
+  }
+| summarize memory_saturation = avg(arrayAvg(memory_usage))
+```
+
+**Smartscape sketch**
+
+```dql
+timeseries memory_usage = avg(dt.process.memory.usage, default: 0),
+  by:{dt.smartscape.process},
+  filter:{
+    dt.smartscape.process in [
+      smartscapeNodes SERVICE
+      | filter in(id, { toSmartscapeId("SERVICE-C55BE95B0B7219CD") })
+      | traverse {runs_on}, {PROCESS}, direction: "forward", fieldsKeep: {id, name, type}
+      | fields id
+    ]
+  }
+| summarize memory_saturation = avg(arrayAvg(memory_usage))
+```
+
+**Notes**
+
+- signal dimension `dt.entity.process_group` → `dt.smartscape.process`
+- `fetch dt.entity.process_group | expand runs[dt.entity.service]` subquery → `smartscapeNodes SERVICE | traverse {runs_on}, {PROCESS}, direction: "forward"`
+- start from the anchor entity (SERVICE) and traverse forward to PROCESS — the classic `expand` direction is reversed in Smartscape traversal
+- `default: 0` added to the aggregation so metric gaps do not produce `null`
+
+## Example 015: Davis Problems entity filter with edge join and dedup
+
+A classic Davis event query filtered by a specific host entity ID.
+
+**Input**
+
+```dql-snippet
+fetch events
+| filter event.kind == "DAVIS_PROBLEM"
+| filter in(dt.entity.host, {"HOST-8CBE06F58F5E99DA"})
+| summarize count()
+```
+
+**Smartscape sketch**
+
+```dql
+fetch events
+| filter event.kind == "DAVIS_PROBLEM" AND isNotNull(smartscape.affected_entity.ids)
+| expand ids = smartscape.affected_entity.ids
+| filter ids in [
+    smartscapeEdges "*"
+    | filter in(target_id, { toSmartscapeId("HOST-8CBE06F58F5E99DA") })
+    | fields source_id
+  ]
+| summarize c = count(), by: {event.id}
+| summarize number_davis_events = sum(c)
+```
+
+**Notes**
+
+- `affected_entity_ids` → `smartscape.affected_entity.ids`; guard with `isNotNull` to drop events not yet indexed in Smartscape
+- `smartscapeEdges "*"` joined via `target_id` gives source IDs (edge node IDs) affected by the host
+- `by: {event.id}` deduplication is mandatory: one Davis problem affects multiple entities, so `expand` generates one row per affected entity — without dedup the `count()` is inflated
+- the double `summarize` pattern first counts rows per event, then sums to a single total

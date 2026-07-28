@@ -1,12 +1,15 @@
-# Vulnerability Queries — `security.events`
+# Dynatrace Vulnerabilities — `security.events`
 
-Dynatrace Runtime Vulnerability Analytics (RVA) and external provider vulnerability
-findings.
+Dynatrace-generated vulnerability data: **Runtime Vulnerability Analytics (RVA) state
+reports** (the canonical snapshot pipeline below) and **Dynatrace-generated
+`VULNERABILITY_FINDING` events** (§ AI-workload vulnerabilities — findings scoped to AI
+workloads). For **external** SCA / SAST / image-scanner findings see
+[vulnerabilities-external.md](vulnerabilities-external.md).
 
 > **Cross-references:** field reference → [data-model.md](data-model.md) ·
 > risk-level mapping, status aggregation precedence, mute-status reporting rule,
 > time-window rules → [common-patterns.md](common-patterns.md) · KPIs, top-N
-> tables, trend charts → [dashboard-patterns.md](dashboard-patterns.md).
+> tables, trend charts → [coverage-and-dashboards.md § Dashboard Query Patterns](coverage-and-dashboards.md#dashboard-query-patterns).
 
 > **Snapshot vs. history.** DT RVA queries start with a **30-minute fixed window**
 > (`from:now()-30m`). State reports usually emit every ~15 min; the 30m window
@@ -62,7 +65,7 @@ findings.
 - [Vulnerable Functions Detail](#dt-rva-vulnerable-functions-detail)
 - [Per-Affected-Entity-Type Breakdown](#dt-rva-per-affected-entity-type-breakdown)
 - [External Vulnerability Findings](#external-vulnerability-findings)
-- [Best Practices](#best-practices)
+- [Advanced Workflows And Best Practices](vulnerabilities-dynatrace-advanced.md)
 
 ---
 
@@ -145,6 +148,7 @@ per-vulnerability summarize.
 |---|---|
 | Vulnerable component name (e.g. "log4j") | `\| filter contains(affected_entity.vulnerable_component.name,"log4j",caseSensitive:false)` |
 | Specific CVE | `\| filter in("CVE-2021-44228", vulnerability.references.cve)` |
+| CVE list (IoC / threat-report hunts) | `\| filter in(vulnerability.references.cve, array("CVE-A","CVE-B","CVE-C"))` — array-to-array intersection: matches if **any** of the finding's CVEs is in the target list. Validated form; see `threat-intelligence.md` § CVEs → vulnerabilities for the join-based variant. |
 | Specific vulnerability by any ID or title keyword | `\| filter vulnerability.display_id == "<id>" OR vulnerability.id == "<id>" OR vulnerability.external_id == "<id>" OR contains(vulnerability.title,"<id>",caseSensitive:false)` |
 | Host name (e.g. "easytravel-demo2") | `\| filter in("easytravel-demo2",related_entities.hosts.names) OR affected_entity.name=="easytravel-demo2"` |
 | Specific K8s workload / host / service by name or ID | See [Vulnerabilities on a specific entity](#vulnerabilities-on-a-specific-entity-by-name-or-id) — use `related_entities.<group>.{names,ids}` and `affected_entity.*`; **not §5** (§5 fields are null on RVA events) |
@@ -496,7 +500,7 @@ built from deduplicated rows.
 > `bin(timestamp, …) + summarize`.** `bin()` produces a flat tabular aggregation
 > per bucket; the user asked for a time-series, and downstream chart-tile
 > rendering expects a `timeseries`-typed column. See
-> [mistakes-and-troubleshooting.md § Mistakes #9](mistakes-and-troubleshooting.md)
+> [common-patterns.md § Mistakes #9](common-patterns.md#mistakes-to-avoid)
 > for the full rationale.
 
 **Open vulnerability count over time:**
@@ -638,7 +642,7 @@ Both IDs are included in the set literal because RVA events may store either for
 KUBERNETES_NODE) can be the directly-affected entity rather than appearing in `related_entities.*`.
 
 > For general `smartscapeNodes` / `id_classic` resolution patterns across entity types see
-> [entity-enrichment.md](entity-enrichment.md).
+> [dt-sec-contextualization/references/entity-enrichment.md](../../dt-sec-contextualization/references/entity-enrichment.md).
 
 #### Route 2 — direct display name or already-classic ID (no resolution)
 
@@ -943,68 +947,5 @@ anti-join, and the cross-provider view.
 
 ---
 
-## Best Practices
-
-1. **Always use the three-event-type union** — state reports alone miss transitions
-   that happened since the last snapshot.
-2. **Dedup on the composite key** `{vulnerability.display_id, affected_entity.id}` —
-   deduping on either field alone corrupts aggregates.
-3. **Derive vulnerability-level status in Step 3** — never filter
-   `vulnerability.resolution.status == "OPEN"` before the `fieldsAdd` *when
-   answering a vulnerability-level question*; the pre-derived field is per-entity.
-   Filtering pre-Stage-3 is fine when the question is genuinely per-entity (see
-   § Per-Affected-Entity-Type Breakdown).
-4. **Use shortened runtime-assessment names in Step 3+** — `vulnerability.exposure.status`,
-   `vulnerability.exploit.status`, `vulnerability.vulnerable_function.status`,
-   `vulnerability.data_assets.status`. Raw events use the long form
-   (`vulnerability.davis_assessment.*_status`); the `fieldsAdd` collapses them.
-5. **Prefer Dynatrace runtime assessments for triage** — `vulnerability.risk.level` is already
-   contextual; the runtime-assessment fields add the why (reachable? exposed? exploit?).
-   `vulnerability.risk.score` (Dynatrace Security Score) **never exceeds**
-   `vulnerability.cvss.base_score` — DSS modifiers can only reduce it.
-6. **`vulnerability.stack` is `CODE` / `CODE_LIBRARY` / `SOFTWARE` /
-   `CONTAINER_ORCHESTRATION`** — not `THIRD_PARTY` / `FIRST_PARTY` /
-   `CODE_LEVEL`. CLV maps to `CODE`; "third-party" usually means
-   `in(stack, array("CODE_LIBRARY","SOFTWARE"))`.
-7. **CLV (`stack=="CODE"`) always scores 10.0** and skips runtime-assessment modifiers —
-   `vulnerable_function.status` and `exposure.status` are not the relevant
-   triage signals. Use `vulnerability.code_location.name` to drill to source.
-8. **Exposure precedence is `PUBLIC_NETWORK > NOT_AVAILABLE > NOT_DETECTED`.**
-   `ADJACENT_NETWORK` is a real exposure value (entity reachable from a peer VPC,
-   internal LAN, etc.) but is intentionally **not** considered public exposure
-   — the canonical aggregation lets it fall through to `NOT_DETECTED`. If a
-   user asks specifically about adjacent-network exposure, query the raw
-   `vulnerability.davis_assessment.exposure_status` field directly rather than
-   the derived `vulnerability.exposure.status`.
-9. **`NOT_AVAILABLE` outranks `NOT_DETECTED` / `NOT_IN_USE`** in runtime-assessment precedence.
-   It surfaces telemetry gaps rather than hiding them under a clean status.
-10. **Keep the summarize block lean** — the canonical aggregation has ~20 fields;
-    drop the ones you don't need for each specific query to keep results
-    token-efficient.
-11. **`affected_entity.vulnerable_component.name` is singular per-entity**, but
-    collected into `affected_entity.vulnerable_component.names` (plural) at
-    vulnerability level. Mind the plural when filtering.
-12. **`vulnerability.parent.*` is deprecated — don't use any of it.** Derive
-    every vulnerability-level value from per-entity fields and per-entity status
-    arrays: resolution/mute verdicts from `collectDistinct(...)` of per-entity
-    statuses, scalars via `takeMax`/`takeFirst` (see Stage 3). Older skill drafts and
-    docs reference `parent.first_seen`, `parent.resolution.status`, `parent.mute.status`,
-    etc. — replace them all. **Caveat on first-detection:** `vulnerability.first_seen`
-    is *not* a usable replacement for `vulnerability.parent.first_seen` on the RVA
-    pipeline — it is commented out of the `entity.state` SD model and null on every
-    state/change row. There is no first-detection field outside the deprecated
-    namespace, so do not aggregate `first_seen` (a `takeMin` over it collapses to
-    null); use `vulnerability.resolution.change_date` for "how long open". A
-    resolution-time proxy (MTTR) **is** computable without `first_seen` via
-    `VULNERABILITY_STATUS_CHANGE_EVENT` — see § Resolution time (MTTR proxy) in
-    [Lifecycle Workflows](vulnerabilities.md#resolution-time-mttr-proxy--openresolved-per-affected-object).
-13. **Mute metadata is per-entity** — `mute.reason`, `mute.user`, `mute.comment`,
-    `mute.change_date` answer "who muted this entity, when, why". Don't collapse
-    these to vulnerability-level; the audit only makes sense per-entity.
-14. **Simple count questions use countIf — one row, one query.** For "how many
-    vulnerabilities do I have?" or "how many CRITICAL?", run the canonical Steps 1+3
-    pipeline and end with a single `summarize` (no `by:` clause) using `countIf` per
-    risk level plus open/muted/resolved dimensions. Do **not** group by
-    `vulnerability.risk.level`, `vulnerability.stack`, or any other dimension unless
-    the user explicitly asks for a breakdown. `vulnerability.stack` in particular must
-    never be added as an unrequested dimension. Run only one query for the primary answer.
+For AI-workload findings and extended best-practice guidance, use
+**[vulnerabilities-dynatrace-advanced.md](vulnerabilities-dynatrace-advanced.md)**.

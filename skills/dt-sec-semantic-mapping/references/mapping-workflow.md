@@ -33,7 +33,7 @@ Every value you put in the **Transform** column must be implementable as an **Op
 
 **Structure the implementation as a processor chain, not a single processor.** The canonical pattern is: one generic processor (common SD fields, shared JSON parsing) → per-subcategory processors scoped by matching criterion (object-type or finding-type-specific namespaces) → a cleanup processor (removes intermediate non-SD fields). Processors execute in order; fields written by an earlier processor are available in already-parsed form to all later ones — no re-parsing needed.
 
-See [openpipeline-constraints.md](openpipeline-constraints.md) for the chain architecture, supported command set, `jsonPath()` alternative, and `ip()` cast for `ipAddress`-typed fields.
+See [intake-and-constraints.md](intake-and-constraints.md) for the chain architecture, supported command set, `jsonPath()` alternative, and `ip()` cast for `ipAddress`-typed fields.
 
 ### A.3 Resolve Doubts via Baseline Comparison (conditional)
 
@@ -83,7 +83,7 @@ Triggered when the user provides an existing mapping (JSON output or mapping tab
 
 ### B.2 Apply All Validation Rules
 
-Run every rule in [validation-rules.md](validation-rules.md) against the provided mapping.
+Run every rule in [validation-policy-and-reporting.md](validation-policy-and-reporting.md) against the provided mapping.
 Record outcome per rule: pass / fail / warning.
 
 For any unknown field, ambiguous enum value, type mismatch, or namespace question that the local references do not unambiguously resolve, verify against the live SD — see [Shared: Verifying Against the Live Semantic Dictionary](#shared-verifying-against-the-live-semantic-dictionary). The live SD is authoritative when local references and SD disagree.
@@ -158,7 +158,7 @@ If user requests real-environment validation:
 
 ## Shared: Verifying Against the Live Semantic Dictionary
 
-When the local references don't unambiguously resolve a field, enum, type, or namespace question, verify against the live SD. See `semantic-dictionary.md` in this skill's references for the canonical guidance: queryable Grail tables (`dt.semantic_dictionary.fields`, `dt.semantic_dictionary.models`), DQL patterns, when-to-query decision matrix, and the authority rule (live SD wins on disagreement).
+When the local references don't unambiguously resolve a field, enum, type, or namespace question, verify against the live SD. See `semantic-reference.md § Semantic Dictionary` in this skill's references for the canonical guidance: queryable Grail tables (`dt.semantic_dictionary.fields`, `dt.semantic_dictionary.models`), DQL patterns, when-to-query decision matrix, and the authority rule (live SD wins on disagreement).
 
 ---
 
@@ -183,13 +183,13 @@ Map vendor fields to semantic targets in this order:
    - `vulnerability.cvss.version` as number-only version token (`3.1`, `4.0`)
    - `vulnerability.remediation.fix_versions` (array of versions; omit when empty)
    - `actor.ips`, `rule.id`, `rule.name` (detections; use `rule.name`, not `rule.title`)
-   - Vendor-namespaced extensions (e.g. `snyk.*`, `github.*`) — may carry the same value as an SD-canonical field when the SD field is simultaneously populated, serving as a familiar query alias for users accustomed to vendor naming. Apply the *Vendor Namespace Duplication Check* from [validation-rules.md](validation-rules.md) to detect the only actionable case: the SD field is empty while the vendor field carries the value.
+   - Vendor-namespaced extensions (e.g. `snyk.*`, `github.*`) — may carry the same value as an SD-canonical field when the SD field is simultaneously populated, serving as a familiar query alias for users accustomed to vendor naming. Apply the *Vendor Namespace Duplication Check* from [validation-policy-and-reporting.md](validation-policy-and-reporting.md) to detect the only actionable case: the SD field is empty while the vendor field carries the value.
 
 ---
 
 ## Shared: Baseline Comparison
 
-Consult `../samples/` **only when a specific doubt is unresolved** after checking the primary references: `semantic-dictionary.md`, `data-model-notes.md`, `known-discrepancies.md`, `validation-rules.md`, `object-type-expectations.md`. Do not open or scan the samples directory as a routine step on every workflow run.
+Consult `../samples/` **only when a specific doubt is unresolved** after checking the primary references: `semantic-reference.md`, `validation-policy-and-reporting.md`, `intake-and-constraints.md`. Do not open or scan the samples directory as a routine step on every workflow run.
 
 **Triggers that justify a sample lookup:**
 
@@ -203,7 +203,7 @@ Consult `../samples/` **only when a specific doubt is unresolved** after checkin
 1. Flag target fields not seen in any local sample as potential unknowns — but verify against the live SD before classifying (see [Shared: Verifying Against the Live Semantic Dictionary](#shared-verifying-against-the-live-semantic-dictionary)).
 2. Identify richer semantic fields available in comparable integrations that are missing.
 3. Flag value-pattern contradictions vs. samples (wrong enum case, wrong type).
-4. Flag known-discrepancy fields — classify as `info` only (see `known-discrepancies.md`).
+4. Flag known-discrepancy fields — classify as `info` only (see `validation-policy-and-reporting.md § Known Discrepancies`).
 
 ---
 

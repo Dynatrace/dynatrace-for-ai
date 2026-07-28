@@ -56,14 +56,15 @@ Use this reference when you need the full classic-to-Smartscape mapping set.
 | `dt.entity.haproxy-prometheus:server` | `<missing>` | `<missing>` | unclear |
 | `dt.entity.host` | `dt.smartscape.host` | `HOST` | available |
 | `dt.entity.host_group` | `<removed>` | `<removed>` | not planned |
-| `dt.entity.http_check` | `dt.smartscape.http_check` | `HTTP_CHECK` | planned |
-| `dt.entity.http_check_step` | `dt.smartscape.http_check_step` | `HTTP_CHECK_STEP` | planned |
+| `dt.entity.http_check` | `dt.smartscape.http_monitor` | `HTTP_MONITOR` | planned |
+| `dt.entity.http_check_step` | `dt.smartscape.http_monitor_step` | `HTTP_MONITOR_STEP` | planned |
 | `dt.entity.kafka:consumer` | `<missing>` | `<missing>` | unclear |
 | `dt.entity.kafka:producer` | `<missing>` | `<missing>` | unclear |
 | `dt.entity.kafka:topic` | `<missing>` | `<missing>` | unclear |
 | `dt.entity.kubernetes_cluster` | `dt.smartscape.k8s_cluster` | `K8S_CLUSTER` | available |
 | `dt.entity.kubernetes_node` | `dt.smartscape.k8s_node` | `K8S_NODE` | available |
 | `dt.entity.kubernetes_service` | `dt.smartscape.k8s_service` | `K8S_SERVICE` | available |
+| `dt.entity.multiprotocol_monitor` | `dt.smartscape.network_availability_monitor` | `NETWORK_AVAILABILITY_MONITOR` | planned |
 | `dt.entity.network_interface` | `dt.smartscape.network_interface` | `NETWORK_INTERFACE` | available |
 | `dt.entity.os:service` | `dt.smartscape.os_service` | `OS_SERVICE` | planned |
 | `dt.entity.process_group` | `<removed>` | `<removed>` | not planned |
@@ -73,8 +74,8 @@ Use this reference when you need the full classic-to-Smartscape mapping set.
 | `dt.entity.service_instance` | `dt.smartscape.service_deployment` | `SERVICE_DEPLOYMENT` | planned |
 | `dt.entity.standardised:slo` | `<missing>` | `<missing>` | unclear |
 | `dt.entity.synthetic_location` | `dt.smartscape.synthetic_location` | `SYNTHETIC_LOCATION` | planned |
-| `dt.entity.synthetic_test` | `dt.smartscape.synthetic_test` | `SYNTHETIC_TEST` | planned |
-| `dt.entity.synthetic_test_step` | `dt.smartscape.synthetic_test_step` | `SYNTHETIC_TEST_STEP` | planned |
+| `dt.entity.synthetic_test` | `dt.smartscape.browser_monitor` | `BROWSER_MONITOR` | planned |
+| `dt.entity.synthetic_test_step` | `dt.smartscape.browser_monitor_step` | `BROWSER_MONITOR_STEP` | planned |
 
 ## Special cases: entities that are no longer standalone types
 

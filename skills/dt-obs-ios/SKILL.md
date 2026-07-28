@@ -1,5 +1,5 @@
 ---
-name: dt-obs-ios-sdk
+name: dt-obs-ios
 description: 'Set up the Dynatrace iOS SDK (OneAgent) in an iOS project using Swift Package Manager. Automates adding the SPM dependency, creating a Dynatrace.plist configuration file, adding the import statement, adding privacy opt-in code, and building the project. Use this skill when the user wants to integrate, install, add, or set up Dynatrace monitoring in their iOS app. Keywords: Dynatrace, iOS, SDK, OneAgent, setup, install, integrate, SPM, Swift Package Manager, Info.plist, DTXApplicationID, DTXBeaconURL, mobile monitoring, RUM.'
 license: Apache-2.0
 compatibility: Requires macOS, Xcode 16+, and the Xcode MCP server

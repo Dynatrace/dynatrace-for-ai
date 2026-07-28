@@ -2,13 +2,13 @@
 
 Ingested vulnerability findings from external SCA / SAST / image scanners (Snyk,
 Qualys, Tenable, AWS Inspector, GitHub Advanced Security, etc.). For Dynatrace-native
-Runtime Vulnerability Analytics (RVA) see [vulnerabilities.md](vulnerabilities.md).
+Runtime Vulnerability Analytics (RVA) see [vulnerabilities-dynatrace.md](vulnerabilities-dynatrace.md).
 
 > **Cross-references:** field reference → [data-model.md § Vulnerability Fields (external)](data-model.md#vulnerability-fields-external--dt-emitted-vulnerability_finding) ·
 > provider scoping, double-counting guard, cross-provider summary →
 > [all-security-events.md](all-security-events.md) · repository coalescing,
 > lifecycle anti-join → [common-patterns.md](common-patterns.md) · mapping findings
-> to runtime entities → [entity-enrichment.md](entity-enrichment.md).
+> to runtime entities → [dt-sec-contextualization entity-enrichment.md](../../dt-sec-contextualization/references/entity-enrichment.md).
 
 ## Contents
 
@@ -395,4 +395,4 @@ normalized fields `dt.security.risk.level`, `finding.id`, `finding.title`,
 
 External findings carry `object.*` / `container_image.*` / cloud-resource identifiers,
 not Dynatrace runtime entity IDs. To map them to hosts / K8s workloads / cloud entities
-via Smartscape, use the recipes in [entity-enrichment.md](entity-enrichment.md).
+via Smartscape, use the recipes in [entity-enrichment.md](../../dt-sec-contextualization/references/entity-enrichment.md).

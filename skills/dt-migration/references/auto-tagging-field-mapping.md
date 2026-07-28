@@ -259,11 +259,11 @@ Matching Smartscape Node: Coming later.
 
 ## NETWORK_AVAILABILITY_MONITOR (NAM)
 
-Matching Smartscape Node: No equivalent.
+Matching Smartscape Node: `NETWORK_AVAILABILITY_MONITOR` (planned; see [type-mappings.md](type-mappings.md))
 
 | Auto-Tagging Key | Semantic Dictionary Field |
 |---|---|
-| `NETWORK_AVAILABILITY_MONITOR_NAME` | - |
+| `NETWORK_AVAILABILITY_MONITOR_NAME` | Name of `dt.smartscape.network_availability_monitor` (planned) |
 | `NETWORK_AVAILABILITY_MONITOR_TAGS` | See above general notes |
 
 ---

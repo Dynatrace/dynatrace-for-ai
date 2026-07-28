@@ -318,6 +318,13 @@ entity** in the Dynatrace UI: it **defaults to CIS** and **lists failed rules on
 Replace `${entityIdsOrNames}` with the target entity's id(s) / name(s). `NOT_RELEVANT` is
 already dropped by the Step-1 base filter, consistent with the tab's failed-only view.
 
+> **Kubernetes scoping note (SPM/KSPM).** For `KUBERNETES_NODE` / `K8S_POD` questions, Dynatrace SPM `COMPLIANCE_FINDING` events are typically emitted per individual K8s resource (e.g. `k8sclusterrole`, `KUBERNETES_NODE`, `CLOUD_APPLICATION_INSTANCE`) and are reliably scoped via `k8s.cluster.name`.
+> Resolve the cluster name if needed and filter on `k8s.cluster.name` (and any available `k8s.*` fields); do **not** assume `object.type == KUBERNETES_CLUSTER` or rely on `related_entities.*` for scoping.
+
+> **Window per source.** Tables 1 and 2 (Dynatrace SPM/KSPM) always use `from:now()-1h`.
+> Table 3 (external CSPM/VSPM tools) uses `from:now()-24h` — external findings arrive on
+> a slower polling cycle and are not inner-joined to a scan event.
+
 **Table 1 — Dynatrace CIS failed rules** (the headline; mirrors the Security tab):
 
 ```dql-snippet
@@ -380,6 +387,8 @@ external providers on the entity). Do **not** rebuild this — use the
 patterns below, scoping the
 **pre-aggregation** filter to the entity via `object.id` / `dt.smartscape_source.id` /
 `k8s.*` (external rows are raw per-finding; the KSPM `affected_entity.*` arrays do not apply).
+Use `from:now()-24h` for the external query — external findings arrive on a slower polling
+cycle and are not inner-joined to a scan event (unlike DT SPM which requires 1h).
 A 0-row result means no external posture tool reported on this entity — still state that
 explicitly.
 

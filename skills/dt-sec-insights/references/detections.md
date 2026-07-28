@@ -52,6 +52,7 @@ external provider detections.
   - [Attack-type breakdown](#attack-type-breakdown)
   - [Blocked vs. monitored breakdown](#blocked-vs-monitored-breakdown)
   - [Top attacker IPs — cross-provider](#top-attacker-ips-last-24h-cross-provider)
+  - [Filter detections by an IoC IP list](#filter-detections-by-an-ioc-ip-list-cross-provider)
   - [Same source IP attacking multiple targets — cross-provider](#same-source-ip-attacking-multiple-targets-cross-provider)
   - [Scope variants (RAP-only / external-only / single provider)](#scope-variants-narrow-only-when-the-user-explicitly-asks)
   - [`actor.ips` coverage check](#actorips-coverage-check-when-results-look-sparse)
@@ -273,6 +274,36 @@ fetch security.events, from:now()-24h
 > (e.g. RAP + an external detection source) is signal — perimeter and in-process detection
 > agreeing on an attacker. Same IP in only one provider is normal — different
 > providers see different traffic.
+
+### Filter detections by an IoC IP list (cross-provider)
+
+Use this when you have a **known list of attacker IPs** (from a threat report, STIX
+bundle, or advisory) and want to check whether any of them appeared as attackers in
+your environment. Distinct from the `join`-based correlation in
+`threat-intelligence.md` (which correlates against IPs already ingested as
+`THREAT_REPORT` events) — this query works directly against a pasted/extracted IP list.
+
+```dql
+fetch security.events, from:now()-24h
+| filter event.type == "DETECTION_FINDING"
+| filter isNotNull(actor.ips)
+| expand actor.ips
+| filter in(ip(actor.ips), array(toIp("<ip1>"), toIp("<ip2>")))
+| fields timestamp, finding.id, finding.title, dt.security.risk.level,
+         finding.type, finding.action, actor.ips, actor.geo.country.name,
+         object.id, object.name, object.type, event.provider, product.name
+| sort timestamp desc
+| limit 100
+```
+
+> **Why `ip()`/`toIp()`, not `toString()`.** Typed IP comparison canonicalizes
+> IPv6 representations and supports CIDR/range predicates. String equality silently
+> misses the same IPv6 address in a different notation. Always use the typed form
+> in skill templates; `toString()` string comparison is only appropriate when you
+> know the IoC list is IPv4-only.
+
+Zero matches is a valid, meaningful answer ("none of the IoC IPs attacked us in
+this window") — report it truthfully with the window used.
 
 ### Same source IP attacking multiple targets (cross-provider)
 
@@ -743,7 +774,7 @@ fetch security.events, from:now()-24h
 This approach (filter on `finding.time.created`) works for **all** `*_FINDING`
 event types — `VULNERABILITY_FINDING`, `DETECTION_FINDING`, `COMPLIANCE_FINDING`.
 For DT RVA, prefer filtering on `vulnerability.resolution.change_date` instead
-(see [vulnerabilities.md](vulnerabilities.md#new-vulnerabilities-in-the-last-24h--7-days-uc-v3)).
+(see [vulnerabilities-dynatrace.md](vulnerabilities-dynatrace.md#new-vulnerabilities-in-the-last-24h--7-days-uc-v3)).
 
 ### Detections by finding type (UC-D3)
 

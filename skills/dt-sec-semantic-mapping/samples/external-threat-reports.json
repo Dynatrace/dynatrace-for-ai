@@ -1,0 +1,145 @@
+[
+    {
+      "timestamp": "2026-07-07T11:00:12.944000000Z",
+      "event.kind": "SECURITY_EVENT",
+      "event.provider": "AlienVault OTX",
+      "event.type": "THREAT_REPORT",
+      "event.name": "Threat report event",
+      "event.description": "Threat report event for pulse 'IMMEDIATE THREAT: SMTP Intrusion from 222.116.47.157 identified by Sentinel'.",
+      "event.original_content": "{\"id\": \"6a4cc15131e5a18deffed2bf\", \"name\": \"IMMEDIATE THREAT: SMTP Intrusion from 222.116.47.157 identified by Sentinel\", \"description\": \"Real-time Intercept: SMTP attack. Reference: 2026-07-07 12:02:08.7213 Login failure: 222.116.47.157 SMTP\", \"modified\": \"2026-07-07T09:05:21.663000\", \"created\": \"2026-07-07T09:05:21.663000\", \"tags\": [\"sentinel\", \"malicious-ip\", \"smtp\", \"smtp-attack\", \"credential-dumping\", \"authentication-failure\"], \"references\": [], \"public\": 1, \"adversary\": \"Automated Scanner\", \"targeted_countries\": [\"T\\u00fcrkiye\"], \"malware_families\": [{\"id\": \"Scanner.SMTP\", \"display_name\": \"Scanner.SMTP\"}], \"attack_ids\": [{\"id\": \"T1110\", \"name\": \"Brute Force\", \"display_name\": \"T1110 - Brute Force\"}, {\"id\": \"T1110.001\", \"name\": \"Password Guessing\", \"display_name\": \"T1110.001 - Password Guessing\"}], \"industries\": [], \"TLP\": \"white\", \"pulse_source\": \"api\", \"author\": {\"username\": \"example_author\", \"id\": \"000000\"}, \"indicator_type_counts\": {\"IPv4\": 1}, \"indicator_count\": 1, \"subscriber_count\": 44}",
+      "product.vendor": "LevelBlue",
+      "product.name": "AlienVault OTX",
+      "threat.report.id": "6a4cc15131e5a18deffed2bf",
+      "threat.report.name": "IMMEDIATE THREAT: SMTP Intrusion from 222.116.47.157 identified by Sentinel",
+      "threat.report.description": "Real-time Intercept: SMTP attack. Reference: 2026-07-07 12:02:08.7213 Login failure: 222.116.47.157 SMTP",
+      "threat.report.author": "example_author",
+      "threat.report.time.created": "2026-07-07T09:05:21Z",
+      "threat.report.time.updated": "2026-07-07T09:05:21Z",
+      "threat.report.tags": [
+        "sentinel",
+        "malicious-ip",
+        "smtp",
+        "smtp-attack",
+        "credential-dumping",
+        "authentication-failure"
+      ],
+      "threat.actor.names": [
+        "Automated Scanner"
+      ],
+      "threat.target.countries.names": [
+        "Türkiye"
+      ],
+      "threat.target.countries.iso_codes": [
+        "TR"
+      ],
+      "threat.malware.families": [
+        "Scanner.SMTP"
+      ],
+      "threat.attack.technique.ids": [
+        "T1110"
+      ],
+      "threat.attack.subtechnique.ids": [
+        "T1110.001"
+      ],
+      "threat.attack.technique.names": [
+        "Brute Force",
+        "Password Guessing"
+      ],
+      "threat.observables.ips": [
+        "222.116.47.157"
+      ],
+      "alienvault.pulse.public": true,
+      "alienvault.pulse.tlp": "WHITE",
+      "dt.openpipeline.source": "/platform/ingest/v1/security.events",
+      "event.id": "00000000-104b-30ed-0000-00001bd73dd5",
+      "dt.openpipeline.pipelines": [
+        "security.events:default"
+      ]
+    },
+    {
+      "timestamp": "2026-07-07T09:43:40.085000000Z",
+      "event.kind": "SECURITY_EVENT",
+      "event.provider": "CrowdStrike",
+      "event.type": "THREAT_REPORT",
+      "event.name": "Threat report event",
+      "event.description": "Threat report event for CSA-260753 New CURLY SPIDER Campaign Leverages Deno JavaScript Abuse and Python-Based Malware",
+      "event.original_content": "{\"id\": 10260753, \"name\": \"CSA-260753 New CURLY SPIDER Campaign Leverages Deno JavaScript Abuse and Python-Based Malware\", \"slug\": \"csa-260753\", \"type\": {\"id\": 356, \"slug\": \"notice\", \"name\": \"Notice\"}, \"url\": \"https://falcon.crowdstrike.com/intelligence-v2/reports/csa-260753\", \"short_description\": \"Adversary: CURLY SPIDER || Target Industry: Technology, Consulting and Professional Services, Manufacturing || Target Country: United States, United Kingdom\", \"created_date\": 1782921633, \"last_modified_date\": 1783008096, \"actors\": [{\"id\": 227444, \"name\": \"CURLY SPIDER\", \"slug\": \"curly-spider\"}], \"target_industries\": [{\"slug\": \"consulting-and-professional-services\", \"value\": \"Consulting and Professional Services\"}, {\"slug\": \"manufacturing\", \"value\": \"Manufacturing\"}, {\"slug\": \"technology\", \"value\": \"Technology\"}], \"target_countries\": [{\"slug\": \"us\", \"value\": \"United States\"}, {\"slug\": \"gb\", \"value\": \"United Kingdom\"}], \"motivations\": [{\"slug\": \"criminal\", \"value\": \"Criminal\"}], \"mitre_attacks\": [{\"tactic_id\": \"ta0001\", \"tactic_name\": \"Initial Access\", \"technique_id\": \"t1566.004\", \"technique_name\": \"Spearphishing Voice\"}, {\"tactic_id\": \"ta0002\", \"tactic_name\": \"Execution\", \"technique_id\": \"t1059.007\", \"technique_name\": \"JavaScript\"}, {\"tactic_id\": \"ta0011\", \"tactic_name\": \"Command and Control\", \"technique_id\": \"t1568\", \"technique_name\": \"Dynamic Resolution\"}]}",
+      "product.vendor": "CrowdStrike",
+      "product.name": "Falcon Intelligence",
+      "threat.report.id": "10260753",
+      "threat.report.name": "CSA-260753 New CURLY SPIDER Campaign Leverages Deno JavaScript Abuse and Python-Based Malware",
+      "threat.report.author": "CrowdStrike Threat Intelligence",
+      "threat.report.description": "Adversary: CURLY SPIDER || Target Industry: Technology, Consulting and Professional Services, Manufacturing || Target Country: United States, United Kingdom. In June 2026, CrowdStrike OverWatch and CrowdStrike Falcon Complete detected several incidents involving similar TTPs and overlapping indicators.",
+      "threat.report.time.created": "2026-07-01T16:00:33Z",
+      "threat.report.time.updated": "2026-07-02T16:01:36Z",
+      "threat.report.references.urls": [
+        "https://falcon.crowdstrike.com/intelligence-v2/reports/csa-260753"
+      ],
+      "threat.report.tags": [
+        "Initial Access/Spearphishing Voice",
+        "Execution/JavaScript",
+        "Execution/Windows Command Shell",
+        "Command And Control/Dynamic Resolution",
+        "Defense Evasion/Masquerading"
+      ],
+      "threat.actor.names": [
+        "CURLY SPIDER"
+      ],
+      "threat.target.countries.names": [
+        "United States of America",
+        "United Kingdom of Great Britain and Northern Ireland"
+      ],
+      "threat.target.countries.iso_codes": [
+        "US",
+        "GB"
+      ],
+      "threat.target.industries": [
+        "Consulting and Professional Services",
+        "Manufacturing",
+        "Technology"
+      ],
+      "threat.attack.tactic.ids": [
+        "TA0001",
+        "TA0002",
+        "TA0011"
+      ],
+      "threat.attack.tactic.names": [
+        "Initial Access",
+        "Execution",
+        "Command and Control"
+      ],
+      "threat.attack.technique.ids": [
+        "T1568"
+      ],
+      "threat.attack.subtechnique.ids": [
+        "T1566.004",
+        "T1059.007"
+      ],
+      "threat.attack.technique.names": [
+        "Spearphishing Voice",
+        "JavaScript",
+        "Dynamic Resolution"
+      ],
+      "threat.observables.domains": [
+        "d385m5skczp5q5.cloudfront.net",
+        "d2g6dl71gua1qa.cloudfront.net"
+      ],
+      "threat.observables.hashes.md5": [
+        "1c15fe59d75b9bd44ccc437eb1804316",
+        "896b1f73bff66e229f1d9c413f9ec3e9"
+      ],
+      "threat.observables.hashes.sha256": [
+        "985696deb0fe76ffc671b0f19cecdb0364d78b32b38a006b782495874605d926",
+        "788ead2c8561f5830964e58444eea7d0f8d8a88b9a0f1384f25510654e7ec344"
+      ],
+      "crowdstrike.report.slug": "csa-260753",
+      "crowdstrike.report.type": "CrowdStrike Alert",
+      "crowdstrike.report.type.id": "356",
+      "crowdstrike.report.type.name": "Notice",
+      "dt.openpipeline.source": "/platform/ingest/v1/security.events",
+      "event.id": "00000000-19b1-87c9-0000-00003b4ec471",
+      "dt.openpipeline.pipelines": [
+        "security.events:default"
+      ]
+    }
+]
