@@ -75,6 +75,12 @@ external provider detections.
   - [Detections over time (grouped by day or hour)](#detections-over-time-grouped-by-day-or-hour)
   - [Critical detections on a specific entity](#critical-detections-on-a-specific-entity)
   - [Detection lookup by ID or title](#detection-lookup-by-id-or-title)
+- [Security Incident Investigation Workflow](#security-incident-investigation-workflow)
+  - [Inv-1: Rule trigger history](#inv-1-rule-trigger-history--is-the-current-spike-unusual)
+  - [Inv-2: Blast radius](#inv-2-blast-radius--how-many-other-entities-triggered-the-same-rule)
+  - [Inv-3: Entity recidivism](#inv-3-entity-recidivism--is-this-a-repeat-offender)
+  - [Inv-4: IOC spread](#inv-4-ioc-spread--how-widespread-is-the-indicator-across-the-environment)
+  - [Inv-5: Peer comparison](#inv-5-peer-comparison--how-does-this-entity-compare-to-its-peer-group)
 - [Best Practices](#best-practices)
 
 ---
@@ -844,6 +850,186 @@ fetch security.events, from:now()-24h
 | sort timestamp desc
 | limit 5
 ```
+
+---
+
+## Security Incident Investigation Workflow
+
+When an analyst selects a specific `DETECTION_FINDING` and wants to understand its
+full context, run the following investigation patterns. Each addresses a distinct
+question; they can execute in parallel once you have the `detection.id` and
+`object.id` from the finding record.
+
+> **Prerequisite — fetch the finding record.** Before running any investigation,
+> retrieve the full finding row to extract `detection.id`, `object.id`,
+> `dt.smartscape_source.id`, and any `k8s.*` context fields:
+>
+> ```dql
+> fetch security.events, from: now() - 7d
+> | filter event.type == "DETECTION_FINDING"
+> | filter event.id == "<EVENT_ID>"
+> | limit 1
+> ```
+>
+> Note: Automated Detections findings populate `detection.id`, `detection.title`,
+> `object.id`, `object.name`, `object.type`, `k8s.*`, and the `dt.smartscape*`
+> family. `dt.entity.*` fields are **null** on Automated Detections findings
+> (use `dt.smartscape*` instead). `finding.severity` is vendor-specific; the
+> normalized field is `dt.security.risk.level`.
+
+### Inv-1: Rule trigger history — is the current spike unusual?
+
+Use `DETECTION_EXECUTION_SUMMARY` (one audit row per rule run) to understand the
+cadence. If the daily `FindingsEmitted` count is significantly higher today than
+the rolling average, the current spike is unusual.
+
+```dql
+fetch security.events, from: now() - 7d
+| filter event.type == "DETECTION_EXECUTION_SUMMARY"
+     AND event.provider == "Dynatrace Automated Detections"
+     AND detection.id == "<DETECTION_ID>"
+| summarize {
+    Runs = count(),
+    FindingsEmitted = sum(execution.events_written),
+    Failures = countIf(execution.status == "FAILURE"),
+    AvgRecordsScanned = avg(execution.scanned_records)
+  }, by: { Day = bin(timestamp, 1d), RuleID = detection.id, Rule = detection.title }
+| sort Day asc
+```
+
+To get the raw finding count per day (not execution count), use `DETECTION_FINDING`
+grouped by day:
+
+```dql
+fetch security.events, from: now() - 7d
+| filter event.type == "DETECTION_FINDING"
+     AND event.provider == "Dynatrace Automated Detections"
+     AND detection.id == "<DETECTION_ID>"
+| summarize Fires = count(), by: { Day = bin(timestamp, 1d) }
+| sort Day asc
+```
+
+### Inv-2: Blast radius — how many other entities triggered the same rule?
+
+```dql
+fetch security.events, from: now() - 7d
+| filter event.type == "DETECTION_FINDING"
+     AND event.provider == "Dynatrace Automated Detections"
+     AND detection.id == "<DETECTION_ID>"
+| summarize {
+    Fires = count(),
+    FirstSeen = takeMin(timestamp),
+    LastSeen = takeMax(timestamp),
+    SampleTitle = takeFirst(finding.title)
+  }, by: {
+    ObjectID = object.id,
+    ObjectName = object.name,
+    ObjectType = object.type,
+    Namespace = k8s.namespace.name,
+    Cluster = k8s.cluster.name
+  }
+| sort Fires desc
+| limit 50
+```
+
+A single entity in the result means the problem is isolated. Multiple entities —
+especially across namespaces or clusters — indicate a fleet-wide issue.
+
+### Inv-3: Entity recidivism — is this a repeat offender?
+
+Group by `finding.type` (attack/rule category) on the specific `object.id`. A high
+`Fires` count over 7d with `DurationHours` > 24 signals a persistent unaddressed
+condition.
+
+```dql
+fetch security.events, from: now() - 7d
+| filter event.type == "DETECTION_FINDING"
+     AND isNotNull(object.id)
+     AND object.id == "<OBJECT_ID>"
+| summarize {
+    Fires = count(),
+    Rules = collectDistinct(detection.id),
+    FirstSeen = takeMin(timestamp),
+    LastSeen = takeMax(timestamp)
+  }, by: { Kind = finding.type, Rule = detection.title }
+| fieldsAdd DurationHours = round(
+    (toLong(LastSeen) - toLong(FirstSeen)) / 1000000000.0 / 3600,
+    decimals: 1
+  )
+| sort Fires desc
+| limit 25
+```
+
+### Inv-4: IOC spread — how widespread is the indicator across the environment?
+
+If the finding carries an IOC (IP, domain, hash, process name), search for it
+across security events and logs. Start narrow with a 7d window; use the IOC value
+derived from `object.name`, `k8s.pod.name`, or `event.description`.
+
+```dql
+// Search security.events for the same object name across all providers (7d)
+fetch security.events, from: now() - 7d
+| filter event.type == "DETECTION_FINDING"
+     AND (object.name == "<IOC_VALUE>"
+          OR contains(event.description, "<IOC_VALUE>"))
+| summarize {
+    Fires = count(),
+    Providers = collectDistinct(event.provider)
+  }, by: { ObjectName = object.name, ObjectType = object.type }
+| sort Fires desc
+| limit 50
+```
+
+```dql
+// Corroborate in logs (1d, for performance)
+fetch logs, from: now() - 1d
+| filter contains(content, "<IOC_VALUE>")
+| fields timestamp, content, log.source, k8s.pod.name, k8s.namespace.name
+| sort timestamp desc
+| limit 50
+```
+
+If the IOC is a process name on an Automated Detections finding, also check
+`process.executable.name` in security events:
+
+```dql
+fetch security.events, from: now() - 7d
+| filter event.type == "DETECTION_FINDING"
+     AND process.executable.name == "<PROCESS_NAME>"
+| summarize { Fires = count() }, by: { k8s.pod.name, k8s.namespace.name }
+| sort Fires desc
+```
+
+### Inv-5: Peer comparison — how does this entity compare to its peer group?
+
+Use Smartscape topology to find peers of the affected entity, then compare their
+detection rates for the same rule. A pod in a namespace is a natural peer group.
+
+```dql
+// Step 1 — count detections for the affected namespace (peer group proxy)
+fetch security.events, from: now() - 7d
+| filter event.type == "DETECTION_FINDING"
+     AND event.provider == "Dynatrace Automated Detections"
+     AND detection.id == "<DETECTION_ID>"
+     AND k8s.namespace.name == "<NAMESPACE>"
+| summarize {
+    Fires = count(),
+    FirstSeen = takeMin(timestamp)
+  }, by: { Pod = k8s.pod.name, Cluster = k8s.cluster.name }
+| sort Fires desc
+| limit 50
+```
+
+If the affected pod's `Fires` count is a clear outlier compared to peers in the
+same namespace, the entity has an individual problem. If most peers share similar
+counts, the detection pattern is namespace-wide. If no other pods fired, this may
+be a one-off.
+
+> **Why `k8s.namespace.name` and not Smartscape traversal?** Automated Detections
+> findings populate `k8s.*` fields directly, making namespace-grouping the most
+> reliable peer proxy. Smartscape traversal (`smartscapeNodes`) works for topology-
+> derived peers (e.g. services sharing a process group) but returns null Smartscape
+> IDs on Automated Detections rows — use the `k8s.*` fields first.
 
 ---
 
