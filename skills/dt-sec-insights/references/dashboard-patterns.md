@@ -1,7 +1,7 @@
 # Dashboard Query Patterns
 
 KPI tiles, top-N tables, trend charts, and container/registry rollups. Each
-pattern complements the base queries in [vulnerabilities.md](vulnerabilities.md),
+pattern complements the base queries in [vulnerabilities-dynatrace.md](vulnerabilities-dynatrace.md),
 [compliance.md](compliance.md), and [detections.md](detections.md).
 
 For shared building blocks (risk-level mapping, status aggregation, sem-dict
@@ -186,7 +186,7 @@ fetch security.events
 
 Joins findings to HOST smartscapeNodes for runtime context. For full 3-way
 enrichment (container image digest / id paths), see
-[entity-enrichment.md](entity-enrichment.md).
+[dt-sec-contextualization/references/entity-enrichment.md](../../dt-sec-contextualization/references/entity-enrichment.md).
 
 ```dql
 fetch security.events, from:now()-30m
@@ -227,7 +227,7 @@ fetch security.events
 ```
 
 For DT RVA equivalents (open vulnerability counts over 7d in 3h buckets), see
-[vulnerabilities.md § Time-Series Trends](vulnerabilities.md#dt-rva-time-series-trends-7-days-3h-buckets).
+[vulnerabilities-dynatrace.md § Time-Series Trends](vulnerabilities-dynatrace.md#dt-rva-time-series-trends-7-days-3h-buckets).
 
 ---
 
@@ -287,7 +287,7 @@ K8s/host match), see [coverage.md](coverage.md).
 ### One-Row-Per-Entity Risk Summary (DT RVA + external)
 
 To produce a single row per entity with risk counts across vulnerability types,
-combine the canonical RVA pattern (from [vulnerabilities.md](vulnerabilities.md))
+combine the canonical RVA pattern (from [vulnerabilities-dynatrace.md](vulnerabilities-dynatrace.md))
 with external findings via `union`/`append`, then summarize. Keep this as a
 reporting-layer merge — don't try to unify the two query shapes upstream.
 
@@ -323,3 +323,28 @@ fetch security.events, from:now()-30m
 | sort Critical desc, High desc
 | limit 25
 ```
+
+---
+
+## Threat Intelligence Dashboards
+
+Threat-intelligence (`THREAT_REPORT`) tiles use the canonical base (SD guard +
+`dedup {threat.report.id}`) — see [threat-intelligence.md](threat-intelligence.md). Two ready-made
+sample dashboards live in `evals/skills/dt-sec-insights/sources/sample-dashboards/`:
+
+- **`emerging-threat-intelligence-reports.json`** — overview: unique-reports-over-time by provider
+  (`makeTimeseries count(), by:{event.provider}`), total-reports single value, last-10-reports table,
+  and top-N IOC/actor/industry/country/tag/technique tiles (`expand` observable →
+  `countDistinctExact(threat.report.id)`). Visualizations: **choropleth** for target countries
+  (`threat.target.countries.iso_codes`), **categorical bar** (log scale) for actors / industries /
+  tags, **bar chart** for the provider trend.
+- **`threat-exposure-analysis.json`** — per-report drilldown: select a report, extract its IOCs, then
+  correlate against the environment (RVA + external vulnerabilities by CVE, detections by actor IP /
+  MITRE technique, logs by `contains(content, …)`, traces by IP/domain/URL). Uses dashboard
+  **variables** to carry the IOC lists and `in(field, $Var)` filters (the self-contained-query
+  equivalent uses `join` — see [threat-intelligence.md § Threat-Exposure Correlation](threat-intelligence.md#threat-exposure-correlation-ioc--environment)).
+
+> **Tile field nuances:** use `threat.target.industries` (plural) and
+> `threat.target.countries.iso_codes` for the map; `coalesce(toTimestamp(threat.report.time.created), timestamp)`
+> for report time. These are threat-intel tiles — do **not** add `dt.security.risk.level` coloring
+> (the field is null on `THREAT_REPORT`).

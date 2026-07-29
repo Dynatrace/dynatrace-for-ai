@@ -5,7 +5,7 @@ vulnerabilities, detections, compliance findings, and scan events from
 Dynatrace RVA / SPM / RAP and any external security tool ingested via OpenPipeline.
 
 > **Use this when the question spans providers.** For Dynatrace-native only, or advanced use cases per type,
-> use [vulnerabilities.md](vulnerabilities.md), [compliance.md](compliance.md),
+> use [vulnerabilities-dynatrace.md](vulnerabilities-dynatrace.md), [compliance.md](compliance.md),
 > or [detections.md](detections.md).
 
 ## Contents
@@ -202,7 +202,7 @@ If any guard is intentionally dropped (e.g. the UC-G2 raw stream below), state t
 
 When mixing providers, Dynatrace-native **vulnerability** and **compliance**
 findings should be read via the dedicated tools (see
-[vulnerabilities.md](vulnerabilities.md), [compliance.md](compliance.md)) which
+[vulnerabilities-dynatrace.md](vulnerabilities-dynatrace.md), [compliance.md](compliance.md)) which
 correctly dedup state reports and scans. In a cross-provider summary, **exclude
 Dynatrace-generated vulnerabilities and compliance findings** to avoid counting
 each state-report row and every scan attempt:
@@ -222,7 +222,7 @@ and excludes:
 - Dynatrace compliance findings (per-(rule, object, scan) rows)
 
 To see Dynatrace-native vulnerability / compliance counts alongside external
-findings, compute them separately via [vulnerabilities.md](vulnerabilities.md)
+findings, compute them separately via [vulnerabilities-dynatrace.md](vulnerabilities-dynatrace.md)
 and [compliance.md](compliance.md) and merge the results at the presentation
 layer. For broad/overview questions, the
 [Broad-Question Query Decomposition](#broad-question-query-decomposition) below
@@ -254,7 +254,7 @@ merge at the presentation layer:**
 | Stream | Covers | Query | Window |
 |---|---|---|---|
 | **A — External + DT detections** | all external providers (vulnerability / detection / compliance findings) + DT RAP & Automated Detections | [Canonical Cross-Provider Query](#canonical-cross-provider-query) (double-counting + SD guards) | `24h` (widen as the question needs) |
-| **B — DT vulnerabilities (RVA)** | Dynatrace-native CVEs / runtime vulnerabilities | canonical RVA pipeline → [vulnerabilities.md § DT RVA: Full Snapshot Queries](vulnerabilities.md) | `30m` fixed |
+| **B — DT vulnerabilities (RVA)** | Dynatrace-native CVEs / runtime vulnerabilities | canonical RVA pipeline → [vulnerabilities-dynatrace.md § DT RVA: Full Snapshot Queries](vulnerabilities-dynatrace.md) | `30m` fixed |
 | **C — DT compliance (KSPM)** | Dynatrace-native CIS / DORA / NIST / STIG | canonical SPM pipeline → [compliance.md § DT SPM: Base Pattern](compliance.md) | `1h` fixed |
 
 Stream A's double-counting guard
@@ -334,7 +334,7 @@ Default windows by query class:
 `from:now()-24h` is the reliable default for summary questions. Starting at `2h` for retrieval queries limits data volume on first attempt; widening is safe since the double-counting guard is already in place.
 
 For the domain-specific snapshot constraints (RVA 30m fixed window, SPM 1h scan-completion join, detection stream guidance), see the specialist references:
-- [vulnerabilities.md § Snapshot vs. History](vulnerabilities.md) — RVA 30m fixed window
+- [vulnerabilities-dynatrace.md § Snapshot vs. History](vulnerabilities-dynatrace.md) — RVA 30m fixed window
 - [compliance.md § Snapshot vs. History](compliance.md) — SPM 1h fixed window
 - [detections.md](detections.md) — detection streams have no snapshot constraint; use the window that covers the attack history the question requires
 
@@ -364,7 +364,7 @@ fetch security.events, from:now()-24h
 ```
 
 **Stream B — DT RVA vulnerability count** (`30m` fixed): run the canonical RVA pipeline
-([vulnerabilities.md § DT RVA: Full Snapshot Queries](vulnerabilities.md)) and take its
+([vulnerabilities-dynatrace.md § DT RVA: Full Snapshot Queries](vulnerabilities-dynatrace.md)) and take its
 vulnerability count.
 
 **Stream C — DT KSPM compliance count** (`1h` fixed): run the canonical SPM pipeline
@@ -429,7 +429,7 @@ fetch security.events, from:now()-24h
 
 > **DT RVA exception:** for newly-OPEN Dynatrace vulnerabilities use
 > `toTimestamp(vulnerability.resolution.change_date) > now() - 24h` after the
-> canonical RVA pipeline (see [vulnerabilities.md](vulnerabilities.md)).
+> canonical RVA pipeline (see [vulnerabilities-dynatrace.md](vulnerabilities-dynatrace.md)).
 
 ---
 
@@ -609,6 +609,7 @@ fetch security.events, from: -24h
 | `COMPLIANCE_SCAN` | External compliance scan coverage events |
 | `COMPLIANCE_SCAN_COMPLETED` | Dynatrace SPM scan completion markers |
 | `VULNERABILITY_COVERAGE_REPORT_EVENT` | **Deprecated** — use `VULNERABILITY_SCAN` |
+| `THREAT_REPORT` | External threat-intelligence platforms (AlienVault OTX, CrowdStrike Falcon Intelligence). **Threat intelligence, not a finding** — **excluded from every cross-provider query on this page** (no `finding.*` / `object.*` / `dt.security.risk.level`, not part of the double-counting guard or the 3-stream decomposition). Query separately via [threat-intelligence.md](threat-intelligence.md). |
 
 ---
 

@@ -1,4 +1,111 @@
-# Security Events Data Model Notes
+# Semantic Reference
+
+## Contents
+
+- [Semantic Dictionary](#semantic-dictionary)
+- [Data Model Notes](#data-model-notes)
+
+
+---
+
+## Semantic Dictionary
+
+
+The Semantic Dictionary (SD) defines the canonical field set for `security.events`. This skill validates against it.
+
+## TOC
+
+- [Local References (Offline Summary)](#local-references-offline-summary)
+- [Live (Authoritative) Sources](#live-authoritative-sources)
+- [DQL Patterns for Live SD Lookup](#dql-patterns-for-live-sd-lookup)
+- [When to Query the Live SD](#when-to-query-the-live-sd)
+- [Authority Rule](#authority-rule)
+
+---
+
+## Local References (Offline Summary)
+
+The following references in this skill are an offline summary of the SD scoped to security-events use cases:
+
+- § Data Model Notes (in this file) — field taxonomy, event types, provider taxonomy, entity scoping
+- `validation-policy-and-reporting.md § Known Discrepancies` — documented acceptable deviations between SD and observed samples
+- `intake-and-constraints.md § Object Type Expectations` — `object.type` namespace expectations
+
+These can drift relative to the live SD between PRs. When in doubt, verify against the live SD (below).
+
+## Live (Authoritative) Sources
+
+- **Patterns + queryable tables** — load the `dt-dql-essentials` skill from `knowledge-base/dynatrace/skills/dt-dql-essentials/` and read its `references/semantic-dictionary.md` for the full documentation of the queryable tables, stability levels, and global namespaces.
+- **Human-facing docs** — https://docs.dynatrace.com/docs/semantic-dictionary/model/security-events.
+
+The SD is queryable in Grail as two tables:
+
+| Table | What it gives you |
+|---|---|
+| `dt.semantic_dictionary.fields` | Per-field: `name`, `type`, `stability` (`stable` / `experimental` / `deprecated`), `description`, `tags`, `unit`, `supported_values`, `examples` |
+| `dt.semantic_dictionary.models` | Per data model: `name`, `description`, `data_object`, `fields[]`, `relationships[]`, `smartscape_node_name` |
+
+These queries are read-only — always safe.
+
+## DQL Patterns for Live SD Lookup
+
+Run via a live DQL execution tool.
+
+```dql-template
+// Verify a single field exists; get its type / stability / supported_values / examples
+fetch dt.semantic_dictionary.fields
+| filter name == "<field.name>"
+```
+
+```dql-template
+// List every field in a namespace (e.g. all `event.*`, `finding.*`, `vulnerability.*`, `compliance.*`, `aws.*`, `k8s.*`)
+fetch dt.semantic_dictionary.fields
+| filter startsWith(name, "<namespace_prefix>.")
+| dedup name
+| sort name asc
+```
+
+```dql
+// Inspect the security-events data model (which fields belong, relationships)
+fetch dt.semantic_dictionary.models
+| filter name == "security_event" or contains(name, "security")
+```
+
+```dql-template
+// Cross-reference: which models include a given field
+fetch dt.semantic_dictionary.models
+| filter in("<field.name>", fields)
+```
+
+## When to Query the Live SD
+
+Applies to **both Workflow A** (suggesting target fields) **and Workflow B** (validating against rules).
+
+| Scenario | What to check | Why |
+|---|---|---|
+| Proposing a target field that isn't in our local references | `fetch dt.semantic_dictionary.fields | filter name == "<candidate>"` | Confirm it exists, check `stability`, get correct type and `supported_values` |
+| Validating an enum-typed field's value (e.g., `event.kind`, `event.type`, `dt.security.risk.level`) | check `supported_values` column | Confirm the value is in the canonical enum |
+| Vendor reports an unknown field that "feels SD-shaped" | namespace lookup + filter by `tags` | Detect SD additions since the local reference was updated |
+| `finding.type` / `object.type` value not documented in our local references | namespace lookup | These are vendor-extensible; live SD shows officially documented values |
+| Suspicious type/format mismatch (string vs number, etc.) | check `type` column | Use as source of truth for `validation-policy-and-reporting.md § Value and Type Checks` |
+| Cross-reference reuse of a field across data objects | `fetch dt.semantic_dictionary.models | filter in("<field.name>", fields)` | See where else (logs/spans/events) the field is used |
+
+## Authority Rule
+
+When local references and the live SD disagree, **the live SD wins.** Note any drift in the validation report and flag a follow-up PR to update the local references.
+
+This rule applies to:
+
+- Field existence (a field present in live SD but missing from local refs is **not** "unknown")
+- Field type (live SD `type` is authoritative for type-check rules)
+- Enum values (live SD `supported_values` is authoritative)
+- Stability classification (a field listed as `deprecated` in live SD should not be proposed for new mappings even if local refs still show it)
+
+
+---
+
+## Data Model Notes
+
 
 Source: live tenant observation and security.events schema introspection
 Date: 2026-04-24
@@ -13,6 +120,7 @@ Date: 2026-04-24
 - [Compliance-Specific Fields](#compliance-specific-fields-on-securityevents-generic-stream)
 - [RVA-Specific Fields](#rva-specific-fields-dynatrace-runtime-vulnerability-analytics)
 - [SPM-Specific Fields](#spm-specific-fields-dynatrace-security-posture-management)
+- [Threat Intelligence Fields (`THREAT_REPORT`)](#threat-intelligence-fields-threat_report)
 - [Object Types Observed](#object-types-observed-live-data-2026-04-24)
 - [Provider Taxonomy](#provider-taxonomy-observed--documented)
 
@@ -41,6 +149,7 @@ Two access patterns:
 | `VULNERABILITY_STATUS_CHANGE_EVENT` | Dynatrace RVA: state transition (open→resolved) | `get-dynatrace-vulnerabilities` (internal) |
 | `VULNERABILITY_TRACKING_LINK_CHANGE_EVENT` | Dynatrace RVA: ticket/link update | `get-dynatrace-vulnerabilities` (internal) |
 | `COMPLIANCE_SCAN_COMPLETED` | Dynatrace SPM: scan completed marker (used for join) | `get-dynatrace-compliance-findings` (internal join) |
+| `THREAT_REPORT` | External threat-intelligence report (AlienVault OTX, CrowdStrike Falcon Intelligence) — **not a finding** | raw DQL (`fetch security.events \| filter event.type=="THREAT_REPORT"`) — see [Threat Intelligence Fields](#threat-intelligence-fields-threat_report) |
 
 **Note:** The `get-security-events-summary` `eventTypes` variable accepts comma-separated values from:
 `ALL`, `VULNERABILITY_FINDING`, `DETECTION_FINDING`, `COMPLIANCE_FINDING`, `COMPLIANCE_SCAN`, `VULNERABILITY_SCAN`
@@ -154,7 +263,7 @@ The generic `rule.*` namespace is the **canonical home for rule identity and pro
 | `rule.description` | string | Full description of the rule. |
 | `rule.type` | string | Vendor-reported rule-evaluation type. Examples: `Correlation`, `Anomaly`, `Custom`, `Threshold`, `Behavioral`. |
 
-**Stability / status:** proposed SD namespace, **experimental** — aligned to OTel `security_rule.*`, OCSF `rule`, and ECS `rule.*` (`security_rule.name`/OCSF `name`/ECS `rule.name` → `rule.name`; OCSF `uid`/ECS `rule.id` → `rule.id`; `desc`/`description` → `rule.description`; OCSF `type` → `rule.type`). `rule.name` is not yet emitted in runtime data (the legacy `rule.title` and `compliance.rule.title` are). When suggesting mappings (Workflow A), target `rule.name`. When validating ingested/live events (Workflow B), the legacy `rule.title` (detections/external) and `compliance.rule.title` (SPM) are still present in current data — accept them, but recommend migration to `rule.name`. Verify current stability via the live SD before relying on it (see `semantic-dictionary.md`).
+**Stability / status:** proposed SD namespace, **experimental** — aligned to OTel `security_rule.*`, OCSF `rule`, and ECS `rule.*` (`security_rule.name`/OCSF `name`/ECS `rule.name` → `rule.name`; OCSF `uid`/ECS `rule.id` → `rule.id`; `desc`/`description` → `rule.description`; OCSF `type` → `rule.type`). `rule.name` is not yet emitted in runtime data (the legacy `rule.title` and `compliance.rule.title` are). When suggesting mappings (Workflow A), target `rule.name`. When validating ingested/live events (Workflow B), the legacy `rule.title` (detections/external) and `compliance.rule.title` (SPM) are still present in current data — accept them, but recommend migration to `rule.name`. Verify current stability via the live SD before relying on it (see § DQL Patterns for Live SD Lookup in this file).
 
 **Migration:** compliance rule identity converges on this namespace — `compliance.rule.id` → `rule.id`, `compliance.rule.title` → `rule.name`. The remaining `compliance.*` fields (`compliance.rule.severity.*`, `compliance.result.*`, `compliance.standard.*`) have no `rule.*` equivalent in the proposal and stay compliance-namespaced.
 
@@ -276,6 +385,76 @@ pipeline (summarize by compliance.rule.id + join with COMPLIANCE_SCAN_COMPLETED)
 
 ---
 
+## Threat Intelligence Fields (`THREAT_REPORT`)
+
+External threat-intelligence reports (AlienVault OTX pulses, CrowdStrike Falcon Intelligence reports,
+STIX/TAXII feeds). **Not findings** — no `finding.*`, `object.*`, `dt.security.risk.level`, or scan
+cycle (see [validation-policy-and-reporting.md § Validation Rules](validation-policy-and-reporting.md#validation-rules)).
+One event per report; **dedup by `threat.report.id`** (reports re-ingest on update:
+`dedup {threat.report.id}, sort:{timestamp desc}`). All `threat.*` fields are SD **experimental** —
+authoritative model: `Semantic-Dictionary/source/model/security_events/threat_report.event.yaml`.
+
+### SD field set
+
+| SD field | Group | Notes |
+|---|---|---|
+| `threat.report.id` / `.name` / `.description` / `.time.created` / `.time.updated` | required | report identity + provenance; `.time.*` are `timestamp` |
+| `threat.report.author` / `.references.urls` / `.tags` | optional | |
+| `threat.actor.names` | recommended | actor names / aliases (array) |
+| `threat.target.countries.names` / `.iso_codes` / `threat.target.industries` | recommended | targeting; `.industries` is **plural** |
+| `threat.malware.families` | recommended | |
+| `threat.attack.{tactic,technique,subtechnique}.{ids,names}` / `threat.attack.version` | recommended | MITRE ATT&CK of the reported campaign (separate arrays) |
+| `threat.observables.{ips,domains,urls,emails,cves,hashes.md5,hashes.sha1,hashes.sha256}` | optional | typed IOC arrays |
+
+### Vendor → SD mapping — AlienVault OTX (pulse)
+
+| Vendor field (pulse JSON) | SD field |
+|---|---|
+| `id` | `threat.report.id` |
+| `name` | `threat.report.name` |
+| `description` | `threat.report.description` |
+| `created` / `modified` | `threat.report.time.created` / `threat.report.time.updated` |
+| `author.username` | `threat.report.author` |
+| `references` | `threat.report.references.urls` |
+| `tags` | `threat.report.tags` |
+| `adversary` | `threat.actor.names` (scalar → single-element array) |
+| `targeted_countries` | `threat.target.countries.names` (derive `.iso_codes` via ISO 3166) |
+| `industries` | `threat.target.industries` |
+| `malware_families[].display_name` | `threat.malware.families` |
+| `attack_ids[].id` | `threat.attack.technique.ids` (dotted `Txxxx.yyy` → `threat.attack.subtechnique.ids`); `.name` → `threat.attack.technique.names` — **tactic-dimension fields not provided**: OTX `attack_ids` contains technique/subtechnique entries only; `threat.attack.tactic.ids` / `.names` are always absent for this provider and must not be required during B1/B2 validation |
+| indicators by type (`IPv4`/`IPv6` → ips, `domain`/`hostname` → domains, `URL` → urls, `email` → emails, `FileHash-MD5/SHA1/SHA256` → hashes.*, `CVE` → cves) | `threat.observables.*` |
+| `TLP` | `alienvault.pulse.tlp` — **vendor extension** (no SD counterpart) |
+| `public` | `alienvault.pulse.public` — **vendor extension** |
+
+### Vendor → SD mapping — CrowdStrike Falcon Intelligence (report)
+
+| Vendor field (report JSON) | SD field |
+|---|---|
+| `id` | `threat.report.id` |
+| `name` | `threat.report.name` |
+| `short_description` / `summary` | `threat.report.description` |
+| `created_date` / `last_modified_date` (epoch seconds) | `threat.report.time.created` / `.time.updated` |
+| (fixed) `CrowdStrike Threat Intelligence` | `threat.report.author` |
+| `url` | `threat.report.references.urls` |
+| `tags[].value` | `threat.report.tags` |
+| `actors[].name` | `threat.actor.names` |
+| `target_countries[].value` | `threat.target.countries.names` (derive `.iso_codes`) |
+| `target_industries[].value` | `threat.target.industries` |
+| `mitre_attacks[]` (`tactic_id`/`tactic_name`, `technique_id`/`technique_name`) | `threat.attack.tactic.ids`/`.names`, `threat.attack.technique.ids`/`.names`, dotted → `threat.attack.subtechnique.ids` |
+| report indicators | `threat.observables.*` |
+| `slug` | `crowdstrike.report.slug` — **vendor extension** |
+| `type.name` / `type.id` / `type` | `crowdstrike.report.type.name` / `.type.id` / `.type` — **vendor extension** (types: Notice / Tipper / Periodic Report / Intelligence Report / Recon+) |
+
+> Vendor extensions `alienvault.pulse.*` and `crowdstrike.report.*` have no SD counterpart — they are
+> **additive** and pass the Vendor Namespace Duplication Check (see
+> [validation-policy-and-reporting.md § Known Discrepancies](validation-policy-and-reporting.md#known-discrepancies)). Do not flag them as unknown or duplicate.
+
+> **`threat.attack.version` is currently absent from both providers in production** (confirmed against
+> live dev-demo tenant, 2026-07-07: 0/98 THREAT_REPORT events carry this field). This is an optional
+> SD experimental field — do not flag its absence as a validation finding.
+
+---
+
 ## Object Types Observed (live data, 2026-04-24)
 
 From `get-security-events-summary` (DETECTION_FINDING):
@@ -303,3 +482,5 @@ More expected but not yet observed in this tenant:
 | `Dynatrace` | n/a | Compliance | Dynatrace SPM (filtered out of summary tool) |
 | `GitHub Advanced Security` | `Dependabot` | Vulnerability | Example from tool description |
 | `Amazon GuardDuty` | `Amazon GuardDuty` | Detection | Direct GuardDuty integration (alternative to Security Hub) |
+| `AlienVault OTX` | `AlienVault OTX` | Threat Intelligence (`THREAT_REPORT`) | `product.vendor = "LevelBlue"` (OTX was rebranded from AlienVault to LevelBlue by AT&T Cybersecurity) |
+| `CrowdStrike` | `Falcon Intelligence` | Threat Intelligence (`THREAT_REPORT`) | `product.vendor = "CrowdStrike"` |

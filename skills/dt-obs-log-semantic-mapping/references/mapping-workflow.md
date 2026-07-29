@@ -80,15 +80,15 @@ Rules:
 2. Inline annotations for every transform applied.
 3. OpenPipeline processor sketch for promoted content fields.
 
-OpenPipeline extraction pattern (`c.` is the pipeline variable prefix from `parseJson`, not part of the field name):
+OpenPipeline extraction pattern for a serialized-`content` field (JSON string). Do **not** use `parseJson` — it is not an OpenPipeline function. Use `parse content, "json:content"` (the `json` DPL token is case-insensitive), then access fields via subscript notation `content[key]` in `fieldsAdd`. `content` always retains the raw payload, so re-parse it in each processor that needs buried values — do not assume an earlier processor's parse persists. Also check for **root-level fields** already parsed at ingest (e.g. `` `service.name` ``) and reference those directly. See `openpipeline-constraints.md`.
 
 ```dql-snippet
-| parseJson content, prefix:"c."
-| fieldsAdd audit.identity = c.user_name
-| fieldsAdd actor.ips = array(c.ip_address)
-| fieldsAdd audit.action = c.action
-| fieldsAdd audit.result = if(c.success == "True", "Succeeded", "Failed")
-| fieldsAdd loglevel = if(c.success == "True", "INFO", "ERROR")
+| parse content, "json:content"                          // turn JSON string into a structured record
+| fieldsAdd audit.identity = content[user_name]          // subscript access: content[key] for JSON keys
+| fieldsAdd actor.ips = array(toIp(content[ip_address])) // → ipAddress[]
+| fieldsAdd audit.action = content[action]
+| fieldsAdd audit.result = if(content[success] == "True", "Succeeded", else: "Failed")
+| fieldsAdd loglevel = if(content[success] == "True", "INFO", else: "ERROR")
 | fieldsAdd status = loglevel
 ```
 

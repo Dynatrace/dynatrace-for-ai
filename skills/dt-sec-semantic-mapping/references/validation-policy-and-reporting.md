@@ -1,4 +1,16 @@
-# Validation Rules
+# Validation Policy And Reporting
+
+## Contents
+
+- [Validation Rules](#validation-rules)
+- [Known Discrepancies](#known-discrepancies)
+- [Report Format](#report-format)
+
+
+---
+
+## Validation Rules
+
 
 Apply all rules to both user-provided mappings and generated mappings. Rules are grouped by topic.
 
@@ -41,8 +53,10 @@ Validate that the integration supports the correct `event.type` values:
 | Detection | `DETECTION_FINDING` | — (not applicable) |
 | Vulnerability | `VULNERABILITY_FINDING` | `VULNERABILITY_SCAN` |
 | Compliance | `COMPLIANCE_FINDING` | `COMPLIANCE_SCAN` |
+| Threat intelligence | `THREAT_REPORT` | — (no scan cycle) |
 
 - Detections are push-based; they have no scan cycle. Flag a mapping critical if it adds scan events for detections.
+- **Threat intelligence** (`THREAT_REPORT`) reports are ingested from external TI platforms (AlienVault OTX pulses, CrowdStrike Falcon Intelligence, STIX/TAXII feeds) via extension/pull integrations. Like detections, they have **no scan cycle** — flag a mapping critical if it emits `*_SCAN` events for threat-intel. They are also **not findings**: see [§ Required Fields — Threat Intelligence](#required-fields--threat-intelligence) for the distinct required set. `THREAT_REPORT` carries no `object.*`, so the object-type-namespace and `finding.type`-namespace rules do **not** apply.
 - Vulnerability and compliance integrations that omit scan events are missing coverage signals — flag as **major**.
 
 ### Alternative — Reclassification Path
@@ -64,6 +78,12 @@ The validator must offer both branches in the discrepancy report so the integrat
 
 ## Required Fields — All Findings
 
+> **Applies to finding + scan classes only — NOT to `THREAT_REPORT`.** Threat-intelligence
+> reports are not findings: they have no `finding.id`/`finding.title`/`finding.time.created`/
+> `finding.type`/`finding.severity`, no `object.*`, and no `dt.security.risk.level`. Validating a
+> `THREAT_REPORT` mapping against the table below would wrongly flag every one of those as
+> critical-missing. Use [§ Required Fields — Threat Intelligence](#required-fields--threat-intelligence) instead.
+
 Fail validation (`critical`) if any of these are absent and cannot be derived:
 
 | Field | Notes |
@@ -83,6 +103,46 @@ Fail validation (`critical`) if any of these are absent and cannot be derived:
 | `object.id` | ID of the affected object |
 | `object.name` | Name of the affected object |
 | `object.type` | Type of the affected object |
+
+---
+
+## Required Fields — Threat Intelligence
+
+For `event.type == "THREAT_REPORT"` (external threat-intelligence reports — AlienVault OTX,
+CrowdStrike Falcon Intelligence, STIX/TAXII). These are **not findings**; validate against this set,
+**not** the "All Findings" table. Fail validation (`critical`) if any of these are absent and cannot be derived:
+
+| Field | Notes |
+|---|---|
+| `event.id` | Auto-generated on ingest — not required in the mapping. |
+| `event.kind` | Should be `SECURITY_EVENT` |
+| `event.type` | `THREAT_REPORT` |
+| `event.provider` | TI platform / feed name (e.g. `AlienVault OTX`, `CrowdStrike`) |
+| `event.name` | Event label (e.g. `Threat report event`) |
+| `product.vendor` | Vendor (e.g. `LevelBlue`, `CrowdStrike`) |
+| `product.name` | Product (e.g. `AlienVault OTX`, `Falcon Intelligence`) |
+| `timestamp` | Auto-populated on ingest — not required as an explicit mapping. |
+| `threat.report.id` | Vendor report ID — stable, non-null; **dedup key** (reports re-ingest on update) |
+| `threat.report.name` | Report title |
+| `threat.report.description` | Report summary / abstract |
+| `threat.report.time.created` | Report creation timestamp (RFC3339 / ISO8601) |
+| `threat.report.time.updated` | Report last-modified timestamp |
+
+**Do NOT require** (absent by design; flagging them is a false positive): `finding.*`, `object.*`,
+`object.type`, `dt.security.risk.level` / `dt.security.risk.score`, `scan.id` / `scan.name`,
+`component.*` / `software_component.*`.
+
+**Recommended** (populate when the source provides them; missing → `minor`): `threat.actor.names`,
+`threat.target.countries.names` / `.iso_codes`, `threat.target.industries`, `threat.malware.families`,
+`threat.attack.{tactic,technique,subtechnique}.{ids,names}`, `threat.attack.version`.
+
+**Optional** IOCs / metadata: `threat.report.author` / `.references.urls` / `.tags`,
+`threat.observables.{ips,domains,urls,emails,cves,hashes.md5,hashes.sha1,hashes.sha256}`.
+
+- **No scan reference** — `THREAT_REPORT` has no scan cycle; do not require or flag `scan.id`.
+- **No object-type / finding.type namespace checks** — `THREAT_REPORT` has no `object.type` or `finding.type`; skip those namespace rules entirely.
+- **Vendor extensions** `alienvault.pulse.*` and `crowdstrike.report.*` are additive (no SD counterpart) — accept them; they are not duplication (see [Known Discrepancies](#known-discrepancies) and the Vendor Namespace Duplication Check below).
+- All `threat.*` fields are SD **experimental** — verify current stability against the live SD per the authority rule before relying on a specific field.
 
 ---
 
@@ -177,7 +237,7 @@ Do **not** flag this overlap as duplication. Flag as **minor** only when:
 
 ## External Compliance Integration — Field Conventions
 
-`compliance.result.*` and `compliance.standard.*` are **reserved for Dynatrace SPM internal events**. External (non-DT) compliance integrations MUST NOT use these namespaces. Rule identity, by contrast, uses the **generic `rule.*` namespace** for all compliance findings (external and SPM) — see `data-model-notes.md § Rule Identity Namespace`.
+`compliance.result.*` and `compliance.standard.*` are **reserved for Dynatrace SPM internal events**. External (non-DT) compliance integrations MUST NOT use these namespaces. Rule identity, by contrast, uses the **generic `rule.*` namespace** for all compliance findings (external and SPM) — see `semantic-reference.md § Rule Identity Namespace`.
 
 ### Rule Fields (External Compliance)
 
@@ -231,9 +291,9 @@ For each observed `object.type`, validate the presence of its expected namespace
 | `AwsEc2Instance` | `aws.*` | `aws.resource.id`, `aws.region` | major |
 | `AwsEksCluster` | `aws.*` | `aws.resource.id`, `aws.region` | major |
 | `URL` | URL fields | `url.domain` or `url.path` | major |
-| `PROCESS` / `PROCESS_GROUP` | none required for static mapping | `dt.entity.*` / `dt.smartscape.*` / `dt.source_entity` are post-ingest enrichment, not mapping inputs (see `object-type-expectations.md § Smartscape Enrichment Fields Are Post-Ingest`); validate at runtime in Workflow B2 only | n/a (not flagged in static validation) |
+| `PROCESS` / `PROCESS_GROUP` | none required for static mapping | `dt.entity.*` / `dt.smartscape.*` / `dt.source_entity` are post-ingest enrichment, not mapping inputs (see `intake-and-constraints.md § Smartscape Enrichment Fields Are Post-Ingest`); validate at runtime in Workflow B2 only | n/a (not flagged in static validation) |
 
-See `object-type-expectations.md` for full companion field tables and samples.
+See `intake-and-constraints.md § Object Type Expectations` for full companion field tables and samples.
 
 ---
 
@@ -256,7 +316,7 @@ For each observed `finding.type`, validate the presence of its expected namespac
 
 ### Acceptable Discrepancies
 
-Fields listed in `references/known-discrepancies.md` are **acceptable** deviations.
+Fields listed in § Known Discrepancies (in this file) are **acceptable** deviations.
 Do not raise critical or major issues for them.
 
 Examples of acceptable absences: `event.start`, `event.end`.
@@ -266,7 +326,7 @@ Examples of acceptable extensions: `finding.severity`, `event.category`, `actor.
 
 Classify a field by working through this resolution order — stop as soon as one step resolves it:
 
-1. **Local references** (`known-discrepancies.md`, `data-model-notes.md`) — if listed as acceptable or documented, it is **not unknown**.
+1. **Local references** (§ Known Discrepancies in this file, `semantic-reference.md § Data Model Notes`) — if listed as acceptable or documented, it is **not unknown**.
 2. **Live SD** (`dt.semantic_dictionary.fields`) — if present there (even if absent from local references), it is **not unknown**; note the drift in the validation report and flag a PR follow-up. See `mapping-workflow.md § Shared: Verifying Against the Live Semantic Dictionary` for DQL patterns.
 3. **Baseline samples** (`samples/`) — consult **only** when steps 1 and 2 leave the field unresolved. If the field appears in any local sample it is a likely known pattern; verify against the live SD before accepting it and note the gap in local references.
 4. **Genuinely unknown** — absent from all three sources above: raise a **major** discrepancy and ask:
@@ -277,7 +337,7 @@ Classify a field by working through this resolution order — stop as soon as on
 
 ### Vendor-Specific Extensions (Expected and Valued)
 
-Vendor-namespace fields (`wiz.*`, `snyk.*`, `qualys.*`, `tenable.*`, etc.) are an expected and valued extension pattern — **not** "unknown" fields. See `known-discrepancies.md § Vendor-Specific Namespaces (Expected & Valued)` for the canonical pattern, criteria, and per-finding-class examples.
+Vendor-namespace fields (`wiz.*`, `snyk.*`, `qualys.*`, `tenable.*`, etc.) are an expected and valued extension pattern — **not** "unknown" fields. See `§ Vendor-Specific Namespaces (Expected & Valued) in this file for the canonical pattern, criteria, and per-finding-class examples.
 
 Apply the *Vendor Namespace Duplication Check* below to detect the one actionable case: when the SD field is absent or empty while the vendor field carries the value.
 
@@ -344,8 +404,8 @@ Flag these:
 13. Vendor-namespace field whose value is identical (or a trivial transform) of an SD-canonical field's value → **info** (redundant — SD field is populated with the same value; vendor field adds nothing new but may be kept for query familiarity). Escalate to **major** if the SD field is empty while the vendor field is populated — that is a missed mapping. See *Vendor Namespace Duplication Check*.
 14. `product.vendor` and `event.provider` refer to the same vendor but differ only by casing or punctuation normalization (for example `Crowdstrike` vs `CrowdStrike`) → **minor** normalization inconsistency. Keep semantic value stable, but normalize to a single canonical spelling for reliable grouping/filtering.
 15. For final ingested events with `event.original_content` populated: compare `finding.severity` against the vendor's own severity field inside `event.original_content` (typically `severity`, `issue_severity`, or equivalent). If the values differ semantically (e.g. vendor says `"Medium"` but `finding.severity` = `"LOW"`), flag as **major** — the mapped field disagrees with the vendor's own classification. Verify the correct source field and backfill `finding.severity`; re-derive `dt.security.risk.level` and `dt.security.risk.score` from the corrected value. Note: case-only differences (e.g. `"medium"` vs `"MEDIUM"`) are **minor** normalization; semantic differences in risk band are **major**.
-16. IP-typed SD fields mapped or received as plain `string` instead of `ipAddress` (or `ipAddress[]` for arrays) → **major** (type mismatch). Affected fields: `actor.ips` (`ipAddress[]`), `host.ip` (`ipAddress[]`), `client.ip` (`ipAddress`). Arrays of IP strings are not automatically equivalent to `ipAddress[]`; the mapping must explicitly target the correct SD type. The OpenPipeline-valid cast is the `ip()` network function (see `openpipeline-constraints.md § Producing ipAddress-typed values`).
-17. A suggested or provided **transform relies on a DQL construct not available in OpenPipeline processors** — most commonly `jsonPath()` for nested-JSON extraction → **major**. Transforms run as OpenPipeline processors at ingest, which support a restricted DQL subset. Flag the unavailable construct and suggest the OpenPipeline-valid alternative (for `jsonPath()`: `parse` with a JSON matcher → `fieldsFlatten`/subscript access). See `openpipeline-constraints.md`.
+16. IP-typed SD fields mapped or received as plain `string` instead of `ipAddress` (or `ipAddress[]` for arrays) → **major** (type mismatch). Affected fields: `actor.ips` (`ipAddress[]`), `host.ip` (`ipAddress[]`), `client.ip` (`ipAddress`). Arrays of IP strings are not automatically equivalent to `ipAddress[]`; the mapping must explicitly target the correct SD type. The OpenPipeline-valid cast is the `ip()` network function (see `intake-and-constraints.md § Producing ipAddress-typed values`).
+17. A suggested or provided **transform relies on a DQL construct not available in OpenPipeline processors** → **major**. Transforms run as OpenPipeline processors at ingest, which support a restricted DQL subset. Flag the unavailable construct and suggest the OpenPipeline-valid alternative. Common violations: `jsonPath()` or `parseJson` for nested-JSON extraction (use `parse` JSON DPL → `fieldsFlatten`/subscript access instead); query/aggregation commands (`summarize`, `join`, `lookup`, `makeTimeseries`, `dedup`, `sort`, `filter` as a query stage) — processors are per-record and these are not available; any function not in the supported function classes (string, conversion/cast, conditional, boolean, array, network, time, math, hash, general). See `intake-and-constraints.md`.
 
 ### Provider-Vendor Canonicalization Check
 
@@ -442,3 +502,367 @@ A mapping passes validation when:
 10. Runtime warnings (for example missing scans or orphan findings) are documented with probable causes and follow-up actions; warnings alone do not fail the mapping.
 11. Runtime validation output should use a `Validation Summary` table with statuses `🟢 pass`, `🟡 warn`, `🔴 fail` (not a bullet-list summary).
 12. Unknown fields have been explained and accepted or removed.
+
+
+---
+
+## Known Discrepancies
+
+
+Documented deviations between the Semantic Dictionary (SD) definition for
+`security.events` and the fields observed in real integration sample payloads.
+
+**This list defines the acceptance baseline.** When validating a new mapping:
+
+- Fields on this list that are absent or divergent are **acceptable** — do not
+  raise a critical or major discrepancy for them.
+- Fields that appear in **both** this list and the candidate mapping confirm
+  alignment with existing integrations.
+- Fields that are **not** on this list, not in the SD, and not in any local
+  sample in `samples/` must be **questioned** (see `§ Known SD Discrepancies and Unknown Fields in this file`).
+
+Reference: https://docs.dynatrace.com/docs/semantic-dictionary/model/security-events
+
+---
+## Vendor-Specific Namespaces (Expected & Valued)
+
+Vendor-namespace fields (e.g., `wiz.*`, `snyk.*`, `qualys.*`, `tenable.*`, `sonatype.*`, `gitlab.*`, `github.*`) are **not** considered discrepancies or "unknown" fields.
+
+They represent an **expected and valued** extension pattern across all finding types:
+
+- **Detection findings**: `dt.security.rap.*` (DT RAP internal), `rule.id` / `rule.name` (SIEM/WAF)
+- **Vulnerability findings**: `snyk.*`, `qualys.*`, `tenable.*`, `sonatype.*`, `github.*`, `gitlab.*`
+- **Compliance findings**: `wiz.*`, `qualys.*`, `crowdstrike.*`
+- **Threat intelligence reports** (`THREAT_REPORT`): `alienvault.pulse.*` (AlienVault OTX — `.public`, `.tlp`), `crowdstrike.report.*` (CrowdStrike Falcon Intelligence — `.slug`, `.type`, `.type.id`, `.type.name`). No SD counterpart — additive vendor context.
+
+**Vendor namespace fields should appear in mappings** to preserve valuable vendor-specific context and provide audit traceability back to source systems.
+
+When validating mappings, do not flag vendor-namespace fields as "unknown" — confirm they are:
+1. Properly namespaced (lowercase vendor prefix + field name)
+2. Sourced from documented vendor API fields
+3. Values are well-formed and meaningful
+
+---
+
+## TOC
+
+- [All Finding Types](#all-finding-types)
+- [Detection Findings](#detection-findings)
+- [Vulnerability Findings](#vulnerability-findings)
+- [Compliance Findings](#compliance-findings)
+
+---
+
+## All Finding Types
+
+| Field | SD Status | Sample Status | Acceptable? | Notes |
+|---|---|---|---|---|
+| `object.type` (vendor-reported value) | Required | Vendor-extensible | ✅ Yes | `object.type` accepts whatever the vendor reports (e.g. `AWS::EC2::Instance`, `AWS::IAM::Role`, vendor-specific resource taxonomies). Smartscape-style canonical enum (`AwsEc2Instance`) is required ONLY when the integration opts into runtime contextualization for an officially supported type. See `intake-and-constraints.md § Vendor-Reported object.type Values Are Accepted` |
+| `event.start` | Required | Absent | ✅ Yes | SD requires earliest activity timestamp; `timestamp` / `finding.time.created` used instead |
+| `event.end` | Required | Absent | ✅ Yes | SD requires latest activity timestamp; same rationale as `event.start` |
+| `event.name` | Absent | Present (all) | ✅ Yes | User-friendly label for the `event.type` value; set as a constant per integration following the pattern `"<Type> event"` — e.g. `DETECTION_FINDING` → `"Detection finding event"`, `VULNERABILITY_FINDING` → `"Vulnerability finding event"`, `COMPLIANCE_FINDING` → `"Compliance finding event"`, `VULNERABILITY_SCAN` → `"Vulnerability scan event"`, `COMPLIANCE_SCAN` → `"Compliance scan event"` |
+| `event.description` | Absent | Present (most) | ✅ Yes | Free-text description; common enrichment extension |
+| `event.category` | Absent | Present (most) | ✅ Yes | High-level category (e.g. `VULNERABILITY_MANAGEMENT`); not in SD |
+| `event.version` | Optional | Present (most) | ✅ Yes | Schema/format version from external providers |
+| `finding.severity` | Absent | Present (all) | ✅ Yes | Vendor-reported severity string. SD normalised equivalent is `dt.security.risk.level`; both coexist |
+| `finding.score` | Absent | Present (many) | ✅ Yes | Vendor numeric score. SD equivalent is `dt.security.risk.score` |
+| `finding.description` | Absent | Present (many) | ✅ Yes | Extended description; acceptable extension |
+| `finding.url` | Absent | Present (most) | ✅ Yes | Deep-link to finding in source system |
+| `finding.status` | Absent | Present (some) | ✅ Yes | Open/closed/detected status from external providers |
+| `finding.tags[]` | Absent | Present (some) | ✅ Yes | Freeform classification tags (e.g. CodeQL categories) |
+| `dt.security.risk.score` | Absent on DETECTION | Present (all) | ✅ Yes | Normalised numeric score; not in SD for Detection Finding |
+| `dt.openpipeline.source` | Absent | Present (all) | ✅ Yes | Platform ingestion metadata |
+| `dt.openpipeline.pipelines[]` | Absent | Present (all) | ✅ Yes | Pipeline processing metadata |
+| `dt.security_context` | Absent | Present (some) | ✅ Yes | Cost/security context metadata |
+| `dt.cost.*` | Absent | Present (some) | ✅ Yes | Cost attribution metadata |
+
+---
+
+## Detection Findings
+
+Fields observed in `samples/external-detections.json`, `samples/dynatrace-detections-rap.json`, `samples/dynatrace-detections-automated.json`.
+
+| Field / Namespace | SD Status | Acceptable? | Notes |
+|---|---|---|---|
+| `actor.ips[]` | Absent | ✅ Yes | Source IP addresses; DT RAP, Automated K8s, external. SD type: `ipAddress[]` |
+| `actor.geo.*` | Absent | ✅ Yes | Geo-enrichment from external providers (city, country, continent, region, lat/lon) |
+| `actor.fqdns` | Absent | ✅ Yes | Reverse-DNS resolved hostname(s) — AWS Security Hub |
+| `detection.id` / `.title` / `.description` | Absent | ✅ Yes | DT Automated Detections internal rule metadata |
+| `detection.owner.id` | Absent | ✅ Yes | DT detection rule ownership |
+| `detection.mitre.ids[]` | Absent | ⚠ Legacy | Older DT detection rule definition pattern. **Do NOT use for new mappings** — emit `threat.attack.*` instead (see row below). Existing integrations may keep `detection.mitre.ids[]` for backward compatibility. |
+| `detection.action` / `detection.type` | Absent | ✅ Yes | Action / rule-type from external providers |
+| `threat.attack.*` | **SD-canonical** | ✅ Yes — **canonical SD pattern** | The canonical SD namespace for MITRE ATT&CK enrichment on detection findings (defined in `source/fields/signal_fields/threat.yaml` in the SD repo). Use this for ALL new detection mappings. Key fields: `threat.attack.tactic.ids[]` (TA-prefixed), `threat.attack.tactic.names[]`, `threat.attack.technique.ids[]` (T-prefixed), `threat.attack.technique.names[]`, `threat.attack.subtechnique.ids[]` (dotted, e.g. `T1059.003`), `threat.attack.subtechnique.names[]`, `threat.attack.version`. Supersedes `detection.mitre.ids[]`. Note: `mitre.attack.enterprise.*` does **not** exist in the SD — do not use or suggest it. |
+| `entry_point.*` / `user_controlled_input.*` | Absent | ✅ Yes | DT RAP attack entry-point detail; flat namespace vs SD structured array |
+| `dt.security.rap.target.*` | Absent | ✅ Yes | DT RAP target type/name |
+| `dt.security.evidence.*` | Absent | ✅ Yes | DT evidence DQL query data |
+| `http.request.*` / `http.response.*` | Absent | ✅ Yes | WAF / SIEM HTTP context; not in SD security-events model |
+| `url.*` / `client.ip` | Absent | ✅ Yes | URL components and client IP from network layer. `client.ip` SD type: `ipAddress` (scalar) |
+| `rule.id` / `rule.name` / `rule.description` / `rule.type` | Absent | ✅ Yes | Generic rule-identity namespace; SIEM/WAF rule identifiers from external providers. Use `rule.name`, **not** `rule.title`. Legacy `rule.title` still appears on current detection events (e.g. `samples/external-detections.json`) — accept it on ingested/live events, recommend migration to `rule.name`. See `semantic-reference.md § Rule Identity Namespace` |
+| `execution.id` / `execution.actor.id` | Absent | ✅ Yes | DT AutomationEngine workflow execution context |
+| `span.id` / `trace.id` / `trace.is_sampled` | Absent | ✅ Yes | DT RAP distributed tracing context |
+| `dt.agent.module.*` | Absent | ✅ Yes | OneAgent module metadata |
+| `dt.smartscape.*` | Not in SD | ✅ Yes — post-ingest enrichment | Platform enrichment populated by OpenPipeline at ingest. NOT an integration-emitted field — do not include in mapping; check at runtime only. **Canonical / preferred namespace** (`dt.entity.*` is its deprecated alias). See `intake-and-constraints.md § Smartscape Enrichment Fields Are Post-Ingest`. |
+| `dt.entity.*` | Not in SD | ✅ Yes — post-ingest enrichment, deprecated alias | Same as `dt.smartscape.*` but the **deprecated** namespace. Existing rows that carry `dt.entity.*` are valid; new mappings/queries should prefer `dt.smartscape.*`. A row with `dt.smartscape.*` populated and no `dt.entity.*` is completely OK — do NOT flag the missing legacy alias. |
+| `event.original_content` | Absent | ✅ Yes | Raw original event payload; WAF / SIEM integrations |
+| `server.address` | Absent | ✅ Yes | Akamai SIEM server address |
+
+---
+
+## Vulnerability Findings
+
+Fields observed in `samples/external-vulnerabilities-*.json`.
+
+| Field / Namespace | SD Status | Acceptable? | Notes |
+|---|---|---|---|
+| `vulnerability.exploit.status` | SD optional | ✅ Yes | Exploit availability; present in some integrations |
+| `vulnerability.remediation.*` | SD optional | ✅ Yes | Remediation status, fix versions, description |
+| `vulnerability.cvss.*` | SD optional | ✅ Yes | CVSS base score and vector |
+| `vulnerability.references.cwe` | Absent | ✅ Yes | CWE references alongside CVE |
+| `code.*` | Absent (SD optional for CODE_ARTIFACT) | ✅ Yes | Source file path and line numbers; expected for CODE_ISSUE / CODE_VULNERABILITY |
+| `artifact.*` | Absent from SD | ✅ Yes | Code artifact identity; expected for `CODE_ARTIFACT` object type. Also acceptable on `CONTAINER_IMAGE` findings and scans when a specific file within the image is the discovery source — for example, a Helm chart template, Dockerfile, or dependency manifest that references or contains the vulnerable package. In this case `artifact.*` describes the source file that led to the finding, not the scanned image itself. Do not flag `artifact.*` on `CONTAINER_IMAGE` events as a namespace mismatch when this discovery-path context is present. |
+| `container_image.*` | Absent | ✅ Yes | Only for CONTAINER_IMAGE findings |
+| `software_component.*` | SD optional | ✅ Yes | Vulnerable component details; expected for DEPENDENCY_VULNERABILITY |
+| Vendor namespaces (`snyk.*`, `sonatype.*`, `gitlab.*`, `github.*`, `qualys.*`, `tenable.*`) | Absent | ✅ Yes | Vendor-specific context; acceptable extension pattern |
+| Threat-intel vendor namespaces (`alienvault.pulse.*`, `crowdstrike.report.*`) | Absent | ✅ Yes | Additive `THREAT_REPORT` context (TLP / public flag / report slug + type). No SD counterpart — not duplication |
+| `threat.report.*` / `threat.actor.*` / `threat.target.*` / `threat.malware.*` / `threat.attack.*` / `threat.observables.*` | SD experimental | ✅ Yes | Canonical `THREAT_REPORT` fields; verify stability against live SD |
+| `finding.status` | Absent | ✅ Yes | Open/detected/fixed status from source (GitLab, SonarQube) |
+| `finding.tags[]` | Absent | ✅ Yes | Category tags from CodeQL / GitHub scanning |
+| `finding.time.created` mapped to scan/analysis date or vendor `last_updated`/`updateDate`/`updated_at` field | SD required | ✅ Yes — general pattern | `finding.time.created` represents the **detection occurrence timestamp** — when the finding was detected in the current scan run. Vendor fields named `creationDate`, `created_at`, or `first_seen_at` are **not** the correct source: they capture only the initial issue creation and are not updated on subsequent scans. Map from the vendor's `last_updated`, `updateDate`, `updated_at`, `last_seen`, or the scan/analysis date instead. Do not flag this mapping choice as a discrepancy. |
+| `dt.security.risk.score` diverging from `vulnerability.cvss.base_score` | — | ✅ Yes — **recommended pattern** | Vendor post-assessment scoring (e.g. JFrog applicability-adjusted severity, Snyk effective severity, Qualys QDS) augments the raw CVSS base score by factoring in exploit context, applicability, and reachability — intentionally lowering scores on theoretical vulnerabilities to deprioritize noise. `dt.security.risk.score` SHOULD reflect the vendor's adjusted score; `vulnerability.cvss.base_score` SHOULD preserve the original CVSS for reference. Both fields coexisting with different values is correct and expected. **Do NOT flag score divergence between these two fields as a discrepancy.** Only flag if (a) `dt.security.risk.score` is identical to `vulnerability.cvss.base_score` for all events while the vendor is known to provide an adjusted score, or (b) the score-to-level mapping is internally inconsistent (Q6 mismatch > 0). |
+
+---
+
+## Compliance Findings
+
+Fields observed in `samples/external-compliance.json`, `samples/dynatrace-compliance.json`.
+
+**Key convention:** rule identity uses the generic `rule.*` namespace for **all** compliance findings — external and SPM alike (`rule.id` / `rule.name` / `rule.description` / `rule.type`; use `rule.name`, **not** `rule.title`). `compliance.result.*` and `compliance.standard.*` remain SPM-internal; external integrations use `finding.*` for result status. See `semantic-reference.md § Rule Identity Namespace` and `§ External Compliance Integration in this file — Field Conventions` for the full rule set.
+
+| Field / Namespace | SD Status | Acceptable? | Notes |
+|---|---|---|---|
+| `rule.id` / `rule.name` / `rule.description` / `rule.type` | Absent from SD (proposed, experimental) | ✅ Yes — **cross-integration standard** | The correct targets for rule identity and context on compliance findings (external and SPM). `rule.name` is the canonical rule-name field — do **not** use `rule.title`. Legacy `compliance.rule.id` / `compliance.rule.title` migrate here. |
+| `finding.result` | Absent from SD | ✅ Yes — **cross-integration standard** | Per-finding PASS/FAIL/MANUAL result status on external compliance findings. Source from vendor `result` field. |
+| `finding.status` | Absent | ✅ Yes | Workflow state (e.g. `OPEN`, `RESOLVED`); acceptable alongside `finding.result` |
+| `compliance.status` | Absent | ✅ Yes | Legacy parallel status field; acceptable |
+| `compliance.control` | Absent | ✅ Yes — cross-integration extension | Vendor rule short-ID or control reference (e.g. Wiz `shortId`). Present across multiple integrations; do not flag as unknown. |
+| `compliance.standards` | Absent | ✅ Yes — cross-integration extension | Array of compliance framework names. Present across multiple integrations; do not flag as unknown. |
+| `compliance.requirements` | Absent | ✅ Yes — cross-integration extension | Array of requirement/sub-category references within the frameworks. Present across multiple integrations; do not flag as unknown. |
+| `scan.id` / `scan.name` | Absent from SD core | Required by this skill | Static mapping requirement: both vulnerability and compliance findings should carry scan reference; runtime gaps are warning-tier when caused by time-window/linkage limits |
+| `compliance.rule.id` / `compliance.rule.title` | Legacy SPM rule identity | ⚠ Legacy — migrate to `rule.*` | Superseded by generic `rule.id` / `rule.name`. Accept on current ingested/live events (still emitted in runtime), but recommend migration. On a **new external mapping**, propose `rule.id` / `rule.name` instead — do not introduce `compliance.rule.id` / `compliance.rule.title`. |
+| `compliance.rule.severity.*` | Present for DT SPM | SPM-only | No `rule.*` equivalent in the proposal; stays compliance-namespaced. Flag as **major** on an external integration event. |
+| `compliance.result.*` namespace | Present for DT SPM | ❌ Must be absent for external integrations | SPM-only. Flag as **major** on any external integration event. Replace with `finding.result` / `finding.severity`. |
+| `compliance.standard.*` namespace (`compliance.standard.name`, `.short_name`, `.url`) | Present for DT SPM | ❌ Must be absent for external integrations | SPM-only. Flag as **major** on any external integration event. |
+
+
+---
+
+## Report Format
+
+
+## TOC
+
+- [Workflow A — Phase 1 Output (Suggestion Table)](#workflow-a--phase-1-output-suggestion-table)
+- [Workflow A — Phase 2 Output (Sample JSON)](#workflow-a--phase-2-output-sample-json)
+- [Workflow B Output (Validation with Diff Table)](#workflow-b-output-validation-with-diff-table)
+- [Shared Sections](#shared-sections)
+
+---
+
+## Workflow A — Phase 1 Output (Suggestion Table)
+
+Present this block first. Do not generate Phase 2 until the user approves.
+
+### 1. Mapping Summary
+
+- Vendor:
+- Finding types covered:
+- Sample count per type:
+- Confidence: `high | medium | low`
+
+### 2. Mapping Table
+
+| Source Field | Target Field | Transform | Required | Sample Value | Notes |
+|---|---|---|---|---|---|
+| `vendor.id` | `event.id` | direct | yes | `abc-123` | |
+| `vendor.severity` | `dt.security.risk.level` | enum map | yes | `critical` → `CRITICAL` | |
+| — | `event.kind` | constant | yes | `SECURITY_EVENT` | always required |
+
+### 3. Gap Summary
+
+List required fields that could not be satisfactorily mapped:
+
+| Required Field | Status | Reason |
+|---|---|---|
+| `finding.time.created` | ❌ missing | not provided by vendor API |
+| `scan.id` | ⚠ partial | present only in scan events, not findings |
+
+### 4. Discrepancies
+
+| Severity | Category | Issue | Impact | Suggested Fix |
+|---|---|---|---|---|
+| critical | required-field | `finding.id` not mapped | cannot deduplicate | map stable vendor finding ID |
+| major | type-mismatch | score is string not number | weak sorting | cast to numeric |
+| minor | enrichment | missing `product.vendor` | weaker attribution | map constant vendor name |
+
+### 5. Additional Sample Requests
+
+1. Payloads with null and missing fields.
+2. Payloads from each finding type and severity band.
+3. Payloads for each `object.type`.
+4. At least one payload per product variant/version if the vendor has multiple feeds.
+
+---
+
+## Workflow A — Phase 2 Output (Sample JSON)
+
+Produce only after user approves Phase 1. One block per `finding.type`.
+
+```json
+// Example: DEPENDENCY_VULNERABILITY (Snyk Open Source)
+// Transforms applied:
+//   vendor.severity "medium" -> dt.security.risk.level "MEDIUM"  [enum map]
+//   event.kind = "SECURITY_EVENT"                                [constant]
+//   scan.id copied from scan event payload                       [cross-event join]
+{
+  "event.id": "63f9f2e2-436c-423a-94c1-2139ed9b2fb6",
+  "event.kind": "SECURITY_EVENT",
+  "event.type": "VULNERABILITY_FINDING",
+  "event.provider": "Snyk",
+  "timestamp": "2026-04-24T13:35:45.397000000Z",
+  "product.vendor": "Snyk",
+  "product.name": "Snyk Open Source",
+  "finding.id": "35c68ba5-cfbe-49f3-a0a3-1a9c25a05944/OpenTelemetry.Instrumentation.Http1.0.0-rc7",
+  "finding.title": "Improper Removal of Sensitive Information Before Storage or Transfer",
+  "finding.time.created": "2026-03-17T20:22:49.375000000Z",
+  "finding.type": "DEPENDENCY_VULNERABILITY",
+  "finding.severity": "medium",
+  "dt.security.risk.level": "MEDIUM",
+  "dt.security.risk.score": 6.9,
+  "object.id": "4ed0e723-9ae9-40c4-ad19-ba217633091c",
+  "object.name": "AdService.csproj",
+  "object.type": "CODE_ARTIFACT",
+  "artifact.name": "AdService.csproj",
+  "artifact.path": "src/ad-service/AdService.csproj",
+  "artifact.repository": "DynatraceAppSec/unguard",
+  "component.name": "OpenTelemetry.Instrumentation.Http",
+  "component.version": "1.0.0-rc7",
+  "software_component.name": "OpenTelemetry.Instrumentation.Http",
+  "software_component.version": "1.0.0-rc7",
+  "vulnerability.references.cve": ["CVE-2024-32028"],
+  "vulnerability.cvss.base_score": 4.1,
+  "scan.id": "8dd82cb0-bbc8-41ea-94aa-07ff1a6f6637",
+  "scan.name": "8dd82cb0-bbc8-41ea-94aa-07ff1a6f6637"
+}
+```
+
+---
+
+## Workflow B Output (Validation with Diff Table)
+
+### 1. Mapping Summary
+
+Same header as Workflow A Phase 1.
+
+### 2. Diff-Highlighted Mapping Table
+
+Marker legend: ✅ ok · ⚠ change · ➕ add · ❌ remove
+
+| Source Field | Current Target | Suggested Target | Transform | Status | Reason |
+|---|---|---|---|---|---|
+| `vendor.id` | `event.id` | `event.id` | direct | ✅ ok | |
+| `vendor.score` | `dt.security.risk.score` | `dt.security.risk.score` | string→number | ⚠ change | must be numeric |
+| `vendor.repoName` | `artifact.name` | `artifact.repository` | direct | ⚠ change | repo belongs in `artifact.repository` |
+| — | — | `component.name` | constant/map | ➕ add | required for VULNERABILITY_FINDING |
+| `vendor.internalRef` | `internal.ref` | — | — | ❌ remove | unknown field, not in SD or local references |
+
+### 3. Gap Summary
+
+Same format as Workflow A Phase 1.
+
+### 4. Coverage Matrices
+
+**Event-type coverage:**
+
+| event.type | Status |
+|---|---|
+| `VULNERABILITY_FINDING` | ✅ mapped |
+| `VULNERABILITY_SCAN` | ❌ missing |
+
+**Object-type namespace check:**
+
+| object.type | Namespace | Status | Missing Fields |
+|---|---|---|---|
+| `CODE_ARTIFACT` | `artifact.*` | ✅ pass | — |
+| `HOST` | `host.*` | ⚠ partial | `host.ip` missing |
+
+**finding.type namespace check:**
+
+| finding.type | Namespace | Status | Missing Fields |
+|---|---|---|---|
+| `DEPENDENCY_VULNERABILITY` | `software_component.*` | ✅ pass | — |
+| `CODE_ISSUE` | `code.*` | ❌ fail | `code.filepath` absent |
+
+### 5. Discrepancies
+
+Same format as Workflow A Phase 1.
+
+### 6. Improvement Plan
+
+1. Immediate blockers to resolve (critical discrepancies).
+2. High-value additions (major discrepancies).
+3. Additional payloads requested.
+4. Regression checks for future vendor schema changes.
+
+### 7. Validation Summary (Optional Runtime Validation)
+
+Include this section only when tenant-backed validation is requested.
+
+Present this section as a table-driven summary. Do not replace it with bullet-list status output.
+
+- Provider: `<event.provider>`
+- Time window: `<window>`
+- Execution path: live DQL execution
+
+Status legend for runtime tables:
+
+- `🟢 pass` — check passed
+- `🟡 warn` — notable issue, but not a blocking runtime failure
+- `🔴 fail` — blocking runtime failure or required-structure violation
+
+| Runtime Check | Result | Evidence |
+|---|---|---|
+| Findings exist for provider | `🟢 pass` / `🔴 fail` | count + event types |
+| Scans exist for provider | `🟢 pass` / `🟡 warn` | count + scan types |
+| Orphan findings without scan | `🟢 pass` / `🟡 warn` | orphan count |
+| Scan reference coverage on findings | `🟢 pass` / `🟡 warn` | missing `scan.id` / `scan.name` counts |
+| Risk level values valid | `🟢 pass` / `🔴 fail` | invalid values (if any) |
+| Risk score-level consistency | `🟢 pass` / `🔴 fail` | mismatch count |
+| Object type distribution sanity | `🟢 pass` / `🟡 warn` / `🔴 fail` | grouped counts |
+| Required-field null audit | `🟢 pass` / `🔴 fail` | null-count summary |
+| Raw payload availability | `🟢 pass` / `🔴 fail` | missing payload count |
+| Sample finding events per object.type (`| limit 1`) | `🟢 pass` / `🔴 fail` | sampled object types + query refs |
+| Sample scan events per object.type (`| limit 1`) | `🟢 pass` / `🟡 warn` / `🔴 fail` | sampled scan object types or reason |
+| Sample-event structure validation | `🟢 pass` / `🔴 fail` | required field checks on samples |
+| Missing-field mapping suggestions | `🟢 pass` / `🟡 warn` / `🔴 fail` | candidate source paths/transforms in priority order: `dt.raw_data`, then `event.original_content`, then vendor samples |
+
+If any check fails, add a one-line remediation action under the table.
+If a check is `warn`, add a one-line likely cause and follow-up action under the table.
+
+If required fields are missing, include a dedicated mapping-backfill table:
+
+| Missing Target Field | Source Evidence | Candidate Source Path | Transform | Confidence | Notes |
+|---|---|---|---|---|---|
+| `object.name` | `dt.raw_data` | `resources[0].details.instanceName` | direct | high | fallback to `object.id` if name absent |
+| `object.name` | `event.original_content` | `asset.displayName` | direct | medium | use only when `dt.raw_data` is unavailable |
+
+---
+
+## Shared Sections
+
+These sections appear in both workflows when relevant.
+
+### Confidence Assignment
+
+- `high`: all required fields mapped, all namespace checks pass, scan refs present for V/C.
+- `medium`: core mapped but gaps in type-specific namespaces or fewer than 5 samples per type.
+- `low`: missing required fields, absent scan events for V/C, or too few samples.

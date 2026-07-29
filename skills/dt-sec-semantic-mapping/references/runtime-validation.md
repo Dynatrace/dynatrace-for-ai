@@ -21,10 +21,10 @@ with SD expectations and integration intent.
 
 ## Step 0 — Load Required Skills (REQUIRED)
 
-**Before composing or running ANY runtime DQL in this workflow, you MUST load `dt-dql-essentials` and use this skill's references (`semantic-dictionary.md`, `validation-rules.md`, and this file).** Do NOT start writing queries until they are loaded.
+**Before composing or running ANY runtime DQL in this workflow, you MUST load `dt-dql-essentials` and use this skill's references (`semantic-reference.md`, `validation-policy-and-reporting.md`, and this file).** Do NOT start writing queries until they are loaded.
 
 1. **DQL Essentials skill** — provides DQL syntax, function reference, and query construction patterns (joins, `fieldsAdd`, `summarize`, `countIf`, time-window expressions, etc.).
-2. **This skill's references** (`semantic-dictionary.md`, `validation-rules.md`, `runtime-validation.md`) — provide `security.events` query patterns, provider scoping, event-type filtering conventions, field guidance, and time-window pitfalls specific to this Grail table.
+2. **This skill's references** (`semantic-reference.md`, `validation-policy-and-reporting.md`, `runtime-validation.md`) — provide `security.events` query patterns, provider scoping, event-type filtering conventions, field guidance, and time-window pitfalls specific to this Grail table.
 
 This file (`runtime-validation.md`) defines **what** to validate. The references above define **how** to write correct DQL: DQL Essentials covers general query mechanics; this skill's references cover `security.events`-specific patterns, provenance rules, and common mistakes.
 
@@ -327,7 +327,7 @@ fetch security.events, from:now()-24h
 | fieldsKeep timestamp, event.id, event.kind, event.type, event.provider, product.vendor, product.name, scan.id, scan.name, scan.time.started, scan.time.completed, object.id, object.name, object.type
 ```
 
-**After fetching sample events in Q10/Q11, apply the static checks in `validation-rules.md` to the fetched events — including the Vendor Namespace Duplication Check. Static checks apply equally to fetched and pasted samples.**
+**After fetching sample events in Q10/Q11, apply the static checks in `validation-policy-and-reporting.md` to the fetched events — including the Vendor Namespace Duplication Check. Static checks apply equally to fetched and pasted samples.**
 
 ### 12) Raw Payload Backfill Analysis For Missing Required Fields
 
@@ -354,15 +354,15 @@ Interpretation:
 
 ### 13) Vendor Namespace Duplication Check (Scale Confirmation Only)
 
-The core detection for this check is a **static field-comparison** on a sample event — no DQL query needed. See `validation-rules.md § Vendor Namespace Duplication Check → How to apply` for the static inspection procedure. Use the sample already fetched in Q10.
+The core detection for this check is a **static field-comparison** on a sample event — no DQL query needed. See `validation-policy-and-reporting.md § Vendor Namespace Duplication Check → How to apply` for the static inspection procedure. Use the sample already fetched in Q10.
 
-**Severity verdicts, the canonical relationship-to-SD-field table, and the common-duplication-patterns table are in `validation-rules.md § Vendor Namespace Duplication Check` — do not duplicate them in the report.**
+**Severity verdicts, the canonical relationship-to-SD-field table, and the common-duplication-patterns table are in `validation-policy-and-reporting.md § Vendor Namespace Duplication Check` — do not duplicate them in the report.**
 
 The DQL below is **optional scale confirmation only** — run it against the live environment to count duplication frequency across many events. It is not required for initial detection.
 
 For each candidate pair identified in the static inspection, count how often the vendor field equals the SD field. Replace `<SD_FIELD>` and `<VENDOR_FIELD>` per pair; add as many `dup_<name>_*` counters as needed. Example below uses `<VENDOR_PREFIX> = wiz` with common compliance pairs.
 
-> **Rule-identity fields are migrating to the generic `rule.*` namespace** (`compliance.rule.title` → `rule.name`, `compliance.rule.description` → `rule.description`; see `data-model-notes.md § Rule Identity Namespace`). The example pairs below use the **legacy `compliance.rule.*` names because that is what current runtime data still emits** — the query must match live events. Once the runtime emits `rule.name` / `rule.description`, pair the vendor field against those canonical fields instead (and check both during the transition).
+> **Rule-identity fields are migrating to the generic `rule.*` namespace** (`compliance.rule.title` → `rule.name`, `compliance.rule.description` → `rule.description`; see `semantic-reference.md § Rule Identity Namespace`). The example pairs below use the **legacy `compliance.rule.*` names because that is what current runtime data still emits** — the query must match live events. Once the runtime emits `rule.name` / `rule.description`, pair the vendor field against those canonical fields instead (and check both during the transition).
 
 ```dql-template
 fetch security.events, from:now()-24h
@@ -385,7 +385,7 @@ fetch security.events, from:now()-24h
     // Add additional pairs as identified in the Q13 static inspection.
 ```
 
-Map `dup_<pair>_match` vs `dup_<pair>_both_present` to a verdict + severity using the verdict table in `validation-rules.md § Vendor Namespace Duplication Check`. Optional drilldown for partial-overlap pairs (rows where SD and vendor disagree) — replace `<SD_FIELD>` and `<VENDOR_FIELD>` per pair:
+Map `dup_<pair>_match` vs `dup_<pair>_both_present` to a verdict + severity using the verdict table in `validation-policy-and-reporting.md § Vendor Namespace Duplication Check`. Optional drilldown for partial-overlap pairs (rows where SD and vendor disagree) — replace `<SD_FIELD>` and `<VENDOR_FIELD>` per pair:
 
 ```dql-template
 // Replace `compliance.rule.title` and `wiz.rule.name` below with the actual SD field and vendor field per pair.
@@ -402,7 +402,7 @@ Report per-pair results in a table with columns `SD field`, `Vendor field`, `Bot
 
 ### 14) Entity Enrichment Coverage
 
-`dt.smartscape.*` and `dt.entity.*` are post-ingest enrichment populated by OpenPipeline — they are NOT integration-emitted fields. This check audits whether enrichment is actually working at runtime. **Missing enrichment is not a blocker** (see `object-type-expectations.md § Smartscape Enrichment Fields Are Post-Ingest`); severity depends on context — K8s and cloud detection findings warrant `warn`, others are `info`.
+`dt.smartscape.*` and `dt.entity.*` are post-ingest enrichment populated by OpenPipeline — they are NOT integration-emitted fields. This check audits whether enrichment is actually working at runtime. **Missing enrichment is not a blocker** (see `intake-and-constraints.md § Smartscape Enrichment Fields Are Post-Ingest`); severity depends on context — K8s and cloud detection findings warrant `warn`, others are `info`.
 
 `dt.entity.*` is the **deprecated** alias namespace; `dt.smartscape.*` is the canonical forward-going namespace. A row that has `dt.smartscape.*` but no `dt.entity.*` is **completely OK** — do NOT flag the missing legacy alias. The check below uses presence of *either* namespace as "enriched."
 
@@ -472,4 +472,4 @@ Every runtime check from this query pack must end up as a row in a single **`Val
 
 ### When required fields are missing
 
-Include a mapping-backfill table (per `intake-and-output.md § Output Contract — Workflow B`, item 13) sourcing candidates in priority order: `dt.raw_data` → `event.original_content` → vendor API samples.
+Include a mapping-backfill table (per `intake-and-constraints.md § Output Contract — Workflow B (Validation)`, item 13) sourcing candidates in priority order: `dt.raw_data` → `event.original_content` → vendor API samples.

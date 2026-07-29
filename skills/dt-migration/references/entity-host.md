@@ -14,6 +14,19 @@ Use this guide when the migration centers on `dt.entity.host` or host-related si
 - `entity.name` → `name`
 - host tags in signal queries → `getNodeField(dt.smartscape.host, "tags")`
 - host group data → host fields such as `dt.host_group.id`
+- `id` stays the same yet needs to be converted in a DQL to `toSmartscapeId("$id")`, where `$id` is replaced with the actual id
+
+## Signal filter with hardcoded host ID
+
+Inline `filter:` inside `timeseries`:
+
+```
+# before
+filter: in(dt.entity.host, {"HOST-ID"})
+
+# after
+filter: in(dt.smartscape.host, { toSmartscapeId("HOST-ID") })
+```
 
 ## Relationship patterns
 

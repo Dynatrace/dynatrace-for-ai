@@ -46,6 +46,7 @@ Use this skill when a user wants to:
 - `references/data-model-notes.md` — Log SD field taxonomy, audit namespace, enums, sample-derived patterns and known discrepancies
 - `references/mapping-workflow.md` — Intake checklist, Workflow A and B1 procedures, content field analysis, field priority order
 - `references/validation-rules.md` — Required fields, content/enum/type rules, discrepancy severity
+- `references/openpipeline-constraints.md` — OpenPipeline processor command/function/operator/matcher restrictions; `parseJson` unavailability + `parse`→`fieldsFlatten` alternative; iterative operators for array casting
 - `references/report-format.md` — Mapping table, diff table, OpenPipeline sketch, Validation Summary templates
 - `references/runtime-validation.md` — Workflow B2: fetch live records, then run B1
 - `samples/audit-logs.json` — Mapped samples: CyberArk, Okta, Azure SignInLogs, Sonatype, GitHub
