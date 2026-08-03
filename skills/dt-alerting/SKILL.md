@@ -72,11 +72,11 @@ entities of the same kind (e.g. "alert on services A, B, and C"), always
 recommend a **single combined detector** rather than one detector per entity.
 Use `by: { <dimension> }` in the DQL `timeseries` call to split results per
 entity, and a single `filter:` clause to scope to the relevant entities.
-Pair the combined detector with a **single `dt.alert_group` tag** shared
-across all alert conditions and the corresponding workflow notification filter.
-This keeps the number of detector configs small, ensures consistent routing,
-and makes the workflow notification channel reusable for future entities added
-to the same group.
+Pair the combined detector with a **routing label of your own** — a custom attribute set on the
+event, for which `alert_group` is a sensible naming convention — and filter the notification
+workflow on that attribute. Recommend the convention; never assume the attribute already exists. This keeps the
+number of detector configs small and makes the workflow channel reusable for entities added
+later.
 
 Example for three services — one detector, one workflow:
 
@@ -86,10 +86,23 @@ timeseries avg(dt.service.request.response_time),
   filter: { in(dt.smartscape.service, {toSmartscapeId("SERVICE-0000000000000001"), toSmartscapeId("SERVICE-0000000000000002"), toSmartscapeId("SERVICE-0000000000000003")}) }
 ```
 
-Set `dt.alert_group: "checkout-team"` in the detector's event properties, then
-filter the notification workflow on `matchesPhrase(dt.alert_group, "checkout-team")`.
-If a new service must be covered, add it to the single `filter:` list — no new
-detector or workflow rule needed.
+If a new service must be covered, add it to the single `filter:` list — no new detector or
+workflow rule needed.
+
+> **Naming convention worth suggesting — but create it, don't assume it.** A routing attribute named
+> `alert_group` is a good convention to standardize on, and it is reasonable to *recommend* that a
+> customer adopt it across detectors, ingested events, and pipeline rules. What matters is that it is
+> **an attribute they define and populate**, not something Dynatrace supplies. Always confirm it is
+> present on the customer's own records before designing routing around it — an attribute nothing
+> sets yields a trigger that silently matches nothing, which is indistinguishable from a quiet estate.
+
+> **⚠️ Unverified as a built-in field — `dt.alert_group`.** Earlier revisions of this skill presented
+> `dt.alert_group` as a platform-provided routing field, with per-detector-type assignment
+> mechanisms and set-union-on-merge semantics at the problem level. As of 2026-08-03 that field
+> **could not be substantiated** against docs.dynatrace.com (workflow trigger pages, anomaly
+> detection app), a live tenant's `dt.semantic_dictionary.fields`, or web search. The guidance
+> below has been rewritten around the documented trigger surface. **Do not reintroduce
+> `dt.alert_group` without a primary source.**
 
 ### Intent Mapping
 
@@ -208,19 +221,19 @@ fetch dt.davis.problems, from: -24h
    entities reduces noise and makes problems more actionable.
 3. **Tune sensitivity before going to production** — Start with LOW sensitivity
    and move to MEDIUM or HIGH only after observing false-positive rates.
-4. **Let Davis denoise before notifying** — Trigger workflow notifications on
+4. **Use the trigger's `Delay` option to suppress transient problems** — a problem trigger can postpone *"until the problem has been open for at least the configured duration"* (5, 10, 15, 30, 60, 120, 240, 1440, or 10080 minutes), evaluated on `dt.duration_marker`. Note the conflicting upgrade-guide statement that the classic Duration filter has "currently no alternative" — verify in-tenant.
+5. **Let Davis denoise before notifying** — Trigger workflow notifications on
    *problems*, not individual alert events. A problem groups correlated alerts
    so you notify once per incident, not once per metric.
-5. **Filter notifications by severity level** — Route `event.severity <= 2` problems to
+6. **Filter notifications by severity level** — Route `event.severity <= 2` problems to
    on-call channels immediately; route `event.severity >= 3` problems to lower-
    urgency channels. Either set severity in the detector config or assign in a pipeline rule or workflow.
-6. **Use `dt.alert_group` event property for routing** — Assign `dt.alert_group` to route alerts to the right team. Either set a static value in the detector config, use dynamic assignment through DQL query result mapping or assign in a pipeline rule.
-7. **Combine same-condition alerts into one detector and one workflow** — When
+6. **Route on a custom attribute you define** — Dynatrace documents no built-in team, owner, or routing-group field on a problem trigger. The documented recommendation is to filter trigger conditions on *"Primary Grail fields, Security context, Custom attributes"* — so set your own routing label where the event is raised (detector event template, Events API payload, or an OpenPipeline enrichment rule) and match it in the workflow's additional custom filter query.
+8. **Combine same-condition alerts into one detector and one workflow** — When
    alerting on multiple entities with the same metric and threshold, merge them
    into a single DQL-based detector using `by: { <dimension> }` and a combined
-   `filter:` clause. Assign the same `dt.alert_group` value to every condition
-   in that detector and point the workflow notification channel at that single
-   group. One detector + one workflow per logical alert group scales better than
+   `filter:` clause. Assign the same routing attribute to every condition in that detector
+   and point the workflow notification channel at that single value. One detector + one workflow per logical alert group scales better than
    N detectors + N notification rules, and adding a new entity is a one-line
    filter change rather than a full detector/workflow addition.
 
