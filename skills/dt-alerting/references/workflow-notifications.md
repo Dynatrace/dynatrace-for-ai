@@ -49,7 +49,7 @@ workflow executions are billed according to the Dynatrace rate card.
 - [Filtering Which Problems Notify](#filtering-which-problems-notify)
 - [Notification Actions](#notification-actions)
 - [Routing Patterns](#routing-patterns)
-- [Scalable Multi-Team Routing with `dt.alert_group`](#scalable-multi-team-routing-with-dtalert_group)
+- [Scalable Multi-Team Routing](#scalable-multi-team-routing)
 - [Best Practices](#best-practices)
 
 ---
@@ -86,13 +86,28 @@ control which problems actually activate the workflow.
 
 ### Trigger filters
 
+The documented problem-trigger configuration options:
+
 | Filter | Values / behaviour |
 |--------|--------------------|
-| **Event status** | `Active only` — fires only when a problem opens or updates; `Active and closed` — also fires on resolution |
-| **Affected entity tags** | Restricts the trigger to problems whose affected Smartscape entities carry the selected tags. Leave empty to match all entities |
-| **Initial root-cause analysis** | When enabled, the trigger waits for Davis to complete its first root-cause and merge run (~1–2 minutes) before firing. **Recommended: enable.** The workflow then receives a fully enriched problem record including root cause, affected entities, and merged events rather than a partially assembled one |
-| **Severity** | Numeric filter on `event.severity` (1 = highest, 5 = lowest). Set a maximum severity level to suppress low-priority problems |
-| **Additional custom filter** | Accepts a DQL filter-matcher expression for any condition not covered by the filters above. Only the subset of DQL matchers supported by OpenPipeline is valid here — see the [OpenPipeline DQL matcher reference](https://docs.dynatrace.com/docs/shortlink/dql-matcher-openpipeline) |
+| **Problem state** | Active only; or active and closed |
+| **Event category** | Which Davis categories activate the workflow |
+| **Severity** | Filters by level threshold |
+| **Affected entities** | Tag-based — all entities, all defined tags, or any defined tag |
+| **Delay** *(advanced)* | Postpones *"the trigger until the problem has been open for at least the configured duration."* Allowed values in minutes: 5, 10, 15, 30, 60, 120, 240, 1440, 10080. Evaluated on `dt.duration_marker`, *"a field set by Dynatrace Intelligence that accumulates from the moment the problem was first created."* *"The trigger fires once when the threshold is crossed on the active phase and, if selected, also once on closure."* |
+| **Updates** *(advanced)* | Re-trigger when selected fields change |
+| **Additional custom filter query** *(advanced)* | A DQL matcher over the problem record |
+
+There is **no management-zone filter, no segment filter, and no built-in team / owner /
+routing-group field.**
+
+> **Conflict to be aware of.** The alert-notification upgrade guide states the classic **Duration**
+> filter is *"No longer supported. Currently there is no alternative to deliver problems that are
+> active longer than X minutes"* — while the trigger documentation describes the **Delay** option
+> above, which does exactly that. Both were live 2026-08-03. Most likely the upgrade guide predates
+> Delay and was not re-tensed, but verify in-tenant rather than repeating either claim as settled.
+
+Source: [Event triggers for workflows (DT docs)](https://docs.dynatrace.com/docs/analyze-explore-automate/workflows/trigger/event-trigger).
 
 ### Trigger payload fields
 
@@ -113,14 +128,13 @@ available for filtering and notification content:
 | `{{event.severity}}` | Numeric severity of the problem (1 = highest, 5 = lowest) |
 | `{{affected_entity_ids}}` | List of entity IDs for all Smartscape entities affected by the problem |
 | `{{affected_entity_names}}` | Array of display names for all Smartscape entities affected by the problem |
-| `{{smartscape.affected_entity.ids}}` | Array of entity IDs for all Smartscape entities directly affected by the problem |
-| `{{smartscape.related_entities}}` | List of entity IDs for Smartscape entities related to the problem but not directly affected |
-| `{{smartscape.related_entity.types}}` | Array of entity types for all Smartscape entities related to the problem but not directly affected |
 | `{{k8s.cluster.uid}}` | UID of the Kubernetes cluster associated with the affected entities |
 | `{{dt.entity.kubernetes_cluster}}` | Entity ID of the Kubernetes cluster associated with the affected entities |
 | `{{k8s.workload.name}}` | Name of the Kubernetes workload associated with the affected entities |
-| `{{dt.security_context}}` | Security context tag attached to the affected entities, used for scoping access and routing |
-| `{{dt.alert_group}}` | Set of routing group names carried by the problem's contributing events |
+| `{{dt.security_context}}` | Security context tag attached to the affected entities |
+
+> **Verify payload field names against your own trigger before using them.** This table has not been
+> re-confirmed field-by-field against primary documentation; treat unfamiliar entries as unverified.
 
 ---
 
@@ -153,17 +167,16 @@ and contains the entity IDs of every Smartscape entity directly affected.
 matchesPhrase(smartscape.affected_entity.ids, "SERVICE-abc123def456")
 ```
 
-**Do not filter on `root_cause_entity_id`** — Davis may not detect or populate
-a root cause for every problem (especially early in the problem lifecycle or for
-externally ingested events). Filtering on `root_cause_entity_id` will silently
-miss problems where the field is absent. Use `smartscape.affected_entity.ids`
-instead — it is always present when a problem has affected entities.
+**Verify a field exists on your own problem records before filtering on it.** Davis does not
+populate every field on every problem — a root cause in particular may be absent early in the
+lifecycle or for externally ingested events, so a condition built on one silently drops those
+problems. Several entity-array field names in circulation are undocumented; confirm before use.
 
-For team-level routing that does not depend on a specific entity ID, prefer
-filtering on `dt.alert_group` (see [Scalable Multi-Team Routing](#scalable-multi-team-routing-with-dtalert_group)):
+For team-level routing that does not depend on a specific entity, filter on a **custom attribute you
+set** (see [Scalable Multi-Team Routing](#scalable-multi-team-routing)):
 
 ```
-matchesPhrase(dt.alert_group, "sev1_slack")
+matchesValue(<your-routing-attribute>, "<team>")
 ```
 
 ### Combining conditions
@@ -210,7 +223,7 @@ Started: {{event.start}}
 ```
 
 Use Slack `blocks` for richer formatting. Route to different channels by
-filtering on `dt.alert_group` or `event.severity` in the workflow condition
+filtering on your routing attribute or `event.severity` in the workflow condition
 rather than maintaining separate channel mappings in action configuration.
 
 ### ServiceNow
@@ -223,7 +236,7 @@ Map fields:
 | `short_description` | `{{event.name}}` |
 | `description` | `{{event.description}}` |
 | `urgency` | Derived from `{{event.severity}}` (maps directly: severity 1 → urgency 1, etc.) |
-| `assignment_group` | Derived from `{{dt.alert_group}}` (use the group name that identifies the owning team) |
+| `assignment_group` | Derived from your routing attribute (the value identifying the owning team) |
 | `work_notes` | Include Dynatrace problem URL |
 
 Add a separate workflow with the same problem trigger and condition `event.status == "CLOSED"` to automatically close or resolve the ServiceNow ticket on resolution.
@@ -252,88 +265,85 @@ Content-Type: application/json
 
 ---
 
-## Scalable Multi-Team Routing with `dt.alert_group`
+## Scalable Multi-Team Routing
 
-For environments with many teams and many detectors, maintaining per-team
-per-detector workflow conditions quickly becomes unmanageable. The recommended
-scalable alternative is to standardize routing on two fields: **`dt.alert_group`**
-for team-level routing and **`event.severity`** for urgency-based routing.
+**Reach for Ownership first — it is the built-in mechanism.** *"Ownership assignment is based on tags.
+Tags are key-value pairs stored in Smartscape nodes."* Dynatrace ships `owner` and `dt.owner` as default
+keys in every monitoring environment, plus up to three custom keys, assignable via Kubernetes labels,
+`oneagentctl --set-host-property owner-1=team-automation`, or process-group environment variables.
+Because ownership is entity tags, the problem trigger's **affected-entity tag filter** routes on it
+directly — no DQL required.
 
-### How it works
+Two further pieces:
 
-1. **At the alert source**, set the `dt.alert_group` field to a routing target
-   identifier when the alert event is raised. The exact mechanism depends on the
-   detector type:
-   - For Davis anomaly detectors (`builtin:davis.anomaly-detectors`): set
-     `dt.alert_group` as a custom property in the `eventTemplate` of the detector
-     configuration
-   - For externally ingested events: include `dt.alert_group` in the event
-     payload sent to the Events API v2
-   - For OpenPipeline-sourced events: add a field enrichment rule that sets
-     `dt.alert_group`
+- **Carrying ownership on the event.** Set `dt.owner` as an event property on the alert configuration
+  (documented example `"dt.owner": "app-team-us-23"`), then map it onto the problem via
+  **Settings → Dynatrace Intelligence → Root cause analysis → Problem fields**. Without that mapping the
+  field never reaches the problem record and the trigger silently matches nothing. The mapping is **not
+  retroactive**: *"Problem records in Grail are immutable … previously recorded problems that were closed
+  before the modifications will not change."* Create it before any parallel-run window, not during one.
+  The docs do **not** specify a field-count limit, what happens when merged events carry conflicting
+  values for the same field, or how array-valued fields behave — test, do not assume. (An earlier
+  revision of this skill asserted set-union-on-merge semantics here; that was never documented.)
+- **Contact details at run time.** The Ownership app's `get_owners` action returns *"ownership team info
+  with contact details for Slack/Teams/Email/JIRA"*, so one workflow can route dynamically instead of one
+  workflow per team. `import_teams` *"imports and auto-syncs ownership team data … and accepts info from
+  ServiceNow and Entra ID."*
 
-2. **Dynatrace stores the field**: the `dt.alert_group` value is carried through
-   to the Davis event and persisted in Grail as part of the event record. It is
-   available as a filter field on the workflow trigger.
+> **⚠️ "Available" is not "populated."** The default keys existing says nothing about whether any entity
+> carries an owner, whether team records exist, whether contact details are filled in, or whether the
+> Problem fields mapping was ever created. Measure coverage before designing routing on it — e.g.
+> `smartscapeNodes "HOST" | fieldsAdd o = tags[\`dt.owner\`] | summarize count(), by:{isNotNull(o)}`.
+> On the tenant used to verify this (2026-08-03) the answer was **zero of 8 hosts**. Unpopulated
+> ownership yields workflows that never fire, which is indistinguishable from a quiet estate.
 
-3. **Each team's workflow filters on its own `dt.alert_group` value**: the
-   workflow condition simply checks `matchesPhrase(dt.alert_group, "<target>")`. Any alert
-   event with that routing label activates the workflow; all others are ignored.
+### Visibility is a different axis — do not solve it with a trigger
 
-### Field semantics: sets and problem-level merging
+A trigger condition decides whether a *notification fires*. It does not decide who may **read** the
+problem. Reading is an IAM **policy boundary**, e.g. `storage:dt.security_context IN ("app-23");`
+attached to an **Event Read** permission and assigned to a user group — *"This allows you to segregate
+and manage access to the Dynatrace Grail data lake based on reading permissions for various user
+groups."*
 
-`dt.alert_group` is not a single string — it is a **set of one or more group
-names**. A single event can carry multiple routing targets simultaneously (e.g.
-`["slack_sev1", "pagerduty_oncall"]`), and a workflow whose filter matches any
-member of that set will activate.
+Note the asymmetry with `dt.owner`: *"All fields that occur on single violation events and are defined
+by the Dynatrace permission system as record permissions are automatically mapped onto problems."* So
+`dt.security_context` needs **no** Problem fields mapping — but it does still have to be set on the
+events. The docs make no statement about arrays, multiple contributing values, or conflict resolution
+here; do not assume behavior an earlier revision of this skill asserted.
 
-When Davis AI groups multiple contributing events into one problem, the
-`dt.alert_group` values from **all** constituent events are **merged into a
-combined set** at the problem level. The problem's `dt.alert_group` field is the
-union of every group name carried by any of its events. This means:
+Where ownership genuinely does not fit, team routing is something you construct.
 
-- A problem that merges events from two different detectors — each with its own
-  `dt.alert_group` value — will activate the workflows of **both** routing targets
-- A team whose workflow filters on their group name receives the notification even
-  if their detector's event was not the root cause, only a contributing event
+The documented guidance is to filter trigger conditions on *"Primary Grail fields, Security context,
+Custom attributes."* In practice that gives three routing dimensions:
 
-This merge behaviour is intentional: it ensures that every team whose detector
-contributed to a problem is notified, regardless of how Davis grouped or ranked
-the contributing events.
+| Dimension | Where it comes from | How the trigger uses it |
+|---|---|---|
+| **Affected-entity tags** | Your tagging standard, propagated onto entities | First-class trigger option |
+| **Severity** | Set on the detector, or assigned downstream | First-class trigger option |
+| **A custom attribute** | A routing label *you* define and set at the alert source | Additional custom filter query |
 
-### Example
+Set the custom attribute where the event is raised — a detector's event template, an Events API v2
+payload, or an OpenPipeline enrichment rule — then match it in the workflow's additional custom
+filter query with `matchesValue`.
 
-A detector responsible for Sev 1 Slack notifications sets:
+**Suggest a name, and say plainly that it must be created.** `alert_group` is a good convention and
+worth recommending, because the pattern's whole value comes from every alert source using the *same*
+attribute name. But it is a customer-defined attribute, not a Dynatrace-provided field: it will not
+appear on any event until something sets it. Verify it is populated on real records before a
+workflow depends on it — a trigger matching an attribute nothing sets never fires, and looks exactly
+like a healthy quiet estate.
 
-```
-dt.alert_group = "slack_sev1"
-```
+**Why this scales:** onboarding a new detector to an existing team becomes a matter of setting the
+same attribute on it; the workflow is unchanged. Detector authorship and notification routing stay
+independently maintainable.
 
-The on-call team's workflow uses the **Additional custom filter** on the problem
-trigger:
+> **Matcher surface differs per context.** The DQL matcher is a restricted subset of DQL, not full
+> DQL. Its core functions are `matchesPhrase`, `matchesValue`, `isNotNull`, `isNull` with logical
+> operators. Support beyond that varies by surface — do not assume numeric comparisons or iterative
+> expressions are available in a workflow trigger. Confirm in the trigger UI.
 
-```
-matchesPhrase(dt.alert_group, "slack_sev1")
-```
-
-Every problem that contains an event carrying `dt.alert_group = "slack_sev1"`
-activates that workflow and is delivered to the team's Slack channel — without
-the workflow needing to know anything about which specific detector fired or
-which entity was affected.
-
-### Why this scales
-
-| Approach | New team onboarding | New detector onboarding |
-|----------|--------------------|-----------------------|
-| Per-detector conditions | Add a new condition branch to every affected workflow | Update every workflow that should receive the new alert |
-| `dt.alert_group` + `event.severity` routing | Team creates one workflow, filters on their `dt.alert_group` value and desired severity range | Detector sets `dt.alert_group`; no workflow changes needed |
-
-Once a team has a workflow that filters on its `dt.alert_group` value, routing
-any new alert to that team requires only setting the correct `dt.alert_group` on
-the detector. The workflow is unchanged. This decouples detector authorship from
-notification routing and makes both independently maintainable.
-
----
+Sources: [Alerting and notifications (DT docs)](https://docs.dynatrace.com/docs/analyze-explore-automate/alerting-and-notifications),
+[DQL matcher in OpenPipeline (DT docs)](https://docs.dynatrace.com/docs/platform/openpipeline/reference/dql/dql-matcher-in-openpipeline).
 
 ## Best Practices
 
@@ -342,12 +352,11 @@ notification routing and makes both independently maintainable.
    floods channels.
 
 2. **Always filter by at least one condition** — An unconditional workflow notifies
-   on every problem in the environment. Start with `dt.alert_group` for team
-   routing and `event.severity` for urgency filtering at minimum.
+   on every problem in the environment. Start with affected-entity tags or a custom routing
+   attribute for team routing, and `event.severity` for urgency filtering, at minimum.
 
-3. **Separate workflows per team using `dt.alert_group`** — One workflow per team
-   filtering on their `dt.alert_group` value is easier to maintain and debug than
-   one mega-workflow with complex branching.
+3. **Separate workflows per team** — One workflow per team, filtering on that team's routing
+   value, is easier to maintain and debug than one mega-workflow with complex branching.
 
 4. **Include the problem URL in every notification** — use `{{ problem_link() }}`
    so recipients can navigate to the problem in one click.
@@ -360,11 +369,9 @@ notification routing and makes both independently maintainable.
    with a threshold that will fire in a test environment to validate the full
    workflow before connecting production alerts to on-call systems.
 
-7. **Never filter on `root_cause_entity_id`** — Davis does not always detect or
-   populate a root cause, especially for externally ingested events or early in
-   the problem lifecycle. Use `matchesPhrase(smartscape.affected_entity.ids, "<entity-id>")`
-   to target a specific entity, or `matchesPhrase(dt.alert_group, "<group>")` for
-   team-based routing. Both fields are reliably present.
+7. **Verify any field name before building a condition on it.** Davis does not populate every
+   field on every problem, and several field names in circulation are not documented. Check the
+   field exists on your own problem records before a workflow depends on it.
 
 8. **Use workflow execution history for debugging** — Navigate to
    **Automation → Workflows → [your workflow] → Executions** to see the full
