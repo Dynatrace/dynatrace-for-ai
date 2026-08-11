@@ -268,7 +268,16 @@ Entity fields are scoped per type — `entity.id` does not exist. Use `smartscap
 | Process     | `dt.smartscape.process`      | `"PROCESS"`            |
 | K8s cluster | `dt.smartscape.k8s_cluster`  | `"K8S_CLUSTER"`        |
 
-Use `toSmartscapeId()` for ID conversion from strings (required!).
+**These four are examples, not the inventory.** A real environment carries well over a hundred node
+types, and the set is not closed — OpenPipeline can extract user-defined `CUSTOM_*` / `EXT_*` nodes.
+Discover them rather than working from a list:
+
+```dql
+smartscapeNodes "*" | dedup type | fields type
+```
+
+Use `toSmartscapeId()` for ID conversion from strings (required!). Nodes also carry `id_classic`, the
+classic entity ID, which is the bridge when migrating off `dt.entity.*`.
 
 → [references/smartscape-topology-navigation.md](references/smartscape-topology-navigation.md)
 
