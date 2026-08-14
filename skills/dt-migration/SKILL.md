@@ -86,7 +86,7 @@ These classic constructs usually need explicit rewriting:
 | `dt.entity.*` in signal queries | `dt.smartscape.*` | Applies to `by`, `filter`, `fieldsAdd`, `expand`, and related clauses |
 | `belongs_to[...]`, `runs[...]`, `instance_of[...]` | `traverse` or `references[...]` | `references` works only for static edges |
 | classic entity ID filters | Smartscape `id` | Do not reuse classic IDs blindly |
-| `affected_entity_ids` and `affected_entity_types` | `smartscape.affected_entity.ids` and `smartscape.affected_entity.types` | Use Smartscape event fields |
+| `affected_entity_ids` and `affected_entity_types` | `smartscape.affected_entities` | One record array replaces the two parallel arrays; each record has `id`, `type`, and `name` |
 
 For the detailed function-by-function guide, load [references/dql-function-migration.md](references/dql-function-migration.md).
 

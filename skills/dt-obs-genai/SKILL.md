@@ -1,23 +1,9 @@
 ---
 name: dt-obs-genai
 description: >-
-  Analyzes observability signals from customer GenAI applications with DQL. Reads
-  OpenTelemetry GenAI spans and LLM evaluation bizevents.
-
-  Use for: golden signals (traffic, errors, latency, saturation); LLM signals
-  (model, provider, tokens); cost/token analytics, usage attribution, and prompt
-  caching; agent signals (tool calls, steps, failures, loop detection, Smartscape
-  topology); conversation/session analytics; guardrails (blocked/truncated
-  responses); and evaluation signals (quality, pass/fail).
-
-  Trigger: "LLM latency", "token usage by model", "cost by model and provider",
-  "cost per conversation", "who is driving token spend", "do I have prompt caching",
-  "failing agent tool calls", "find runaway agents", "responses truncated or
-  blocked", "failed evaluations", "am I hitting rate limits", "token throughput /
-  TPM", "provider throttling or 429s".
-
-  Do NOT use for: Davis CoPilot/MCP telemetry (dt-platform), generic service
-  metrics (dt-obs-services), logs (dt-obs-logs), or non-GenAI tracing (dt-obs-tracing).
+  Analyze & debug GenAI/LLM apps: token cost & caching by prompt, model &
+  provider; latency/errors; agent & tool loops/failures; conversations;
+  guardrails; evaluations; OpenTelemetry/dt-evals setup.
 license: Apache-2.0
 ---
 
@@ -27,6 +13,38 @@ Analyze AI Observability signals from customer GenAI applications using DQL — 
 signals, LLM signals, token and cost analytics (with usage attribution and prompt-caching
 economics), agent signals (including loop/runaway detection and Smartscape topology),
 conversation/session-level analytics, guardrails, and evaluation quality.
+
+## When to Use
+
+Use this skill for observability questions about customer GenAI applications — anything
+reading OpenTelemetry GenAI spans (`gen_ai.*`) or LLM evaluation bizevents. Example triggers:
+
+- "LLM latency", "error rate by model"
+- "token usage by model", "token throughput / TPM", "am I hitting rate limits", "provider throttling or 429s"
+- "cost by model and provider", "who is driving token spend", "do I have prompt caching"
+- "cost per conversation", "most expensive sessions"
+- "failing agent tool calls", "find runaway agents"
+- "responses truncated or blocked", "finish reasons"
+- "failed evaluations", "quality scores"
+
+## When NOT to Use
+
+Davis CoPilot/MCP telemetry (dt-platform), generic service metrics (dt-obs-services),
+logs (dt-obs-logs), or non-GenAI distributed tracing (dt-obs-tracing).
+
+## Example Questions
+
+When suggesting follow-up questions (e.g., "give me one example question per topic"),
+use these canonical, ready-to-ask phrasings — one per capability. Keep suggestions
+single-clause and avoid the literal phrase "content filter" (use "blocked or
+safety-filtered" instead); overly long, multi-clause questions can be rejected.
+
+- **Traffic, errors & latency:** What is my LLM error rate and p95 latency by model in the last 24 hours?
+- **Token usage & cost:** Break down token usage and cost by model and provider in the last 24 hours.
+- **Agent & tool activity:** Show me failing agent tool calls in the last 24 hours.
+- **Conversation analytics:** What are my top 10 most expensive conversations by total token usage in the last 24 hours?
+- **Guardrails:** How many responses were blocked or truncated in the last 7 days, and which model was affected most?
+- **Evaluation quality:** Show me failed evaluations from the last 24 hours with the judge's explanation and the question-answer pair.
 
 ---
 
@@ -134,7 +152,7 @@ fetch spans, from: now()-24h
 | sort calls desc
 ```
 
-→ **Blocked (content filter), truncated (length), finish-reason breakdown:** See [references/guardrails.md](references/guardrails.md)
+→ **Blocked (safety-filtered), truncated (length), finish-reason breakdown:** See [references/guardrails.md](references/guardrails.md)
 
 ### Evaluation Quality
 
@@ -288,7 +306,7 @@ contain product configuration how-tos.
 ```
 1. Run the guardrails presence check (guardrails.md) to confirm finish reasons are recorded
 2. Run the finish-reason breakdown, then the blocked (content_filter) and truncated (length) queries
-3. Correlate content-filter spikes with the prompt-injection evaluator and truncation with answer-completeness failures (evaluations.md)
+3. Correlate safety-filter spikes with the prompt-injection evaluator and truncation with answer-completeness failures (evaluations.md)
 4. For a specific block or failure, take the trace.id and pivot to the originating spans (evaluations.md → "Correlating evaluations to traces")
 ```
 
@@ -311,5 +329,5 @@ contain product configuration how-tos.
 - [references/cost-and-tokens.md](references/cost-and-tokens.md) — token usage, spikes, cost-estimation template, usage attribution, prompt-caching economics
 - [references/agent-signals.md](references/agent-signals.md) — tool usage, failing agents, step latency, loop/runaway detection, Smartscape agent topology (preview)
 - [references/conversation-analytics.md](references/conversation-analytics.md) — session-level cost, depth, and error rate (`gen_ai.conversation.id`)
-- [references/guardrails.md](references/guardrails.md) — blocked (content filter) and truncated (length) responses via finish reasons
+- [references/guardrails.md](references/guardrails.md) — blocked (safety-filtered) and truncated (length) responses via finish reasons
 - [references/evaluations.md](references/evaluations.md) — quality scores, failed evals, fail-rate, trace correlation (bizevents)

@@ -333,10 +333,13 @@ smartscapeNodes CONTAINER
     containerGroupName = null
 | lookup [
   fetch dt.davis.events.snapshots
-  | filter isNotNull(smartscape.affected_entity.ids)
-  | filter in(smartscape.affected_entity.types, "CONTAINER")
-  | expand smartscape.affected_entity.ids
-  | fields affected_entity_ids = smartscape.affected_entity.ids, event.id
+  | filter isNotNull(smartscape.affected_entities)
+  | expand smartscape.affected_entities
+  | fieldsAdd
+      affected_entity_ids = smartscape.affected_entities[id],
+      affected_entity_type = smartscape.affected_entities[type]
+  | filter affected_entity_type == "CONTAINER"
+  | fields affected_entity_ids, event.id
   | summarize by:{affected_entity_ids}, events = countDistinct(event.id)
 ], sourceField:id, lookupField:affected_entity_ids, fields: events
 | fieldsAdd events = if(isNull(events), 0, else:events)
@@ -348,6 +351,10 @@ smartscapeNodes CONTAINER
 - `container_group_instance` maps to `CONTAINER`
 - `container_group` remains unsupported as a standalone entity
 - event fields become Smartscape event fields
+- filtering the type **after** `expand` is more precise than the classic
+  `in(smartscape.affected_entity.types, "CONTAINER")`: each record carries its own `type`, so the
+  filter now keeps only the container records instead of every entity on an event that happened to
+  include one container
 
 ## Example 012: mass data migration end-to-end with fieldsSnapshot
 
@@ -507,8 +514,9 @@ fetch events
 
 ```dql
 fetch events
-| filter event.kind == "DAVIS_PROBLEM" AND isNotNull(smartscape.affected_entity.ids)
-| expand ids = smartscape.affected_entity.ids
+| filter event.kind == "DAVIS_PROBLEM" AND isNotNull(smartscape.affected_entities)
+| expand smartscape.affected_entities
+| fieldsAdd ids = smartscape.affected_entities[id]
 | filter ids in [
     smartscapeEdges "*"
     | filter in(target_id, { toSmartscapeId("HOST-8CBE06F58F5E99DA") })
@@ -520,7 +528,7 @@ fetch events
 
 **Notes**
 
-- `affected_entity_ids` → `smartscape.affected_entity.ids`; guard with `isNotNull` to drop events not yet indexed in Smartscape
+- `affected_entity_ids` → `smartscape.affected_entities`; guard with `isNotNull` to drop events not yet indexed in Smartscape. `expand` yields one record per row, then `[id]` projects the scalar ID — the same projection without a preceding `expand` returns `null`
 - `smartscapeEdges "*"` joined via `target_id` gives source IDs (edge node IDs) affected by the host
 - `by: {event.id}` deduplication is mandatory: one Davis problem affects multiple entities, so `expand` generates one row per affected entity — without dedup the `count()` is inflated
 - the double `summarize` pattern first counts rows per event, then sums to a single total

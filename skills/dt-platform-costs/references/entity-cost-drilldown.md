@@ -83,6 +83,8 @@ When the user asks to drill down into a specific billing capability (e.g.,
 | Security Posture Management | `dt.entity.kubernetes_cluster`, `dt.entity.kubernetes_node` |
 | Automation Workflow | `workflow.id`, `workflow.title`, `workflow.owner` |
 | AppEngine Functions - Small | `workflow.id`, `function.id`, `dt.app.id` |
+| AI Units | `workflow.id`, `workflow.execution.id`, `tool` (optional), `dt.app.id` (optional), `conversation_id` (optional) |
+| AI Function Standard Call | `workflow.id`, `workflow.execution.id`, `tool` (optional), `dt.app.id` (optional), `conversation_id` (optional) |
 | Database Monitoring | `dt.smartscape_source.id`, `dt.smartscape_source.type` |
 
 For categories **without** entity attribution, see
@@ -253,8 +255,39 @@ fetch dt.system.events, from: -7d
 | limit 20
 ```
 
-> For full workflow cost attribution (query scan + AppEngine + workflow-hours),
+> For full workflow cost attribution (query scan + AppEngine + workflow-hours + AI),
 > see [workflow-total-cost.md](workflow-total-cost.md).
+
+### AppEngine AI Invocations
+
+**AI Function Standard Call** (non-LLM tool usage, `billed_invocations`):
+
+```dql
+fetch dt.system.events, from: -7d
+| filter event.kind == "BILLING_USAGE_EVENT"
+| filter event.type == "AI Function Standard Call"
+| dedup event.id
+| summarize total_invocations = sum(billed_invocations),
+    by: {workflow.id, dt.app.id, tool}
+| sort total_invocations desc
+| limit 20
+```
+
+**AI Units** (AI/LLM usage, `usage.quantity.billable`):
+
+```dql
+fetch dt.system.events, from: -7d
+| filter event.kind == "BILLING_USAGE_EVENT"
+| filter event.type == "AI Units"
+| dedup event.id
+| summarize total_units = sum(`usage.quantity.billable`),
+    by: {workflow.id, dt.app.id, tool}
+| sort total_units desc
+| limit 20
+```
+
+> `tool` identifies the specific tool invoked (e.g. `"execute-dql"`, `"operator"`). Use
+> `conversation_id` as an additional group-by to isolate costs by AI conversation.
 
 ## Non-Entity Categories
 

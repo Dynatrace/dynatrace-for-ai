@@ -15,7 +15,7 @@ Although the results live in bizevents, each one is anchored to the trace that p
 | `gen_ai.evaluation.input.question` | string | The user question that was evaluated |
 | `gen_ai.evaluation.input.answer` | string | The model answer that was evaluated |
 | `gen_ai.evaluation.input.system_prompt` | string | System prompt active at evaluation time |
-| `gen_ai.response.id` | string | 16-hex identifier matching `span_id` in the bizevent — does NOT match the `chatcmpl-…` format of the chat span's `gen_ai.response.id` (see [Q&A linkage note](#qa-linkage-note)) |
+| `gen_ai.response.id` | string | 16-hex identifier matching `span_id` in the bizevent — does NOT match the `chatcmpl-…` format of the chat span's `gen_ai.response.id` |
 | `trace.id` | uid | Trace that produced the evaluated response — pivot to the originating distributed trace (see [Correlating evaluations to traces](#correlating-evaluations-to-traces)) |
 | `dt.eval.run_id` | string | Evaluation run identifier (e.g., `run-2026-06-24T13-07-19-422e8bb1`) |
 | `timestamp` | timestamp | Event time — use `timestamp` for time bucketing (bizevents use `timestamp`; spans use `start_time`) |

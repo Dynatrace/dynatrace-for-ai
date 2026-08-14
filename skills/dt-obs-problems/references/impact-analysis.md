@@ -6,7 +6,7 @@ Assess business and technical impact of DAVIS problems by analyzing affected use
 
 Impact analysis helps answer critical questions:
 - **How many users are affected?** (`dt.davis.affected_users_count`)
-- **Which services are impacted?** (`dt.smartscape.service`, `smartscape.affected_entity.ids`)
+- **Which services are impacted?** (`dt.smartscape.service`, `smartscape.affected_entities`)
 - **What is the blast radius?** (count of affected entities)
 - **At what system layer?** (`dt.davis.impact_level`)
 - **How critical is this?** (combination of users + services + category)
@@ -17,8 +17,7 @@ Impact analysis helps answer critical questions:
 |-------|-------------|------|-------|
 | `dt.davis.affected_users_count` | Estimated users impacted | integer | Prioritization metric |
 | `dt.davis.impact_level` | System layer (Application, Services, Infrastructure) | string | Determines user visibility |
-| `smartscape.affected_entity.ids` | Array of directly impacted entity IDs | array | Calculate blast radius |
-| `smartscape.affected_entity.types` | Types of affected entities | array | Understand scope |
+| `smartscape.affected_entities` | Record array of directly impacted entities, each with `id`, `type`, and `name` | record[] | Blast radius via `arraySize()`; project members with `[][id]` / `[][type]` |
 | `dt.smartscape.service` | Affected service IDs | array | Business criticality |
 | `event.category` | Problem type (AVAILABILITY, ERROR, etc.) | string | Severity indicator |
 
@@ -82,7 +81,7 @@ fetch dt.davis.problems, from:now() - 2h
 | summarize
     total_problems = count(),
     total_affected_users = sum(dt.davis.affected_users_count),
-    total_affected_entities = sum(arraySize(smartscape.affected_entity.ids)),
+    total_affected_entities = sum(arraySize(smartscape.affected_entities)),
     critical_problems = countIf(dt.davis.affected_users_count > 100),
     availability_issues = countIf(event.category == "AVAILABILITY"),
     error_issues = countIf(event.category == "ERROR")
@@ -169,7 +168,7 @@ Calculate how many entities each problem affects:
 ```dql
 fetch dt.davis.problems, from:now() - 24h
 | filter not(dt.davis.is_duplicate) and event.status == "ACTIVE"
-| fieldsAdd affected_count = arraySize(smartscape.affected_entity.ids)
+| fieldsAdd affected_count = arraySize(smartscape.affected_entities)
 | fields display_id, event.name, event.category, affected_count
 | sort affected_count desc
 ```
@@ -181,7 +180,7 @@ Categorize by breadth of impact:
 ```dql
 fetch dt.davis.problems, from:now() - 24h
 | filter not(dt.davis.is_duplicate)
-| fieldsAdd affected_count = arraySize(smartscape.affected_entity.ids)
+| fieldsAdd affected_count = arraySize(smartscape.affected_entities)
 | fieldsAdd scope = if(affected_count == 1, "Single",
     else: if(affected_count <= 5, "Limited",
     else: if(affected_count <= 20, "Moderate", else: "Wide")))
@@ -196,11 +195,12 @@ Which entity types are most frequently affected:
 ```dql
 fetch dt.davis.problems, from:now() - 7d
 | filter not(dt.davis.is_duplicate)
-| expand smartscape.affected_entity.types
+| expand smartscape.affected_entities
+| fieldsAdd entityType = smartscape.affected_entities[type]
 | summarize
     problem_count = count(),
     avg_users_affected = avg(dt.davis.affected_users_count),
-    by:{smartscape.affected_entity.types}
+    by:{entityType}
 | sort problem_count desc
 ```
 
@@ -211,12 +211,13 @@ Entities appearing in multiple problems:
 ```dql
 fetch dt.davis.problems, from:now() - 24h
 | filter not(dt.davis.is_duplicate)
-| expand smartscape.affected_entity.ids
+| expand smartscape.affected_entities
+| fieldsAdd entityId = smartscape.affected_entities[id]
 | summarize
     problem_count = countDistinct(display_id),
     categories = collectDistinct(event.category),
     total_user_impact = sum(dt.davis.affected_users_count),
-    by:{smartscape.affected_entity.ids}
+    by:{entityId}
 | filter problem_count > 1
 | sort problem_count desc
 ```
@@ -266,7 +267,7 @@ fetch dt.davis.problems, from:now() - 24h
 | filter not(dt.davis.is_duplicate) and event.status == "ACTIVE"
 | fieldsAdd
     user_score = coalesce(dt.davis.affected_users_count, 0) / 10,
-    entity_score = arraySize(smartscape.affected_entity.ids) * 5,
+    entity_score = arraySize(smartscape.affected_entities) * 5,
     category_score = if(event.category == "AVAILABILITY", 100,
         else: if(event.category == "ERROR", 50,
         else: if(event.category == "SLOWDOWN", 25, else: 10))),
@@ -286,7 +287,7 @@ fetch dt.davis.problems, from:now() - 4h
 | fieldsAdd
     is_high_user_impact = dt.davis.affected_users_count > 100,
     is_availability_issue = event.category == "AVAILABILITY",
-    is_wide_scope = arraySize(smartscape.affected_entity.ids) > 10,
+    is_wide_scope = arraySize(smartscape.affected_entities) > 10,
     is_critical = is_high_user_impact or is_availability_issue or is_wide_scope
 | filter is_critical
 | fields
@@ -294,7 +295,7 @@ fetch dt.davis.problems, from:now() - 4h
     event.name,
     dt.davis.affected_users_count,
     event.category,
-    affected_entity_count = arraySize(smartscape.affected_entity.ids)
+    affected_entity_count = arraySize(smartscape.affected_entities)
 | sort dt.davis.affected_users_count desc
 ```
 
@@ -412,7 +413,7 @@ fetch dt.davis.problems
 ```dql
 fetch dt.davis.problems, from:now() - 2h
 | filter not(dt.davis.is_duplicate) and event.status == "ACTIVE"
-| filter dt.davis.affected_users_count > 10 or arraySize(smartscape.affected_entity.ids) > 5
+| filter dt.davis.affected_users_count > 10 or arraySize(smartscape.affected_entities) > 5
 | fields display_id, event.name, event.category, dt.davis.affected_users_count
 | sort dt.davis.affected_users_count desc
 ```
@@ -422,7 +423,7 @@ fetch dt.davis.problems, from:now() - 2h
 ```dql
 fetch dt.davis.problems
 | filter display_id == "P-XXXXXXXXXX"
-| fields display_id, dt.smartscape.service, smartscape.affected_entity.ids, dt.davis.impact_level
+| fields display_id, dt.smartscape.service, affected_entity_ids = smartscape.affected_entities[][id], dt.davis.impact_level
 ```
 
 ### Step 3: Calculate Blast Radius
@@ -431,9 +432,9 @@ fetch dt.davis.problems
 fetch dt.davis.problems
 | filter display_id == "P-XXXXXXXXXX"
 | fieldsAdd
-    total_entities = arraySize(smartscape.affected_entity.ids),
+    total_entities = arraySize(smartscape.affected_entities),
     total_services = arraySize(dt.smartscape.service)
-| fields display_id, total_entities, total_services, smartscape.affected_entity.ids
+| fields display_id, total_entities, total_services, affected_entity_ids = smartscape.affected_entities[][id]
 ```
 
 ### Step 4: Correlate with Business Context

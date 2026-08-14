@@ -18,6 +18,18 @@ GenAI agents instrumented with OpenTelemetry GenAI semantic conventions emit spa
 
 ---
 
+## Presence check
+
+Before trusting an empty result, confirm the app is **truly agentic**. Smartscape extracts a `GENAI_AGENT` entity for every instrumented agent, so a single topology read confirms it without scanning span volume. Run this once when you're unsure or a query comes back empty — not before every query.
+
+```dql
+smartscapeNodes "GENAI_AGENT"
+```
+
+**How to read it:** If this returns rows, the app is agentic and the queries below have data. **Zero rows** means the service is not agentic — it only generates LLM responses (plain `chat` calls), which is an *architectural* fact. In this case, report "no agent signals available", **not** "no failing agents".
+
+---
+
 ## Tool usage
 
 Which tools are called most often. Use this to understand the tool call distribution across your agent fleet, identify unexpectedly high call rates, and spot tools that may be driving cost or latency.
@@ -49,7 +61,7 @@ fetch spans, from: now()-24h
 
 **How to read it:** Each row is one agent. `errors` is the absolute count of failed spans for that agent; `error_rate_pct` is the share of spans that ended in error. An agent with a high absolute error count but low rate may be healthy at scale — sort by `error_rate_pct` to prioritise agents that are failing disproportionately. An agent with both a high rate and high absolute count is the primary candidate for root-cause investigation.
 
-**Not every error is a real failure — break errors down by exception type.** A raw `span.status_code == "error"` count can overstate how unstable an agent is, because some exception types are normal control flow rather than faults. The exception detail lives on the span's events:
+**Not every error is a real failure — break errors down by exception type.** A raw `span.status_code == "error"` count can overstate how unstable an agent is, because some exception types are normal control flow rather than faults. The exception detail lives on the span's events. This query reads the `span.events` array; if `span.events` is null across the fleet it returns zero rows — skip it and rely on the agent-level error count above. Run it exactly as written: the `expand` + `fieldsFlatten` sequence on `span.events` is order-sensitive, and reordering or omitting either step returns zero rows or errors.
 
 ```dql
 fetch spans, from: now()-24h
@@ -73,7 +85,42 @@ fetch spans, from: now()-24h
 | sort errors desc
 ```
 
-**Tip:** To correlate erroring agent spans back to the conversation turn, add `trace.id` to the `fields` projection and open the trace in the Dynatrace distributed-tracing view. The erroring agent span and the associated `execute_tool` spans will share the same `trace.id`. When filtering by a specific trace, note that `trace.id` is a `uid` type: use `filter trace.id == toUid("<hex>")` (or `filter toString(trace.id) == "<hex>"`). A plain `trace.id == "<hex>"` comparison silently returns zero rows.
+### Drill into a specific failed run
+
+To go from a failing agent to the exact run, take the `trace.id` of an erroring span and open that trace in the Dynatrace distributed-tracing view — the erroring agent span and its `execute_tool` spans share the same `trace.id`. First surface candidate traces:
+
+```dql
+fetch spans, from: now()-24h
+| filter isNotNull(gen_ai.agent.name) and span.status_code == "error"
+| fields start_time, gen_ai.agent.name, span.name, trace.id
+| sort start_time desc
+| limit 20
+```
+
+Then filter to one trace. **`trace.id` is a `uid` type** — use `filter trace.id == toUid("<hex>")` (or `filter toString(trace.id) == "<hex>"`). A plain `trace.id == "<hex>"` comparison **silently returns zero rows**, which looks like a broken drill-in rather than a type mismatch.
+
+```dql
+fetch spans, from: now()-24h
+| filter trace.id == toUid("<hex>")
+| fields start_time, span.name, gen_ai.operation.name, gen_ai.agent.name, gen_ai.tool.name, span.status_code
+| sort start_time asc
+```
+
+---
+
+## LLM call failures
+
+The [Failing agent activity](#failing-agent-activity) query filters on `gen_ai.agent.name`, which is null on plain `chat` (LLM) spans — so it does **not** cover LLM calls that fail outside an agent context. A question about "agents *and* LLM calls failing" needs this query too: drop the agent filter and group by model.
+
+```dql
+fetch spans, from: now()-24h
+| filter isNotNull(gen_ai.request.model)
+| summarize total = count(), errors = countIf(span.status_code == "error"), by: {gen_ai.request.model, gen_ai.provider.name}
+| fieldsAdd error_rate_pct = if(total > 0, errors * 100.0 / total, else: 0.0)
+| sort errors desc
+```
+
+**How to read it:** Each row is a model+provider combination across all GenAI spans (including `chat`), not only agent spans. Answer "which agents and LLM calls are failing most often" by running both this query and [Failing agent activity](#failing-agent-activity). For the full traffic/error golden-signal view, see [golden-signals.md](golden-signals.md).
 
 ---
 

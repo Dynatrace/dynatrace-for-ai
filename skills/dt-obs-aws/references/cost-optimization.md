@@ -92,6 +92,21 @@ smartscapeNodes "AWS_EC2_VPCENDPOINT"
 | sort endpoint_count desc
 ```
 
+Analyze IP addresses not associated with any resource:
+
+```dql
+smartscapeNodes "AWS_EC2_EIP"
+| parse aws.object, "JSON:awsjson"
+| fieldsAdd associationId = awsjson[configuration][associationId],
+            instanceId = awsjson[configuration][instanceId],
+            networkInterfaceId = awsjson[configuration][networkInterfaceId],
+            publicIp = awsjson[configuration][publicIp],
+            allocationId = awsjson[configuration][allocationId],
+            domain = awsjson[configuration][domain]
+| filter isNull(associationId) and isNull(instanceId) and isNull(networkInterfaceId)
+| fields name, publicIp, allocationId, domain, aws.account.id, aws.region
+```
+
 ## Database Costs
 
 Analyze RDS instance costs by class:

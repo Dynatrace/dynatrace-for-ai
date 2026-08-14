@@ -1,17 +1,18 @@
 # Workflow Total Cost
 
 Composite cost attribution for automation workflows. Workflows generate costs
-across **three separate billing signals** — missing any one gives an incomplete
+across **four separate billing signals** — missing any one gives an incomplete
 picture.
 
 ## Contents
 
 - [Common Principles](#common-principles)
-- [Three-Signal Checklist](#three-signal-checklist)
+- [Four-Signal Checklist](#four-signal-checklist)
 - [Cross-Event Field Reference](#cross-event-field-reference)
-- [Step 1 — Query Scan Cost (QEE)](#step-1--query-scan-cost-qee)
+- [Step 1 — Query Scan Cost](#step-1--query-scan-cost)
 - [Step 2 — AppEngine Function Cost (BUE)](#step-2--appengine-function-cost-bue)
 - [Step 3 — Automation Workflow BUE Cost](#step-3--automation-workflow-bue-cost)
+- [Step 4 — AI Invocation Cost (BUE)](#step-4--ai-invocation-cost-bue)
 - [Per-Workflow Deep Dive](#per-workflow-deep-dive)
 - [How Often Did the Workflow Run](#how-often-did-the-workflow-run)
 - [Owner Identification](#owner-identification)
@@ -37,15 +38,23 @@ picture.
    that must match the Account Management Portal, use explicit UTC midnight
    boundaries per [billing-capabilities.md § Billing Timeframe Boundaries](billing-capabilities.md#billing-timeframe-boundaries).
 
-## Three-Signal Checklist
+## Four-Signal Checklist
 
 | # | Signal | BUE `event.type` | What it measures |
 |---|--------|------------------|-----------------|
 | 1 | Query Execution | `Events - Query`, `Log Management & Analytics - Query`, `Traces - Query`, `Files - Query` | DQL scans run inside workflow scripts |
 | 2 | AppEngine Functions | `AppEngine Functions - Small` | JS/Python function invocations |
-| 3 | Automation Workflow | `Automation Workflow` | Workflow execution time (workflow-hours) |
+| 3 | Automation Workflow | `Automation Workflow` | Workflow existence time (workflow-hours) — **STANDARD workflows only** |
+| 4 | AI Invocations | `AI Units`, `AI Function Standard Call` | AI invocations from workflow AI actions — `usage.quantity.billable` (Units) for AI Units, `billed_invocations` for AI Function Standard Call |
 
-Always check all three before concluding what a workflow costs.
+Always check all four before concluding what a workflow costs.
+
+> **Signal 3 applies to `STANDARD` workflows only.** `SIMPLE` and `DRAFT` workflows
+> emit no `Automation Workflow` BUE — cost lives in signals 1, 2, and (if the
+> workflow uses AI actions) 4. Only Signal 3 is inapplicable.
+> Resolve `dt.automation_engine.workflow.type` from `WORKFLOW_EVENT` before
+> interpreting Signal 3. See
+> [Dynatrace Automation billing docs](https://docs.dynatrace.com/docs/license/capabilities/automation/automation).
 
 ## Cross-Event Field Reference
 
@@ -55,6 +64,7 @@ Field names differ across event kinds **and** across BUE event types.
 |---------|----------------------|------------------|--------------------------|--------------------------|----------------|
 | Workflow ID | `client.workflow_context` | `dt.automation_engine.workflow.id` | `workflow.id` | `workflow.id` | `client.workflow_context` |
 | Workflow name | — | `dt.automation_engine.workflow.title` | `workflow.title` | — | ❌ not available |
+| Workflow type | — | `dt.automation_engine.workflow.type` (`STANDARD` / `SIMPLE` / `DRAFT`) | — | — | — |
 | Function/action | `client.function_context` | `dt.automation_engine.action.name` | — | `function.id` | `client.function_context` |
 | User ID | `user.id` | `dt.automation_engine.workflow_execution.actor` | `workflow.actor` | `user.id` | `user.id` |
 | Trigger type | — | `dt.automation_engine.workflow_execution.trigger.type` | `workflow.trigger_type` | — | — |
@@ -66,10 +76,36 @@ Field names differ across event kinds **and** across BUE event types.
 > **Tip:** When a field returns no results, sample raw events first:
 > `| limit 3` (without `fields`) to see all available fields on the event.
 
-## Step 1 — Query Scan Cost (QEE)
+## Step 1 — Query Scan Cost
 
-BUE Query events contain workflow attribution fields, but they might not contain a value. Use QEE AUTOMATION pool
-(`client.workflow_context`) to attribute query scan volume to a workflow:
+BUE Query events carry `client.workflow_context` (AUTOMATION-pool queries), so
+read the workflow's **billable** scan straight from BUE — billable truth, and
+the figure that reflects actual cost. Do not rank on QEE `scanned_bytes`: it is
+diagnostic and overstates cost wherever queries are zero-rated, so a scan-based
+ranking can order workflows differently from their actual bill.
+
+> **Multi-type dedup:** this query spans multiple BUE Query `event.type`s, so
+> use compound `dedup {event.id, event.type}`. Plain `dedup event.id` would
+> silently drop same-id siblings across types (an id can repeat across
+> `Logs`/`Events`/`Traces`/`Files` query events).
+
+```dql-template
+fetch dt.system.events, from: -30d
+| filter event.kind == "BILLING_USAGE_EVENT"
+| filter in(event.type, "Log Management & Analytics - Query", "Events - Query", "Traces - Query", "Files - Query")
+| dedup {event.id, event.type}
+| filter client.workflow_context == "<workflow-uuid>"
+| summarize total_billed_gib = sum(toDouble(billed_bytes) / 1073741824), by: {event.type}
+| sort total_billed_gib desc
+```
+
+**Fallback when BUE attribution is null:** `client.workflow_context` is a
+recently added BUE attribute, so older BUEs in the retention window emit it as
+null (this is time-based, not tenant-specific — see
+[query-cost-attribution.md § Step 1a](query-cost-attribution.md#step-1a--coverage-check)
+for a coverage check).
+Where it is null, attribute via QEE AUTOMATION pool — this yields diagnostic
+`scanned_bytes`, not billable bytes, so use it only to fill coverage gaps:
 
 ```dql-template
 fetch dt.system.events, from: -30d
@@ -77,16 +113,11 @@ fetch dt.system.events, from: -30d
 | filter query_pool == "AUTOMATION"
 | filter client.workflow_context == "<workflow-uuid>"
 | summarize total_scanned_gib = sum(scanned_bytes) / 1073741824,
-    qee_events = count(),
     dql_statements = countDistinct(query_id),
+    qee_rows = count(),
     by: {table}
 | sort total_scanned_gib desc
 ```
-
-> **Note:** QEE `scanned_bytes` is diagnostic, not billable. For billable totals,
-> sum BUE Query events by `client.source` pattern matching (see
-> [query-cost-attribution.md](query-cost-attribution.md)), then correlate with
-> QEE for per-workflow breakdown.
 
 > **⛔ QEE count ≠ workflow run count.** `count()` on QEE counts bucket-touches
 > (one row per bucket per DQL statement), `countDistinct(query_id)` counts DQL
@@ -129,45 +160,83 @@ fetch dt.system.events, from: -30d
 > **Output rule:** Present `total_invocations` and `total_workflow_hours` in
 > native units. Apply **SKILL.md § Cost Ranking Rules** for any cross-capability
 > cost comparison — do not compute or display dollar estimates from these values.
+> For `SIMPLE`/`DRAFT` workflows, label Signal 3 **"N/A (workflow type)"** — not `0` or `missing`.
 
-## Per-Workflow Deep Dive
+## Step 4 — AI Invocation Cost (BUE)
 
-First, identify top workflows by query scan volume using QEE AUTOMATION pool
-(BUE Query events lack workflow attribution):
+If the workflow uses AI/LLM actions, also check Signal 4 BUEs:
+
+**AI Function Standard Call** (non-LLM tool usage):
 
 ```dql
 fetch dt.system.events, from: -30d
-| filter event.kind == "QUERY_EXECUTION_EVENT"
-| filter query_pool == "AUTOMATION"
+| filter event.kind == "BILLING_USAGE_EVENT"
+| filter event.type == "AI Function Standard Call"
+| dedup event.id
+| filter workflow.id == "<workflow-uuid>"
+| summarize total_invocations = sum(billed_invocations)
+```
+
+**AI Units** (AI/LLM work):
+
+```dql
+fetch dt.system.events, from: -30d
+| filter event.kind == "BILLING_USAGE_EVENT"
+| filter event.type == "AI Units"
+| dedup event.id
+| filter workflow.id == "<workflow-uuid>"
+| summarize total_units = sum(`usage.quantity.billable`)
+```
+
+## Per-Workflow Deep Dive
+
+First, identify the top workflows by **billable** query scan. BUE Query events
+carry `client.workflow_context` (AUTOMATION-pool queries), so rank on BUE
+`billed_bytes` — not QEE `scanned_bytes`. QEE overstates cost wherever queries
+are zero-rated, so a `scanned_bytes` ranking can put a heavily-scanning but
+partly zero-rated workflow above the one that actually costs the most:
+
+```dql
+fetch dt.system.events, from: -30d
+| filter event.kind == "BILLING_USAGE_EVENT"
+| filter in(event.type, "Log Management & Analytics - Query", "Events - Query", "Traces - Query", "Files - Query")
+| dedup {event.id, event.type}
 | filter isNotNull(client.workflow_context)
-| summarize total_scanned_gib = sum(scanned_bytes) / 1073741824,
-    qee_events = count(),
-    dql_statements = countDistinct(query_id),
+| summarize total_billed_gib = sum(toDouble(billed_bytes) / 1073741824),
     by: {client.workflow_context}
-| sort total_scanned_gib desc
+| sort total_billed_gib desc
 | limit 20
 ```
 
-> Rank workflows by `total_scanned_gib`, not by `qee_events`. A workflow whose
-> queries touch many buckets will have a large `qee_events` count without
-> necessarily running often or scanning the most — see
+> **Coverage fallback:** where `client.workflow_context` is null on the BUE
+> (recently added attribute — older BUEs in the retention window carry no
+> value; see
+> [query-cost-attribution.md § Step 1a](query-cost-attribution.md#step-1a--coverage-check)),
+> fall back to QEE AUTOMATION pool (`client.workflow_context`) for a diagnostic
+> `scanned_bytes` ranking. Never rank by `qee_events` (bucket-touches). See
 > [How Often Did the Workflow Run](#how-often-did-the-workflow-run).
 
-Then resolve the workflow name from `WORKFLOW_EVENT`:
+Then resolve the workflow name and type from `WORKFLOW_EVENT` — always pull
+`workflow.type` to know whether Signal 3 applies (`STANDARD`) or not (`SIMPLE`/`DRAFT`):
 
 ```dql-template
 fetch dt.system.events, from: -30d
 | filter event.kind == "WORKFLOW_EVENT"
 | filter dt.automation_engine.workflow.id == "<uuid from above>"
-| fields dt.automation_engine.workflow.id, dt.automation_engine.workflow.title
+| fields dt.automation_engine.workflow.id, dt.automation_engine.workflow.title, dt.automation_engine.workflow.type
 | limit 1
 ```
 
-> **Deleted workflows:** Workflows that have been deleted may still appear in
-> QEE events for queries that were already in-flight. If a workflow ID doesn't
-> resolve via `WORKFLOW_EVENT`, BUE `Automation Workflow`, or `dtctl get workflow`,
-> it was likely deleted. Check whether it still appears in recent billing events
-> or only in historical data.
+> **Two caveats when resolving workflow IDs:**
+> 1. **No `Automation Workflow` BUE for `SIMPLE`/`DRAFT`.** These types emit no
+>    Signal 3 by design — check `dt.automation_engine.workflow.type` on
+>    `WORKFLOW_EVENT` before interpreting a missing Signal 3.
+> 2. **Event history retains deleted workflows.** `WORKFLOW_EVENT`,
+>    `Automation Workflow` BUE, and QEE all keep rows for as long as their
+>    events bucket retention allows, so an ID that resolves in events may
+>    already have been deleted in the platform. Event data alone cannot
+>    distinguish "still exists" from "deleted but recent" — treat resolution
+>    via events as a name/type lookup, not proof of existence.
 
 ## How Often Did the Workflow Run
 
@@ -178,22 +247,19 @@ fetch dt.system.events, from: -30d
 
 > ### ⛔ Two layers of `count()` fan-out
 >
-> 1. **QEE** (`QUERY_EXECUTION_EVENT`) `count()` = bucket-touches (one row per
->    bucket per DQL statement); `countDistinct(query_id)` = DQL statements.
->    Neither is a run count.
+> 1. **QEE** (`QUERY_EXECUTION_EVENT`) `count()` = bucket-touches; neither it nor
+>    `countDistinct(query_id)` (= DQL statements) is a run count.
 > 2. **`WORKFLOW_EXECUTION` `count()` is also not a run count** — it is a
->    **state-change** event: one row per `dt.automation_engine.state` transition
->    (`RUNNING` with `duration` ≈ `0,00 ns`, then a terminal
->    `SUCCESS`/`ERROR`/`CANCELLED` row with real `duration` + end timestamp),
->    **both sharing the same** `dt.automation_engine.workflow_execution.id`. A
->    completed run is 2 rows, an in-flight run is 1, so the factor drifts around
->    2×. Use `countDistinct(dt.automation_engine.workflow_execution.id)`.
+>    state-change event, so a completed run emits ≈2 rows (a `RUNNING` row plus a
+>    terminal `SUCCESS`/`ERROR`/`CANCELLED` row) that share one
+>    `dt.automation_engine.workflow_execution.id`. Count runs with
+>    `countDistinct(dt.automation_engine.workflow_execution.id)`.
 >
-> Validated on a live tenant for one scheduled workflow (24h): **1,440 distinct
-> runs** (≈1/min) → 2,879 `WORKFLOW_EXECUTION` rows (≈2×) → 2,867 DQL statements
-> (≈2 per run) → 7,195 QEE events (≈5×). Reading the QEE `count()` as runs
-> overstates 5×; reading the `WORKFLOW_EXECUTION` `count()` as runs overstates
-> 2×. Frequency comes **only** from distinct executions ÷ timespan.
+> Example of the fan-out: a workflow running ≈1/min emits ≈2 `WORKFLOW_EXECUTION`
+> rows per run (the ≈2× is structural — a `RUNNING` plus a terminal row) and many
+> more QEE events (one per bucket per statement, so that factor *varies* with the
+> queries). A raw `count()` on either is therefore several× the true run count.
+> Derive frequency **only** from distinct executions ÷ timespan.
 
 ```dql-template
 fetch dt.system.events, from: -7d
@@ -214,10 +280,13 @@ fetch dt.system.events, from: -7d
 >   cause of thousands of runs/day.
 > - **Hit the cap:** `event.type == "WORKFLOW_THROTTLED"` rows mean the workflow
 >   exceeded its per-hour execution limit (`dt.automation_engine.throttle.limit`).
-> - **Reporting both signals:** when QEE or row volume looks alarming, anchor it
->   with the distinct-execution count, e.g. "≈1,440 runs/day (≈1/min), generating
->   ≈7.2K QEE bucket-events/day (≈5 per run)". A large gap between any `count()`
->   and the distinct-execution count is expected fan-out, not a spike.
+> - **Reporting both signals:** when QEE or row volume looks alarming, always
+>   report the distinct workflow-execution count alongside it. A large gap
+>   between any `count()` and
+>   `countDistinct(dt.automation_engine.workflow_execution.id)` is expected
+>   fan-out, not a spike. The QEE-to-run ratio is workflow-specific (depends on
+>   how many DQL statements the script fires and how many buckets each touches)
+>   and is **not a diagnostic signal on its own**.
 
 ## Owner Identification
 
@@ -245,7 +314,7 @@ fetch dt.system.events, from: -7d
 
 ## Best Practices
 
-1. **Always check all three billing signals** for workflows — a query scan spike
+1. **Always check all four billing signals** for workflows — a query scan spike
    may be just one of multiple cost contributors.
 2. **Sample first, then extend to 30d** — verify field availability on a 7-day
    slice before running expensive 30-day queries.

@@ -23,6 +23,7 @@ Before working on specific tasks, load the relevant reference:
 | Array and timeseries manipulation (`arrayFilter`, `collectArray`, iterative)  | [references/iterative-expressions.md](references/iterative-expressions.md)                   |
 | Conditional logic (`if/else` chains), `coalesce`, string/date helpers         | [references/useful-expressions.md](references/useful-expressions.md)                         |
 | `in` operator (subquery), full `@` time alignment unit table                  | [references/operators.md](references/operators.md)                                           |
+| `matchesValue`, `matchesPhrase`, `matchesPattern`, `in()` — string pattern matching, regex, array matching, wildcards, case sensitivity | [references/string-matching.md](references/string-matching.md)                               |
 
 ______________________________________________________________________
 
@@ -69,6 +70,11 @@ ______________________________________________________________________
 | `contains(toLowercase(field), "err")` | `contains(field, "err", false)` | Don't wrap in `lower()` for case-insensitive matching. `contains()` has a built-in third positional `caseSensitive` parameter (default `true`). |
 | `filter name == "*serv*9*"` | `filter matchesValue(name, "*serv*") and matchesValue(name, "*9*")` | `==` does not support wildcards. `matchesValue()` supports `*` wildcards but only at the beginning and/or end of the pattern—split mid-string wildcard intent into multiple calls combined with `and`. |
 | `matchesValue(field, "prod")` on string field | `contains(field, "prod")` | Without wildcards, `matchesValue()` performs an exact (case-insensitive) match — it will not find `"production"`. Use `contains()` for substring matching (or `matchesValue(field, "*prod*")` for wildcard matching). |
+| `iAny(matchesValue(arr[], "x") OR matchesValue(arr[], "y"))` | `matchesValue(arr, {"x", "y"})` | `matchesValue` accepts an array field in the first param and an array literal `{}` in the second — no `iAny` or `[]` needed. The same applies when consolidating multiple `contains(f, x) OR contains(f, y)` on the same field: use `matchesValue(f, {"*x*", "*y*"})`. |
+| `iAny(matchesPhrase(arr[], "phrase"))` | `matchesPhrase(arr, "phrase")` | `matchesPhrase` iterates array fields natively — drop `iAny(` and `[]`. Note: the **second** parameter must be a static string; `matchesPhrase(f, array("a","b")[])` is a runtime error. |
+| `contains(field, "pip")` on a short or common token | `matchesPhrase(field, "pip")` | `contains` is a pure substring match — `"pip"` also fires on `"pipenv"`, `"gripping"`. `matchesPhrase` tokenizes the string and matches whole words only, giving fewer false positives. |
+| `iAny(in(lower(arr[]), array("a", "b")))` | `matchesValue(arr, {"a", "b"}, caseSensitive: false)` | `matchesValue` is case-insensitive by default — no `lower()`, `in()`, or `iAny` wrapper needed. `caseSensitive: false` shown explicitly here only to mirror the intent of the `lower()` it replaces. |
+| `iAny(f1[] == "a" AND f2[] == "b")` iterating two separate arrays | `in(f1, "a") AND in(f2, "b")` | Multi-array `iAny` is **pairwise**, not a cross-product: element `i` of `f1[]` is tested against element `i` of `f2[]`. If the arrays differ in length the result is `null`. Use independent `in()` checks instead. See [references/iterative-expressions.md](references/iterative-expressions.md). |
 | `toLowercase(field)` | `lower(field)` | The function is `lower()`, not `toLowercase()`. Only type-casting functions use the `to` prefix (`toString()`, `toLong()`, etc.). |
 | `arrayAvg(field[])` or `arraySum(field[])` | `arrayAvg(field)` or `field[]` | `field[]` = element-wise iterative expression (array→array); `arrayAvg(field)` = collapse to scalar (array→single value). Never mix both — `arrayAvg(field[])` is semantically wrong. |
 | `my_field` after `lookup` or `join` | `lookup.my_field` / `right.my_field` | `lookup` prefixes added fields with `lookup.` by default (configurable via `prefix:`). `join` prefixes right-side fields with `right.`. |
@@ -82,6 +88,14 @@ ______________________________________________________________________
 | `join [...], on:{left.a.b == right.a.b}` | `` join [...], on:{left[`a.b`] == right[`a.b`]} `` | Dotted field names in join/lookup conditions require bracket notation with backticks. |
 | `fieldsSummary` (no arguments) | `fieldsSummary field1, field2` | `fieldsSummary` requires at least one field parameter. |
 | `timeseries` with `percentile`/`median`/`percentRank` — no results | Add `rollup: avg` (or `min`/`max`/`sum`) to the `timeseries` command | These three functions **require `rollup:`** on gauge/count metrics — without it the query silently returns empty. |
+| `summarize p95 = percentile(duration, 95, rollup: avg)` | `summarize p95 = percentile(duration, 95)` | `rollup:` is a **`timeseries`-only** parameter. The same-named aggregations in `summarize` over logs/spans/events reject it with `UNKNOWN_PARAMETER_DEFINED`. Only add `rollup:` when aggregating a *metric* inside `timeseries`. |
+| `filter array.contains(field, "v")` or `arrayContains(field, "v")` | `filter in(field, {"v"})` | Neither function exists in DQL — both are hallucinated from Python/Java/SQL. `in()` already matches **array-typed** fields natively (e.g. `k8s.namespace.name` on `dt.davis.problems`): it returns true if any element of the needle matches any haystack element. See [references/iterative-expressions.md](references/iterative-expressions.md). |
+| `filter k8s.namespace.name == "ns"` where the field is array-typed | `filter in(k8s.namespace.name, {"ns"})` | `==` against an array-typed field matches **nothing** — it returns zero rows with no error, which reads as "no data" rather than a mistake. `k8s.*` fields are arrays on `dt.davis.problems`. Use `in()` for exact membership, or `matchesValue(field, {...})`. |
+| `parseJson(field)` or `extractJsonField(field, jsonPath: "$.x")` | `parse field, "JSON:parsed"` then `parsed[x]` | Neither function exists. JSON embedded in a string field is unpacked with the `parse` command and the `JSON` DPL matcher, then accessed with bracket notation. |
+| `filter hour(timestamp) == 4` / `minute(timestamp)` | `filter getHour(timestamp) == 4` / `getMinute(timestamp)` | There are no `hour()`/`minute()` functions. The `get*` family returns **numbers**, so numeric comparison and ranges work. Do not substitute `formatTimestamp(timestamp, format: "HH")` — that returns a *string*, so `== 4` silently matches nothing. |
+| `fields fromRelationships, toRelationships, containerImageTag` on `dt.entity.*` | `describe dt.entity.<type>` first, then select real fields | Classic entity objects do **not** expose the Entities REST API's attribute names. Field names must be discovered with `describe <dataObject>`, not guessed from API payloads. |
+| `by: {bin(timestamp, 1h)}` then `` sort `bin(timestamp,1h)` `` | `by: {t = bin(timestamp, 1h)}` then `sort t` | DQL normalizes the auto-generated group-key name to `bin(timestamp, 1h)` — with a space after the comma, regardless of how the expression was written. A backticked reference that omits the space raises `FIELD_DOES_NOT_EXIST`. Always alias group keys. |
+| `fetch spans \| ... by: {bin(timestamp, 1h)}` | `fetch spans \| ... by: {t = bin(start_time, 1h)}` | `spans` has no `timestamp` field — its time fields are `start_time` and `end_time`. Referencing `timestamp` either errors or yields nulls depending on position. |
 | `` lookup [...], fields: {`dotted.name`} `` | `lookup [...], fields: {dotted.name}` | Do not backtick field names inside the `fields:` parameter of `lookup` — causes PARSE_ERROR. |
 | `data record(key: "val")` | `data record(key = "val")` | `record()` uses `=` for named fields, not `:` — `:` is for command parameters like `rollup:`. |
 | `getNodeField(dt.smartscape.host, "tags")["tag.key"]` | `getNodeField(dt.smartscape.host, "tags")[tag.key]` | In this tag-map access pattern, bracket keys must use unquoted identifier syntax; quoted keys cause a parse error. |
@@ -177,6 +191,8 @@ Helpers (use alongside an aggregation): `start()`, `end()`.
 ### The `rollup:` parameter
 
 Metrics are pre-aggregated at ingest time. `rollup:` controls how raw data points are combined per time slot. Required for `percentile`, `median`, `percentRank` — without it the query silently returns no results. `avg`/`min`/`max`/`sum`/`count` work without `rollup:`.
+
+`rollup:` is a **`timeseries`-only** parameter — it belongs to metric aggregations and nothing else. The identically-named aggregation functions available in `summarize` over event data (logs, spans, events) do **not** accept it: `summarize p95 = percentile(duration, 95, rollup: avg)` fails with `UNKNOWN_PARAMETER_DEFINED`. In `summarize`, use `percentile(field, N)` with no `rollup:`.
 
 Single aggregation — `rollup:` at command level. Multiple aggregations in `{}` — `rollup:` must go **inside each function call** (command-level `rollup:` causes `UNKNOWN_PARAMETER_DEFINED`):
 
@@ -297,16 +313,13 @@ Key parameters: `interval:`, `by:{}`, `from:`/`to:`, `bins:`, `time:` (timestamp
 
 ______________________________________________________________________
 
-## matchesValue() Usage
+## String Matching Functions
 
-Use `matchesValue()` for **array fields** such as `dt.tags`:
+DQL has four main functions for string and array pattern matching. See [references/string-matching.md](references/string-matching.md) for the full guide and quick-reference table.
 
-```dql-snippet
-| filter matchesValue(dt.tags, "env:production")
-```
-
-- **Not** for string fields with special characters — use `contains()` for those
-- `matchesValue()` on a scalar string field does not behave like a wildcard or fuzzy match
+- **`matchesValue(field, {"pattern*", "*other*"})`** — wildcard matching (`*` at start/end). Accepts an array field in the first param and an array literal `{}` in the second — no `iAny` or `[]` needed. Case-insensitive by default (`caseSensitive: true` to enforce case-sensitive matching). Replaces `contains()` + `iAny` chains and `lower()` workarounds.
+- **`matchesPhrase(field, "token")`** — tokenizes the string and matches whole words, unlike `contains()` which is a bare substring match. First param accepts an array field natively; second param must be a **static string** (array unwrapping causes a runtime error).
+- **`in(field, array("a", "b"))`** — set membership. Both params accept arrays, making it an overlap/intersection check.
 
 ______________________________________________________________________
 

@@ -21,6 +21,8 @@ Complete catalog of Dynatrace billing event types available in
   - [Security](#security)
   - [Containers](#containers)
   - [Automation](#automation)
+  - [AppEngine Functions](#appengine-functions)
+  - [Agentic AppEngine](#agentic-appengine)
   - [Data Egress](#data-egress)
   - [Database Monitoring](#database-monitoring)
 
@@ -72,7 +74,7 @@ Usage events are generated at different cadences depending on the capability:
 |----------|-------------|
 | **15 min** | All Ingest types (Log, Events, Files, Metrics, Traces), Host monitoring (Full-Stack, Infrastructure, Foundation, Mainframe, Code), K8s Platform Monitoring, RUM (Real User Monitoring, Session Replay), Synthetic (all types), Runtime Application Protection, Runtime Vulnerability Analytics, Data Egress, Database Monitoring |
 | **Hourly** | All Retain types (Log, Events, Files, Metrics, Traces, DEM, Log Retain with Included Queries), Real User Monitoring Property, Automation Workflow, Security Posture Management |
-| **Per execution** | All Query types (per query execution), AppEngine Functions (per invocation) |
+| **Per execution** | All Query types (per query execution), AppEngine Functions - Small, AI Function Standard Call, AI Units (per invocation) |
 
 The interval determines the granularity of `usage.start` / `usage.end` windows
 (where present) and how to bin events for trend analysis. For event types that
@@ -81,7 +83,7 @@ have `usage.start`, always bin by `usage.start` (not `timestamp`) — the
 minutes for most 15-min types and ≈4 hours for Metrics Ingest (see
 [Billing Event Emission Lag](billing-capabilities.md#billing-event-emission-lag)).
 For event types that lack `usage.start` (Retain, Query, Workflow, SPM,
-AppEngine Functions), bin by `timestamp` instead.
+AppEngine Functions - Small, AI Function Standard Call, AI Units), bin by `timestamp` instead.
 
 ## Event Types by Category
 
@@ -126,7 +128,17 @@ Charged per scan volume. Billed unit: `billed_bytes` (long).
 **Additional fields:** `usage.bucket`, `query_id`, `query_start`,
 `client.application_context`, `client.function_context`, `client.source`,
 `client.client_context`, `client.workflow_context`, `client.internal_service_context`,
-`action_type` (values: `"QUERY"`, `"DELETION"`), `user.id`, `user.email`
+`action_type` (values: `"QUERY"`, `"DELETION"`), `user.id`, `user.email`,
+`ai_generated` (boolean, always present — `true` when the query was issued by an AI agent, `false` otherwise),
+`conversation_id` (string, optional — may be empty string on Query BUEs even when set on the originating AI Units or AI Function Standard Call BUE),
+`session_id` (string, optional)
+
+**Indirect AI costs:** Query BUEs with `ai_generated == true` represent scan volume triggered by AI agents
+— the indirect cost of AI functionality on top of the direct charges billed as `AI Units` and
+`AI Function Standard Call` BUEs. The `session_id` field links these Query BUEs to the corresponding
+AI Units / AI Function Standard Call BUEs from the same session. See
+[query-cost-attribution.md → Step 2a — AI-Generated Queries](query-cost-attribution.md#step-2a--ai-generated-queries)
+for isolation queries.
 
 #### Query Attribution
 
@@ -156,8 +168,8 @@ for the coverage check query.
   `query_start`, `client.source`, `client.application_context`,
   `client.function_context`, `client.client_context`,
   `client.workflow_context`, `client.internal_service_context`,
-  `action_type`, `user.id`, `user.email`,
-  `event.billing.category`)
+  `action_type`, `user.id`, `user.email`, `ai_generated`,
+  `conversation_id`, `session_id`, `event.billing.category`)
 - **Subcategories** (via `event.billing.category`): `"Synthetic events"` and
   RUM-related subcategories
 - **Provider:** `LIMA_USAGE_TRACKER`
@@ -287,17 +299,41 @@ counts distinct workflows per hour.
 `workflow.is_private`, `workflow.created_at`, `workflow.updated_by`,
 `event.start`, `event.end`
 
-**AppEngine Functions** — Charged per invocation. Billed unit:
-`billed_invocations` (long).
+### AppEngine Functions
 
-| Event Type | Billed Field | Type |
-|------------|-------------|------|
-| `AppEngine Functions - Small` | `billed_invocations` | long |
+Charged per invocation. Billed unit: `billed_invocations` (long). Appears as **Standard Function Calls** in Account Management.
+
+| Event Type | Billed Field | Type | Notes |
+|------------|-------------|------|-------|
+| `AppEngine Functions - Small` | `billed_invocations` | long | JS/Python function invocations |
 
 **Additional fields:** `dt.app.id`, `function.id`,
 `function.execution_id`, `function.duration_sec`, `function.memory_mib`,
 `function.type`, `caller.app.id`, `caller.service.id`, `workflow.id`,
 `workflow.execution.id`, `user.id`, `user.email`
+
+### Agentic AppEngine
+
+AI-triggered invocations. Two types: non-LLM tool calls (`AI Function Standard Call`) and AI/LLM work (`AI Units`). `AI Function Standard Call` shares the **Standard Function Calls** rate-card item with `AppEngine Functions - Small`; `AI Units` is a separate rate-card item.
+
+| Event Type | Billed Field | Type | Notes |
+|------------|-------------|------|-------|
+| `AI Function Standard Call` | `billed_invocations` | long | Non-LLM tool usage (no LLM inference); typically 1 per call |
+| `AI Units` | `usage.quantity.billable` | double | AI/LLM work — model inference and LLM-based tools; `usage.unit` = `"Units"` |
+
+**Additional fields (AI Function Standard Call and AI Units):**
+`tool` (specific tool name, e.g. `"execute-dql"`, `"operator"`; optional),
+`tool.category` (`"standard"` or `"ai"`),
+`caller.type` (`"api"` | `"mcp"` | `"internal"`),
+`caller.app.id` (optional), `caller.service.id` (optional), `dt.app.id` (optional),
+`conversation_id` (optional), `session_id` (optional),
+`workflow.id` (optional — present when invoked from a workflow),
+`workflow.execution.id` (optional),
+`user.id`, `user.email`
+
+**AI Units only:** `usage.unit` (always `"Units"`).
+
+**Event type names are exact.** When displaying event type names to the user, always copy them verbatim — never abbreviate.
 
 ### Data Egress
 

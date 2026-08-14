@@ -317,11 +317,14 @@ Find active DAVIS problems affecting K8s entities:
 ```dql
 fetch dt.davis.problems, from:now() - 2h
 | filter not(dt.davis.is_duplicate) and event.status == "ACTIVE"
-| filter matchesPhrase(smartscape.affected_entity.types, "K8S_")
-| fields display_id, event.name, event.category, smartscape.affected_entity.ids
+| filter iAny(startsWith(smartscape.affected_entities[][type], "K8S_"))
+| fields display_id, event.name, event.category, affected_entity_ids = smartscape.affected_entities[][id]
 ```
 
-Use entries `smartscape.affected_entity.ids` (array of Smartscape IDs) to look up the affected entity using its Smartscape ID.
+`smartscape.affected_entities` is a record array; each record has `id`, `type`, and `name`. Use
+`[][id]` to get the array of Smartscape IDs to look up the affected entity, or
+`[id]` after `expand smartscape.affected_entities`. Without a preceding `expand`, `[id]` returns
+`null` silently. A `filter` cannot take a bare iterative expression, so wrap it in `iAny(...)`.
 
 ## Best Practices
 

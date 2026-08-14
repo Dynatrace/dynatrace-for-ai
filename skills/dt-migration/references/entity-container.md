@@ -19,7 +19,7 @@ When the old query projects container-group identifiers or names, preserve the o
 
 - `entity.name` → `name`
 - `containerizationType` → `container.containerization_type`
-- classic affected-entity event joins → `smartscape.affected_entity.ids` and `smartscape.affected_entity.types`
+- classic affected-entity event joins → `smartscape.affected_entities` (record array: `id`, `type`, `name` per entity); use `expand` before joining
 
 ## Relationship patterns
 

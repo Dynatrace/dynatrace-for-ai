@@ -122,7 +122,7 @@ fetch dt.davis.problems, from:now() - 1h
     event.status,                         // ACTIVE or CLOSED
     dt.smartscape_source.id,              // The smartscape ID for the affected resource
     dt.davis.affected_users_count,        // Number of affected users
-    smartscape.affected_entity.ids,        // Array of affected entity IDs
+    affected_entity_ids = smartscape.affected_entities[][id],  // Array of affected entity IDs
     dt.smartscape.service,                // Affected services (may be array)
     dt.davis.root_cause_entity,           // Entity identified as root cause
     root_cause_entity_id,                 // Root cause entity ID
@@ -212,7 +212,7 @@ fetch dt.davis.problems, from:now() - 24h
     event.description,
     root_cause_entity_id,
     root_cause_entity_name,
-    smartscape.affected_entity.ids
+    affected_entity_ids = smartscape.affected_entities[][id]
 ```
 
 ### Root Cause by Entity Type
@@ -233,7 +233,7 @@ fetch dt.davis.problems, from:now() - 7d
 ```dql
 fetch dt.davis.problems, from:now() - 24h
 | filter not(dt.davis.is_duplicate) and event.status == "ACTIVE"
-| filter matchesPhrase(arrayToString(smartscape.affected_entity.types, delimiter:","), "AWS_")
+| filter iAny(startsWith(smartscape.affected_entities[][type], "AWS_"))
 ```
 
 
@@ -255,7 +255,7 @@ Calculate entity impact per root cause:
 fetch dt.davis.problems, from:now() - 7d
 | filter not(dt.davis.is_duplicate)
 | filter isNotNull(root_cause_entity_id)
-| fieldsAdd affected_count = arraySize(smartscape.affected_entity.ids)
+| fieldsAdd affected_count = arraySize(smartscape.affected_entities)
 | summarize
     avg_affected = avg(affected_count),
     max_affected = max(affected_count),

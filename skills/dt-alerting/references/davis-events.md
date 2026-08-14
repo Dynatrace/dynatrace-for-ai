@@ -64,7 +64,7 @@ The `event.category` field classifies what kind of condition was detected:
 | `event.description` | Long-form description of the Davis event (up to 10,000 characters, Markdown format) |
 | `event.provider` | Identification for the detector source category of the Davis event |
 | `dt.smartscape_source.id` | Smartscape entity ID of the affected resource |
-| `dt.smartscape_source.type` | Entity type of the affected resource (e.g. `SERVICE`, `HOST`, `PROCESS_GROUP_INSTANCE`, `CLOUD_APPLICATION`) |
+| `dt.smartscape_source.type` | Smartscape entity type of the affected resource (e.g. `SERVICE`, `HOST`, `PROCESS`, `K8S_POD`, `K8S_DEPLOYMENT`). These are Smartscape type names, not classic ones — `PROCESS`, not `PROCESS_GROUP_INSTANCE`; `K8S_DEPLOYMENT`, not `CLOUD_APPLICATION` |
 | `event.severity` | ITIL-aligned incident severity: `1` (Critical) · `2` (High) · `3` (Medium) · `4` (Low) · `5` (Informational) — lower number = more severe (see below) |
 | `dt.davis.timeout` | Keep-alive window in minutes — the event stays `ACTIVE` for this duration after the last report; a new report with the same `event.name` and identifying fields must arrive within the window to extend it, otherwise the event closes automatically |
 | `dt.event.correlation_tag` | Optional tag added by the event source to split otherwise identical events into separate active instances. By default Dynatrace derives the correlation ID from `event.name`, `dt.source_entity`, and `event.provider`; setting this field appends an extra component to that hash so two reports with the same name and entity but different tags are tracked as independent events |

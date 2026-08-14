@@ -1,5 +1,5 @@
 ---
-name: dt-obs-react-native
+name: dt-setup-react-native
 license: Apache-2.0
 description: >-
   Integrate the Dynatrace React Native Plugin into a React Native or Expo project —

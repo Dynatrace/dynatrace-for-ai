@@ -1,6 +1,6 @@
 ---
 name: dt-platform-costs
-description: "Query and analyze a Dynatrace tenant's ACTUAL billing and usage data with DQL against dt.system.events — DPS consumption breakdown, cost-normalized spend ranking, included volume deduction, chargeback/showback, cost drivers, spending trends, cost investigation, metrics ingest optimization, query cost attribution, workflow total cost, and entity-level cost drill-down (RUM, hosts, synthetic, K8s). Also directs licensing/entitlement questions to the right resource (not available via DQL). USE ONLY to query/analyze the tenant's actual consumption. Do NOT use for conceptual 'explain' questions about how DPS billing/pricing works or what units/weights/the rate card mean — those belong to Dynatrace documentation. Also do NOT use for making a DQL query itself faster or cheaper to run (query optimization, reducing scanned data/consumption per run, filter-early best practices) — that belongs to dt-dql-essentials. This skill only MEASURES recorded consumption; it does not tune queries."
+description: "Query and analyze a Dynatrace tenant's ACTUAL billing and usage data with DQL against dt.system.events — DPS consumption breakdown, cost-normalized spend ranking, included volume deduction, chargeback/showback, cost drivers, spending trends, cost investigation, metrics ingest optimization, query cost attribution, workflow total cost, entity-level cost drill-down (RUM, hosts, synthetic, K8s), and AI/LLM cost (AI Units, AI Function Standard Calls, AI-generated query consumption). Directs licensing/entitlement questions to documentation (not via DQL). USE ONLY to query/analyze the tenant's actual consumption. Do NOT use for conceptual 'explain' questions about how DPS billing/pricing works or what units/weights/the rate card mean — see Dynatrace documentation. Do NOT use for making DQL queries faster or cheaper to run (query optimization, reducing scanned data/consumption per run, filter-early best practices) — that belongs to dt-dql-essentials. This skill MEASURES consumption; it does not tune queries."
 license: Apache-2.0
 ---
 
@@ -71,7 +71,7 @@ beyond the single one shown:
 
 - **Usage Overview** — DPS consumption breakdown by capability, unit conversion, cross-capability comparison
 - **Cost Estimation** — Cost-normalized usage comparison and relative spend ranking, daily cost trends, spending spikes
-- **Cost Investigation** — Step-by-step drill-down into cost drivers, query scan cost attribution, workflow total cost (3 signals)
+- **Cost Investigation** — Step-by-step drill-down into cost drivers, query scan cost attribution, workflow total cost (4 signals)
 - **Chargeback / Showback** — Cost center and product attribution, team-level billing
 - **Included Volume** — Metrics/Traces Ingest baseline deduction, billed vs. total usage
 
@@ -98,7 +98,8 @@ pricing guide — for billing concepts, see the
 | "cost trend", "spending spike", "budget forecast" | Daily cost trend | cost-estimations.md -> Daily Cost Trend |
 | "compare this week to last", "week over week", "WoW", "MoM", "month over month", "how did costs change", "cost change vs last week", "cost change vs last month", "period comparison", "what grew", "what shrank", "usage trend", "notable changes in usage" | Period Comparison — two explicit UTC windows, compare `capability_usage` per capability, sort by largest absolute cost-weight delta | cost-estimations.md -> Period Comparison (WoW / MoM) |
 | "detector costs", "anomaly detector query cost", "ALERTING pool costs" | Cross-reference detector -> query cost | query-cost-attribution.md |
-| "workflow cost", "what does this workflow cost", "workflow spending" | Composite workflow cost (3 signals) | workflow-total-cost.md |
+| "workflow cost", "what does this workflow cost", "workflow spending" | Composite workflow cost (4 signals) | workflow-total-cost.md |
+| "which workflow", "workflow name", "workflow owner", "how often does this workflow run", "workflow frequency" | Resolve workflow name/owner and run frequency | workflow-total-cost.md → Cross-Event Field Reference + Owner Identification + How Often Did the Workflow Run |
 | "what's driving costs", "cost investigation", "cost spike" | Step-by-step cost investigation | query-cost-attribution.md, workflow-total-cost.md, entity-cost-drilldown.md |
 | "which app", "which host", "which monitor", "drill down", "break down by application/host/cluster" | Entity-based drill-down with sample-first step | entity-cost-drilldown.md |
 | "what's driving RUM/Full-Stack/Synthetic/K8s cost" | Entity drill-down for specific capability | entity-cost-drilldown.md |
@@ -106,6 +107,7 @@ pricing guide — for billing concepts, see the
 | "drop metric", "remove metric from ingestion", "stop ingesting metric" | Drop metric strategy via OpenPipeline or OTel Collector | metrics-ingest-optimization.md -> Strategy 1 — Drop Metric |
 | "reduce cardinality", "remove dimension", "drop dimension from metric" | Reduce cardinality strategy via OpenPipeline or OTel Collector | metrics-ingest-optimization.md -> Strategy 2 — Reduce Cardinality |
 | "change ingest interval", "reduce collection frequency", "scrape interval" | Change ingest interval at source | metrics-ingest-optimization.md -> Strategy 3 — Change Ingest Interval |
+| "AI costs", "cost of AI agents", "what does AI cost", "AI spending", "AI agent costs", "direct and indirect AI cost", "how much is AI costing", "AI Units cost" | Direct AI costs (AI Units / AI Function Standard Call BUEs) + indirect AI costs (Query BUEs with `ai_generated == true`) | billing-event-types.md -> Agentic AppEngine, query-cost-attribution.md -> Step 2a |
 | "query cost by source", "who is scanning most", "cost attribution by app" | BUE query cost by source | query-cost-attribution.md -> Step 1 |
 | "expensive dashboards", "dashboard cost ranking", "top dashboards by cost" | Dashboard query cost ranking | query-cost-attribution.md -> Step 1b + Step 2 |
 | "included volume", "billed vs total", "baseline usage" | Included volume analysis | billing-capabilities.md -> Included Volume |
@@ -197,7 +199,7 @@ Which of these matches what you're trying to do?
 | 3 | [cost-estimations.md](references/cost-estimations.md) | Cost normalization weights, unit conversion lookup, cost estimation queries, full inline lookup for dashboards |
 | 4 | [cost-allocation.md](references/cost-allocation.md) | Cost center/product attribution, chargeback queries |
 | 5 | [query-cost-attribution.md](references/query-cost-attribution.md) | Query scan cost attribution — BUE by source, per-detector breakdown (ALERTING pool), QEE drill-down |
-| 6 | [workflow-total-cost.md](references/workflow-total-cost.md) | Workflow total cost — three billing signals (query scan, AppEngine, workflow-hours) |
+| 6 | [workflow-total-cost.md](references/workflow-total-cost.md) | Workflow total cost — four billing signals (query scan, AppEngine, workflow-hours, AI invocations) |
 | 7 | [entity-cost-drilldown.md](references/entity-cost-drilldown.md) | Entity-based cost drill-down — RUM/Host/Synthetic/K8s/Security/Automation by entity |
 | 8 | [metrics-ingest-optimization.md](references/metrics-ingest-optimization.md) | Per-metric-key cost drill-down — cardinality analysis, timeseries verification, optimization target identification |
 

@@ -85,8 +85,9 @@ Before mapping types, determine what role entities play in the query.
   - `expand`
   - helper functions using entity dimensions
 - Event fields migrate as follows:
-  - `affected_entity_ids` → `smartscape.affected_entity.ids`
-  - `affected_entity_types` → `smartscape.affected_entity.types`
+  - `affected_entity_ids` and `affected_entity_types` → `smartscape.affected_entities`, a single
+    `record[]` with `id`, `type`, and `name`; project members with `[][id]` / `[][type]`, or with
+    `[id]` / `[type]` after `expand smartscape.affected_entities`
   - `dt.source_entity.type` → `dt.smartscape_source.type`
 
 ## Tag Matching Rules

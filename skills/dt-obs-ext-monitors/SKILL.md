@@ -6,11 +6,10 @@ description: >-
   CI monitor data, or third-party check results to Dynatrace. Covers token scope, full event
   schema for external_test_run and external_test_step (including dt.security_context, ci.*,
   trace correlation, and pipeline-added fields), curl and Java DTO examples, and DQL verification.
-  Trigger: "ingest test results", "send monitor results", "third party monitor",
-  "external test ingestion", "send synthetic results to Grail", "push external test data
-  to Dynatrace", "external monitor results", "external test run event schema".
-  Do NOT use for Dynatrace-native Synthetic Monitoring browser/HTTP checks, or
-  Real User Monitoring (use dt-obs-frontends for RUM).
+  Triggers: "ingest test results", "send monitor results", "third party monitor",
+  "external test ingestion", "send synthetic results to Grail", "external test run event schema".
+  Not for Dynatrace-native Synthetic Monitoring browser/HTTP checks, or RUM (use dt-obs-frontends).
+  For migrating from the deprecated POST /api/v1/synthetic/ext/tests API, load dt-upgrade instead.
 license: Apache-2.0
 ---
 

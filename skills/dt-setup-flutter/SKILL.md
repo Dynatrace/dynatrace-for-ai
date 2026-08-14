@@ -1,5 +1,5 @@
 ---
-name: dt-obs-flutter
+name: dt-setup-flutter
 license: Apache-2.0
 description: >-
   Integrate the Dynatrace Flutter Plugin into a Flutter project — dependency setup, config,
