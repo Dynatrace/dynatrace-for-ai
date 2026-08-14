@@ -32,8 +32,10 @@ Use this page as a compact cheat sheet during Smartscape migration.
 
 ## Event field updates
 
-- `affected_entity_ids` → `smartscape.affected_entity.ids`
-- `affected_entity_types` → `smartscape.affected_entity.types`
+- `affected_entity_ids` and `affected_entity_types` → `smartscape.affected_entities` (one `record[]`
+  with `id`, `type`, and `name`, replacing the two parallel arrays)
+- project members with `smartscape.affected_entities[][id]` / `smartscape.affected_entities[][type]`, or with `smartscape.affected_entities[id]` / `smartscape.affected_entities[type]` after `expand smartscape.affected_entities`
+- `smartscape.affected_entities[id]` / `smartscape.affected_entities[type]` without a preceding `expand smartscape.affected_entities` returns `null` silently
 - `dt.source_entity.type` → `dt.smartscape_source.type`
 
 ## Common gotchas

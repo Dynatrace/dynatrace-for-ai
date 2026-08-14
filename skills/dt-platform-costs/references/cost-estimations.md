@@ -108,6 +108,8 @@ capabilities by relative cost. **Never display these values as dollar estimates*
 | `Security Posture Management` | host-hours | 0.007 |
 | `Automation Workflow` | workflow-hours | 0.03 |
 | `AppEngine Functions - Small` | invocations | 0.001 |
+| `AI Function Standard Call` | invocations | 0.001 |
+| `AI Units` | units | 0.1 |
 | `Data Egress` | GiB | 0.15 |
 | `Database Monitoring` | database-instance-hours | 0.11 |
 
@@ -116,6 +118,8 @@ capabilities by relative cost. **Never display these values as dollar estimates*
 >   [billing-capabilities.md § BUE-to-Capability Mapping](billing-capabilities.md#bue-to-capability-mapping)).
 > - Preview types (`Digital Experience Monitoring - Query/Retain`)
 >   have no weight — omit from cost rankings.
+> - `AI Units` uses `usage.quantity.billable` (double) as its billed field,
+>   not `billed_invocations`.
 
 ## Cost Estimation Pattern
 
@@ -289,10 +293,10 @@ All Query types included above share the same normalization weight (`0.0035`),
 so the inline lookup is not required — `capability_usage` already reflects
 relative cost within this result set. Sort by `capability_usage desc`.
 
-> - For `client.source` semantics by query pool, see
->   [query-cost-attribution.md → Step 2](query-cost-attribution.md#step-2--identify-source-type)
-> - BUE Query events lack `client.client_context` — for per-detector drill-down
->   and the full investigation workflow, see [query-cost-attribution.md](query-cost-attribution.md)
+> The `attribution` values mix source types (dashboard, detector, workflow, app).
+> To interpret them and drill down per source — per-detector, per-workflow, and
+> the full investigation workflow — see
+> [query-cost-attribution.md](query-cost-attribution.md).
 
 ### Daily Cost Trend
 
@@ -441,6 +445,8 @@ Each entry carries `unitDivisor` (bytes → capability unit conversion) plus
       {"event_type": "Security Posture Management", "unitDivisor": 1, "unit": "host-hours", "factor": 700, "factorBase": 100000},
       {"event_type": "Automation Workflow", "unitDivisor": 1, "unit": "workflow-hours", "factor": 300, "factorBase": 10000},
       {"event_type": "AppEngine Functions - Small", "unitDivisor": 1, "unit": "invocations", "factor": 1000, "factorBase": 1000000},
+      {"event_type": "AI Function Standard Call", "unitDivisor": 1, "unit": "invocations", "factor": 1000, "factorBase": 1000000},
+      {"event_type": "AI Units", "unitDivisor": 1, "unit": "units", "factor": 1000, "factorBase": 10000},
       {"event_type": "Data Egress", "unitDivisor": 1073741824, "unit": "GiB", "factor": 1500, "factorBase": 10000},
       {"event_type": "Database Monitoring", "unitDivisor": 1, "unit": "database-instance-hours", "factor": 1100, "factorBase": 10000}
     ]

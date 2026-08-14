@@ -20,7 +20,15 @@
 ## General rules
 
 * Iterative expression is a notation when specific operation is performed on every element of arrays used in the query
-* Operation on multiple arrays are done in sync. While iteration over arrays operation is happening and elements of the same index
+* Operations over multiple arrays run in lockstep: at each index `i`, the elements at position `i` from every array are combined in the same step. This is pairwise, **not** a cross-product. `iAny(f1[] == "a" AND f2[] == "b")` is `TRUE` only when `"a"` and `"b"` sit at the *same* index, not when each value appears somewhere in its array. To test whether each array independently contains a value, use separate `in()` calls:
+
+  ```dql-snippet
+  // WRONG — only matches if "a" and "b" are at the same index
+  | filter iAny(f1[] == "a" AND f2[] == "b")
+
+  // RIGHT — each check is independent
+  | filter in(f1, "a") AND in(f2, "b")
+  ```
 * All arrays need to be of the same length / size. If not iterative expressions fail.
 * Result of iterative expression is another arrays.
 * DQL has a set of dedicated array functions. Their names start with `array....()` — see [dql/dql-functions-array.md](dql/dql-functions-array.md) for the full reference.

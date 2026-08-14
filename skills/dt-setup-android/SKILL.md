@@ -1,5 +1,5 @@
 ---
-name: dt-obs-android
+name: dt-setup-android
 description: 'Instruments an existing Android project (Kotlin or Java) with the Dynatrace Mobile Agent for basic monitoring. Covers zero-to-first-event setup only: Gradle plugin, agent config, and user privacy opt-in. Do not use for advanced Dynatrace configuration beyond initial instrumentation.'
 license: Apache-2.0
 ---

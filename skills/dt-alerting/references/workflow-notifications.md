@@ -113,9 +113,8 @@ available for filtering and notification content:
 | `{{event.severity}}` | Numeric severity of the problem (1 = highest, 5 = lowest) |
 | `{{affected_entity_ids}}` | List of entity IDs for all Smartscape entities affected by the problem |
 | `{{affected_entity_names}}` | Array of display names for all Smartscape entities affected by the problem |
-| `{{smartscape.affected_entity.ids}}` | Array of entity IDs for all Smartscape entities directly affected by the problem |
-| `{{smartscape.related_entities}}` | List of entity IDs for Smartscape entities related to the problem but not directly affected |
-| `{{smartscape.related_entity.types}}` | Array of entity types for all Smartscape entities related to the problem but not directly affected |
+| `{{smartscape.affected_entities}}` | Record array of Smartscape entities directly affected by the problem; each record has `id`, `type`, and `name`. May be `null` — see [Filter by affected entity](#filter-by-affected-entity) |
+| `{{smartscape.related_entities}}` | Record array of Smartscape entities related to the problem but not directly affected; same `id` / `type` / `name` record shape |
 | `{{k8s.cluster.uid}}` | UID of the Kubernetes cluster associated with the affected entities |
 | `{{dt.entity.kubernetes_cluster}}` | Entity ID of the Kubernetes cluster associated with the affected entities |
 | `{{k8s.workload.name}}` | Name of the Kubernetes workload associated with the affected entities |
@@ -146,18 +145,28 @@ event.category == "RESOURCE"
 ### Filter by affected entity
 
 To route a problem to the team responsible for a specific entity, filter on
-`smartscape.affected_entity.ids`. This field is reliably populated for all problems
-and contains the entity IDs of every Smartscape entity directly affected.
+`smartscape.affected_entities`. This is a record array; each record holds the `id`, `type`, and
+`name` of one directly affected Smartscape entity.
+
+`[][id]` iterates the array, and `iAny(...)` matches when any element matches. The `id` member is a
+`smartscapeId`, so it must be converted with `toString()` before it is compared to a string —
+without the conversion the comparison silently evaluates to false and the workflow never fires:
 
 ```
-matchesPhrase(smartscape.affected_entity.ids, "SERVICE-abc123def456")
+iAny(toString(smartscape.affected_entities[][id]) == "SERVICE-abc123def456")
 ```
+
+`iAny`, `toString`, `matchesPhrase`, and `==` are all part of the OpenPipeline matcher subset that
+the trigger's **Additional custom filter** accepts.
 
 **Do not filter on `root_cause_entity_id`** — Davis may not detect or populate
 a root cause for every problem (especially early in the problem lifecycle or for
 externally ingested events). Filtering on `root_cause_entity_id` will silently
-miss problems where the field is absent. Use `smartscape.affected_entity.ids`
-instead — it is always present when a problem has affected entities.
+miss problems where the field is absent.
+
+**`smartscape.affected_entities` is not present on every problem either.** A problem carries
+affected entities only when it is scoped to entities in the first place. These cases produce a
+`null` array.
 
 For team-level routing that does not depend on a specific entity ID, prefer
 filtering on `dt.alert_group` (see [Scalable Multi-Team Routing](#scalable-multi-team-routing-with-dtalert_group)):
@@ -362,9 +371,12 @@ notification routing and makes both independently maintainable.
 
 7. **Never filter on `root_cause_entity_id`** — Davis does not always detect or
    populate a root cause, especially for externally ingested events or early in
-   the problem lifecycle. Use `matchesPhrase(smartscape.affected_entity.ids, "<entity-id>")`
-   to target a specific entity, or `matchesPhrase(dt.alert_group, "<group>")` for
-   team-based routing. Both fields are reliably present.
+   the problem lifecycle. Use
+   `iAny(toString(smartscape.affected_entities[][id]) == "<entity-id>")` to target a specific
+   entity, or `matchesPhrase(dt.alert_group, "<group>")` for team-based routing. Prefer
+   `dt.alert_group`: `smartscape.affected_entities` is `null` for problems that are not scoped to
+   entities, so an entity condition silently skips them. Omitting `toString()` also makes the
+   comparison silently false, because `id` is a `smartscapeId` rather than a string.
 
 8. **Use workflow execution history for debugging** — Navigate to
    **Automation → Workflows → [your workflow] → Executions** to see the full

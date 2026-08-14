@@ -68,6 +68,8 @@ Vulnerabilities / Threats & Exploits / SPM apps.
 57. **Grouping external findings by raw `k8s.namespace.name` / `host.name` / `object.name` / cloud resource IDs as "entity mapping"** → names are not unique and skip topology reconciliation. Use the Smartscape join recipes: 3-way match (K8s workloads), host-by-IP, direct `dt.smartscape_source.id` (cloud). `dt-sec-contextualization/references/entity-enrichment.md`
 58. **Parsing or querying `compliance.rule.metadata_json`** → do not use this field; it is forbidden in this skill. Use `compliance.rule.id` (e.g. `CIS-2762`, `STIG-82824`, `DORA-67952`, `NIST-82827`) and `compliance.rule.title` for rule identity instead. The field exists in the data as a standard-specific JSON blob but must never be accessed.
 
+59. **Using any keyword/name/library heuristic as an AI-workload proxy when no GENAI_SERVICE entities are found** → when `smartscapeNodes "GENAI_SERVICE"` returns zero rows, do not run any further queries. No substitute is valid: not entity-name substring matching (`"ai"`, `"llm"`, `"ml"`, `"genai"`, `"model"`, `"inference"`, `"copilot"`, etc.), not component-library matching (torch, tensorflow, langchain, openai, etc.), not K8s namespace/label patterns, not process-name filters. All of these produce false positives and false negatives. Zero GENAI_SERVICE rows means no monitored AI workloads — state that and stop. See [vulnerabilities-dynatrace-advanced.md § Prerequisite: confirm GenAI entities exist](vulnerabilities-dynatrace-advanced.md#prerequisite-confirm-genai-entities-exist).
+
 ---
 
 ## Best Practices

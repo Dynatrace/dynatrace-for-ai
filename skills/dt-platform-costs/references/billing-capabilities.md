@@ -94,10 +94,12 @@ level in the Account Management Portal.
 | `billed_http_request_count` | 1 | synthetic requests |
 | `billed_test_result_ingestion_count` | 1 | synthetic results |
 | `billed_invocations` | 1 | invocations |
+| `usage.quantity.billable` | 1 | Units |
 | `database-instance-hours` | 1 | database-instance-hours |
 | `data_points` | 1 | data points |
 | `ingested_bytes` | 1073741824 | GiB |
 
+> `usage.quantity.billable` is a generic field; its unit label is carried in the sibling `usage.unit` field (`"Units"` for AI Units). Sum `usage.quantity.billable` directly — no divisor needed.
 ## Cross-Capability Usage (4 Queries)
 
 > ⚠️ **All 4 queries are required for complete coverage.** Use the
@@ -191,7 +193,7 @@ fetch dt.system.events, from: "<START>", to: "<END_PLUS_2H>"
     billed_container_hours, billed_bytes, billed_sessions, billed_replay_sessions,
     billed_property_sessions, billed_pod_hours, billed_synthetic_action_count,
     billed_http_request_count, billed_test_result_ingestion_count, billed_invocations,
-    `database-instance-hours`)
+    `usage.quantity.billable`, `database-instance-hours`)
 | dedup {event.id, event.type}
 ```
 
@@ -468,7 +470,7 @@ The lag between `usage.start` and `timestamp` (emission time) varies by type:
 | **≈75 min** | RUM Property |
 | **≈few min** | Query types (Logs, Events, Traces, Files) — negligible for daily binning |
 | **≈4 hours** | Metrics Ingest only |
-| **N/A** | Retain types, AppEngine Functions, Workflow, SPM — no `usage.start` field; use `timestamp` for time-based logic |
+| **N/A** | Retain types, AppEngine Functions - Small, AI Function Standard Call, AI Units, Workflow, SPM — no `usage.start` field; use `timestamp` for time-based logic |
 
 For most types the lag is operationally negligible — events land within the
 same hour they measure. The key consequence is for **daily binning**: always use
@@ -544,12 +546,14 @@ fetch dt.system.events, from: "<START>", to: "<END>"
 | sort n_types desc
 ```
 
-### Empirical evidence
+### Why compound dedup
 
-On a 13-day window of a real tenant, 41 `event.id` values appeared under two
-different `event.type` values each — every pair involving `Log Management &
-Analytics - Query` combined with either `Traces - Query` or `Files - Query`.
-Using bare `dedup event.id` silently dropped **~0.63%** of Traces Query usage.
+Cross-bucket siblings are common in practice — a single Query event id routinely
+appears under `Log Management & Analytics - Query` alongside `Traces - Query` or
+`Files - Query`. Bare `dedup event.id` keeps only one of those rows, silently
+dropping the others and undercounting the affected Query capabilities (typically
+a fraction of a percent, but real and easy to miss). `dedup {event.id, event.type}`
+preserves each sibling while still collapsing refresh duplicates.
 
 ## Best Practices
 

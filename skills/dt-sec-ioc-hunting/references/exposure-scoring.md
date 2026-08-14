@@ -74,13 +74,8 @@ Output pure Markdown (no fenced markdown wrapper).
 
 Table A - Matched IoCs:
 
-| IoC value | Type | Primary/Secondary | Sources matched | Count |
-|---|---|---|---|---|
-
-Table B - Unmatched IoCs:
-
-| IoC value | Type | Primary/Secondary | Sources searched | Discovered via |
-|---|---|---|---|---|
+| IoC value | Type | Primary/Secondary | Sources matched | Count | Discovered via |
+|---|---|---|---|---|---|
 
 `Primary/Secondary` values:
 - **Primary** — from original user/advisory input.
@@ -88,13 +83,17 @@ Table B - Unmatched IoCs:
 
 For secondary IoCs, the `Discovered via` column must state which primary record
 and which header/field produced it (for example `X-Forwarded-For in log record
-2026-07-16T13:19Z matched by 34.93.163.48`). If secondary re-hunts returned zero
-matches, they still appear in Table B. If secondary re-hunts were INCONCLUSIVE,
-state so in the table and recommend follow-up.
+2026-07-16T13:19Z matched by 34.93.163.48`). Unmatched IoCs (primary or secondary)
+are not included in this table and are not reported.
 
 ## Output Guidance
 
-- Include full details. Do not truncate material findings.
+- Include full details. Do not truncate material findings. This applies to the
+  **report**, not the raw query output: hunt legs are summarize-first (one row per
+  entity/source), which already preserves every affected entity, matched
+  observable, count, and first/last-seen time — so the report stays complete
+  without dumping raw records. Pull raw records via a reference's drill-down only
+  when a specific record's context is material to a finding.
 - Always state searched windows and which legs returned zero.
 - Mark any leg with `FETCH_EXEC_TIME_LIMIT` as INCONCLUSIVE and explain impact.
 - Do not let incomplete legs lower the score.

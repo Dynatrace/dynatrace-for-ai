@@ -265,6 +265,9 @@ infrastructure = `billed_host_hours × 4 × 1500`, other/discovery = 0.
 > Replace `<START>` / `<END>` with UTC midnight boundaries. Replace
 > `<END_PLUS_5H>` with `<END>` + 5 hours (Metrics Ingest emission lag — see
 > [billing-capabilities.md § Billing Event Emission Lag](billing-capabilities.md#billing-event-emission-lag)).
+> Both the outer fetch and the join subquery use `<END_PLUS_5H>` — the join's
+> `usage.start < toTimestamp("<END>")` filter prevents over-counting regardless
+> of the fetch window. Do NOT use plain `<END>` for either fetch here.
 >
 > Uses `dt.cost.costcenter`. Replace with `dt.cost.product` for product
 > attribution — same field types, same query pattern.
@@ -284,7 +287,7 @@ fetch dt.system.events, from: "<START>", to: "<END_PLUS_5H>"
 | summarize data_points = toLong(sum(data_points)),
     by: {usage.start, dt.cost.costcenter, monitoring_source}
 | join [
-    fetch dt.system.events
+    fetch dt.system.events, from: "<START>", to: "<END_PLUS_5H>"
     | filter event.kind == "BILLING_USAGE_EVENT"
     | filter in(event.type, { "Full-Stack Monitoring", "Infrastructure Monitoring" })
     | filter usage.start >= toTimestamp("<START>") and usage.start < toTimestamp("<END>")

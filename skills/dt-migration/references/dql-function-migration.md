@@ -171,9 +171,65 @@ Use these field migrations in Davis event queries:
 
 | Classic field | Smartscape field |
 | --- | --- |
-| `affected_entity_ids` | `smartscape.affected_entity.ids` |
-| `affected_entity_types` | `smartscape.affected_entity.types` |
+| `affected_entity_ids` | `smartscape.affected_entities` (project IDs with `smartscape.affected_entities[][id]`) |
+| `affected_entity_types` | `smartscape.affected_entities` (project types with `smartscape.affected_entities[][type]`) |
 | `dt.source_entity.type` | `dt.smartscape_source.type` |
+
+The same applies to `related_entity_ids` and `related_entity_types`, which become
+`smartscape.related_entities`.
+
+### Record array access
+
+`smartscape.affected_entities` is a `record[]`; each record has an `id`, `type`, and `name`. A
+single record array replaces the two parallel arrays, which also removes the old caveat that the
+ID and type arrays were not ordered the same way — each record now carries its own matching type.
+
+How you access a member depends on whether the query expands the array first:
+
+| Context | Accessor | Result |
+| --- | --- | --- |
+| No preceding `expand` | `smartscape.affected_entities[][id]` | array of IDs |
+| After `expand smartscape.affected_entities` | `smartscape.affected_entities[id]` | one scalar ID per row |
+
+Writing `smartscape.affected_entities[id]` **without** a preceding `expand` returns `null`
+silently — no error is raised, so the query appears to work while dropping every value.
+
+Two further rules follow from the array shape:
+
+- **`join` needs `expand`.** A join key that is still an array matches nothing.
+- **`filter` cannot take a bare iterative expression.** Wrap the comparison in `iAny(...)`.
+  Because `id` is a `smartscapeId`, convert it with `toString()` before comparing it to a string;
+  `type` and `name` are plain strings and need no conversion. Example, filtering the un-expanded
+  array directly (no `expand` needed here):
+
+```dql
+fetch dt.davis.events
+| filter iAny(toString(smartscape.affected_entities[][id]) == "HOST-8CBE06F58F5E99DA")
+```
+
+Note: The format of smartscape entity ids on events/problems changed.
+Queries might be still using the old formats, e.g., 
+`smartscape.affected_entity.ids`, `smartscape.affected_entity.types`, `smartscape.related_entity.ids`,`smartscape.related_entity.types`.
+These are deprecated.
+
+```dql
+// Old: two parallel arrays, types not aligned with ids
+fetch dt.davis.events
+| filter isNotNull(smartscape.affected_entity.ids)
+| filter in(smartscape.affected_entity.types, "SERVICE")
+| expand smartscape.affected_entity.ids
+```
+
+```dql
+// New: one record array, each record carries its own type
+fetch dt.davis.events
+| filter isNotNull(smartscape.affected_entities)
+| expand smartscape.affected_entities
+| fieldsAdd
+    entityId = smartscape.affected_entities[id],
+    entityType = smartscape.affected_entities[type]
+| filter entityType == "SERVICE"
+```
 
 ### Important value rule
 

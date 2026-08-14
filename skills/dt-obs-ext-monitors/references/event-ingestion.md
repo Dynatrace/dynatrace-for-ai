@@ -227,7 +227,7 @@ use clear all-caps names that distinguish them from system-level codes:
 ### Minimal — single run event
 
 ```text
-curl -X POST "https://{your-environment-id}.apps.dynatrace.com/platform/ingest/custom/events/external.tests" \
+curl -X POST "https://xdc84620.dev.apps.dynatracelabs.com/platform/ingest/custom/events/external.tests" \
   -H "Authorization: Api-Token {token}" \
   -H "Content-Type: application/json" \
   -d '[{

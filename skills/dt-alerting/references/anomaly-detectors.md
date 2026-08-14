@@ -1173,14 +1173,17 @@ Is the metric predefined (service response time, host CPU, etc.)? │
    events are weighted higher in Davis problem prioritization than `PERFORMANCE`
    or `CUSTOM_ALERT`. Match severity to business impact, not technical magnitude.
 
-8. **Filter notification workflows by `smartscape.affected_entity.ids`, not `root_cause_entity_id`** —
+8. **Filter notification workflows by `smartscape.affected_entities`, not `root_cause_entity_id`** —
    when a problem trigger in a workflow needs to be scoped to a specific entity,
    do **not** filter on `root_cause_entity_id`. Davis may not populate a root cause,
    and the root cause assignment may shift during the problem lifecycle.
-   Instead, filter on the `smartscape.affected_entity.ids` list and match the target entity ID:
+   Instead, match the target entity ID against the `smartscape.affected_entities` record array.
+   Use `[][id]` to iterate the array and wrap the comparison in `iAny(...)`, because DQL rejects
+   a bare iterative expression in a `filter`. The `id` member is a `smartscapeId`, so convert it
+   with `toString()` before comparing it to a string:
 
    ```
-   matchesPhrase(smartscape.affected_entity.ids, "SERVICE-0000000000000001")
+   iAny(toString(smartscape.affected_entities[][id]) == "SERVICE-0000000000000001")
    ```
 
    This makes the filter resilient to root-cause re-assignments and ensures the

@@ -53,6 +53,7 @@ external provider detections.
   - [Blocked vs. monitored breakdown](#blocked-vs-monitored-breakdown)
   - [Top attacker IPs — cross-provider](#top-attacker-ips-last-24h-cross-provider)
   - [Filter detections by an IoC IP list](#filter-detections-by-an-ioc-ip-list-cross-provider)
+  - [Filter detections by domain/URL/URI IoC list](#filter-detections-by-domainurluri-ioc-list)
   - [Same source IP attacking multiple targets — cross-provider](#same-source-ip-attacking-multiple-targets-cross-provider)
   - [Scope variants (RAP-only / external-only / single provider)](#scope-variants-narrow-only-when-the-user-explicitly-asks)
   - [`actor.ips` coverage check](#actorips-coverage-check-when-results-look-sparse)
@@ -304,6 +305,59 @@ fetch security.events, from:now()-24h
 
 Zero matches is a valid, meaningful answer ("none of the IoC IPs attacked us in
 this window") — report it truthfully with the window used.
+
+### Filter detections by domain/URL/URI IoC list
+
+Use when you have a list of domain, URL, or path indicators and want to check whether
+any detection recorded activity involving those values. Not all providers or event types
+populate every URL field — the filter is a broad OR across all fields that may carry
+domain/URL evidence. Zero matches is a valid result; report the window used.
+
+Fields searched (populated varies by provider and attack type):
+
+| Field | Notes |
+|---|---|
+| `url.full` | Full URL; populated by some providers and RAP SSRF/injection events |
+| `url.path` | HTTP path targeted; populated by RAP (`url.path`) and `entry_point.url.path` |
+| `url.domain` | Domain component of the URL; provider-dependent |
+| `server.address` | Target server domain/hostname; provider-dependent |
+| `host.fqdn` | Array; fully qualified domain names of the affected host |
+
+For external providers, `http.request.header.Host` and similar raw request headers may
+appear only in `dt.raw_data` — parse with `parse dt.raw_data, "JSON:raw"` if the above
+fields are null and the provider is known to carry the header in raw payload.
+
+**Safety:** DQL-escape all IoC values before inserting into string literals (replace `\` with `\\` and `"` with `\"`). See `dt-sec-ioc-hunting/references/ioc-intake.md` § URL Cleaning step 7.
+
+**Domain casing:** Domains and hostnames are case-insensitive — provide them in lowercase and the template normalizes field values with `lower()` before comparison. URL/path IoCs are matched as-is (URL paths can be case-sensitive on the target server).
+
+```dql-template
+fetch security.events, from:now()-2h
+| filter event.type == "DETECTION_FINDING"
+| fieldsAdd Domains = array("<domain1_lowercase>", "<domain2_lowercase>"),
+            URLs    = array("<url1>")
+| filter iAny(contains(lower(url.full),      Domains[]))
+      OR in(lower(url.domain),    Domains)
+      OR in(lower(server.address), Domains)
+      OR iAny(in(lower(host.fqdn[]), Domains))
+      OR iAny(contains(url.full, URLs[]))
+      OR iAny(contains(url.path, URLs[]))
+| fields timestamp, finding.id, finding.title, dt.security.risk.level,
+         finding.type, finding.action, event.provider, product.name,
+         url.full, url.path, url.domain, server.address, host.fqdn,
+         object.id, object.name, object.type,
+         actor.ips, "dt.smartscape*", "dt.entity*"
+| sort timestamp desc
+| limit 100
+```
+
+Apply the widen-on-empty fallback: if `from:now()-2h` returns zero rows, re-run with
+`from:now()-24h` before concluding no match. Report the window used.
+
+Omit `URLs` lines entirely when no URL IoCs are present; omit the `Domains` lines when
+no domain IoCs are present.
+
+---
 
 ### Same source IP attacking multiple targets (cross-provider)
 

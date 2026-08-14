@@ -4,13 +4,25 @@ Correlate DAVIS problems with logs, events, and other telemetry from affected en
 
 ## Overview
 
-When DAVIS detects a problem, use `smartscape.affected_entity.ids` to query logs and telemetry from impacted entities. This correlation helps identify the specific error conditions, configuration changes, or resource constraints that triggered the problem.
+When DAVIS detects a problem, use `smartscape.affected_entities` to query logs and telemetry from impacted entities. This correlation helps identify the specific error conditions, configuration changes, or resource constraints that triggered the problem.
+
+`smartscape.affected_entities` is a **record array**; each record has an `id`, `type`, and `name`. How you access the members depends on whether the query expands the array first:
+
+| Context | Accessor | Result |
+|---------|----------|--------|
+| No preceding `expand` | `smartscape.affected_entities[][id]` | array of IDs |
+| After `expand smartscape.affected_entities` | `smartscape.affected_entities[id]` | one scalar ID per row |
+
+Writing `smartscape.affected_entities[id]` **without** a preceding `expand` returns `null` silently, so it never raises an error and quietly drops every correlation. Two further rules follow from the array shape:
+
+- **`join` needs `expand`.** A join key that is still an array matches nothing. Expand the records first so the key is a scalar.
+- **`filter` cannot take a bare iterative expression.** Wrap the comparison in `iAny(...)`. Because `id` is a `smartscapeId` rather than a string, convert it with `toString()` before comparing it to a string; `type` and `name` are plain strings and need no conversion.
 
 ## Key Correlation Fields
 
 | Field | Description | Usage |
 |-------|-------------|-------|
-| `smartscape.affected_entity.ids` | Array of entity IDs directly impacted | Use in subqueries to filter logs/metrics/events/traces |
+| `smartscape.affected_entities` | Record array of directly impacted entities (`id`, `type`, `name`) | Project IDs with `[][id]` and use them in subqueries to filter logs/metrics/events/traces |
 | `affected_entity_ids` | Array of classic entity IDs directly impacted | Use in subqueries to filter logs/metrics/events/traces |
 | `root_cause_entity_id` | Entity ID identified as root cause | Focus investigation on this entity |
 | `dt.davis.event_ids` | Underlying Davis event IDs | Query dt.davis.events for details |
@@ -25,7 +37,7 @@ fetch logs
 | filter dt.smartscape_source.id in [
     fetch dt.davis.problems
     | filter display_id == "P-12345678"
-    | fields smartscape.affected_entity.ids
+    | fields entity_ids = smartscape.affected_entities[][id]
   ] or dt.source_entity in [
     fetch dt.davis.problems
     | filter display_id == "P-12345678"
@@ -57,7 +69,7 @@ fetch logs, from:now() - 1h
 | filter dt.smartscape_source.id in [
     fetch dt.davis.problems, from:now() - 1h
     | filter not(dt.davis.is_duplicate) and event.status == "ACTIVE"
-    | fields smartscape.affected_entity.ids
+    | fields entity_ids = smartscape.affected_entities[][id]
   ] or dt.source_entity in [
     fetch dt.davis.problems, from:now() - 1h
     | filter not(dt.davis.is_duplicate) and event.status == "ACTIVE"
@@ -78,7 +90,7 @@ fetch logs, from:now() - 2h
 | filter dt.smartscape_source.id in [
    fetch dt.davis.problems
     | filter display_id == "P-12345678"
-    | fields smartscape.affected_entity.ids
+    | fields entity_ids = smartscape.affected_entities[][id]
   ] or dt.source_entity in [
     fetch dt.davis.problems
     | filter display_id == "P-12345678"
@@ -98,7 +110,7 @@ fetch logs, from:now() - 4h
     fetch dt.davis.problems, from:now() - 4h
     | filter not(dt.davis.is_duplicate)
     | filter event.category == "ERROR"
-    | fields smartscape.affected_entity.ids 
+    | fields entity_ids = smartscape.affected_entities[][id]
 ]
     or dt.source_entity in [
         fetch dt.davis.problems, from:now() - 4h
@@ -116,18 +128,20 @@ fetch logs, from:now() - 4h
 
 ### Logs Relative to Problem Occurrence
 
-View logs in temporal context around problem detection:
+View logs in temporal context around problem detection. `expand` produces one row per affected
+entity so the join key is a scalar; joining on the unexpanded array matches nothing:
 
 ```dql-snippet
 fetch dt.davis.problems
 | filter display_id == "P-12345678"
-| fields problem_start=event.start, smartscape.affected_entity.ids, timestamp
+| expand smartscape.affected_entities
+| fields problem_start=event.start, timestamp, entity_id = smartscape.affected_entities[id]
 | join [
     fetch logs
     | filter in(loglevel, {"ERROR", "WARN"})
     | fields content, timestamp, dt.source_entity, loglevel
     | limit 100
-], on:{left[smartscape.affected_entity.ids] == right[dt.source_entity]}
+], on:{left[entity_id] == right[dt.source_entity]}
 | fieldsAdd time_offset = timestamp - problem_start
 | sort timestamp asc
 | fields timestamp, time_offset, right.loglevel, right.content
@@ -141,7 +155,9 @@ Query logs with expanded time window to see precursor events:
 // Get problem start time
 fetch dt.davis.problems
 | filter display_id == "P-12345678"
-| fields problem_start = event.start, problem_entities = smartscape.affected_entity.ids
+| fieldsAdd problem_start = event.start
+| expand smartscape.affected_entities
+| fieldsAdd problem_entity = smartscape.affected_entities[id]
 ```
 
 ```dql
@@ -150,7 +166,7 @@ fetch logs, from:now() - 1h
 | filter dt.smartscape_source.id in [
     fetch dt.davis.problems
     | filter display_id == "P-12345678"
-    | fields smartscape.affected_entity.ids
+    | fields entity_ids = smartscape.affected_entities[][id]
 ]
     or dt.source_entity in [
         fetch dt.davis.problems
@@ -173,7 +189,7 @@ fetch logs, from:now() - 2h
 | filter dt.smartscape_source.id in [
     fetch dt.davis.problems, from:now() - 2h
     | filter not(dt.davis.is_duplicate) and event.status == "ACTIVE"
-    | fields smartscape.affected_entity.ids
+    | fields entity_ids = smartscape.affected_entities[][id]
 ]
     or dt.source_entity in [
         fetch dt.davis.problems, from:now() - 2h
@@ -192,11 +208,12 @@ Identify entities appearing in multiple problems:
 ```dql
 fetch dt.davis.problems, from:now() - 24h
 | filter not(dt.davis.is_duplicate)
-| expand smartscape.affected_entity.ids
+| expand smartscape.affected_entities
+| fieldsAdd entityId = smartscape.affected_entities[id]
 | summarize 
     problem_count = countDistinct(display_id),
     categories = collectDistinct(event.category),
-    by:{smartscape.affected_entity.ids}
+    by:{entityId}
 | filter problem_count > 1
 | sort problem_count desc
 ```
@@ -225,11 +242,12 @@ Check if problems correlate with recent deployments:
 ```dql
 fetch dt.davis.problems, from:now() - 2h
 | filter not(dt.davis.is_duplicate) and event.status == "ACTIVE"
-| fields problem_start = event.start, display_id, event.name, smartscape.affected_entity.ids, timestamp
+| expand smartscape.affected_entities
+| fields problem_start = event.start, entity_id = smartscape.affected_entities[id], display_id, event.name, timestamp
 | join [
     fetch events
     | filter event.type == "DEPLOYMENT"
-], on:{left[smartscape.affected_entity.ids] == right[dt.smartscape.service]}
+], on:{left[entity_id] == right[dt.smartscape.service]}
 | fieldsAdd time_since_deployment = problem_start - timestamp
 | filter time_since_deployment > 0m and time_since_deployment < 30m
 | fields display_id, event.name, time_since_deployment
@@ -237,22 +255,21 @@ fetch dt.davis.problems, from:now() - 2h
 
 ### K8S or Technology Correlation
 
-Check if active problems correlate with K8S deployment:
+Check if active problems correlate with K8S deployment. Match on the `type` member rather than on
+an ID prefix; `type` is a plain string, so it needs no `toString()` conversion:
 
 ```dql
-fetch dt.davis.problems, from:now() - 24h
+fetch dt.davis.problems, from:now() - 48h
 | filter not(dt.davis.is_duplicate) and event.status == "ACTIVE"
-| fieldsAdd e = arraytoString(smartscape.affected_entity.ids, delimiter:",")
-| filter matchesPhrase(arraytoString(smartscape.affected_entity.ids, delimiter:","), "K8S_DEPLOYMENT-")
+| filter iAny(smartscape.affected_entities[][type] == "K8S_DEPLOYMENT")
 ```
 
 Check if active problems correlate with AWS S3 buckets:
 
 ```dql
-fetch dt.davis.problems, from:now() - 24h
+fetch dt.davis.problems, from:now() - 48h
 | filter not(dt.davis.is_duplicate) and event.status == "ACTIVE"
-| fieldsAdd e = arraytoString(smartscape.affected_entity.ids, delimiter:",")
-| filter matchesPhrase(arraytoString(smartscape.affected_entity.ids, delimiter:","), "AWS_S3_BUCKET-")
+| filter iAny(smartscape.affected_entities[][type] == "AWS_S3_BUCKET")
 ```
 
 ## Root Cause Correlation
@@ -292,7 +309,7 @@ fetch logs, from: "2026-05-18T22:50:00Z", to: "2026-05-18T23:35:00Z"
 | filter dt.smartscape_source.id in [
     fetch dt.davis.problems, from: "2026-05-18T22:00:00Z", to: "2026-05-18T23:35:00Z"
     | filter display_id == "P-12345678"
-    | fields smartscape.affected_entity.ids
+    | fields entity_ids = smartscape.affected_entities[][id]
   ] or dt.source_entity in [
     fetch dt.davis.problems, from: "2026-05-18T22:00:00Z", to: "2026-05-18T23:35:00Z"
     | filter display_id == "P-12345678"
@@ -312,7 +329,7 @@ fetch logs, from: "2026-05-18T22:50:00Z", to: "2026-05-18T23:35:00Z"
    fetch logs, from:now() - 1h
    | filter dt.smartscape_source.id in [
        fetch dt.davis.problems, from:now() - 1h
-       | fields smartscape.affected_entity.ids
+       | fields entity_ids = smartscape.affected_entities[][id]
    ] or dt.source_entity in [
        fetch dt.davis.problems, from:now() - 1h
        | fields affected_entity_ids
@@ -336,7 +353,7 @@ fetch logs, from: "2026-05-18T22:50:00Z", to: "2026-05-18T23:35:00Z"
 
 ### Investigation Workflow
 
-1. **Identify problem**: Get `display_id` and `smartscape.affected_entity.ids`
+1. **Identify problem**: Get `display_id` and `smartscape.affected_entities[][id]`
 2. **Expand time window**: Query logs from before problem start to after resolution
 3. **Filter by severity**: Start with ERROR, expand to WARN if needed
 4. **Look for patterns**: Use `summarize` to find recurring messages
@@ -351,7 +368,7 @@ fetch logs, from: "2026-05-18T22:50:00Z", to: "2026-05-18T23:35:00Z"
 fetch logs, from:now() - 1h
 | filter dt.smartscape_source.id in [
     fetch dt.davis.problems  // No time range
-    | fields smartscape.affected_entity.ids
+    | fields entity_ids = smartscape.affected_entities[][id]
 ]
     or dt.source_entity in [
         fetch dt.davis.problems  // No time range
@@ -362,7 +379,7 @@ fetch logs, from:now() - 1h
 ```dql
 // ❌ WRONG - Not filtering duplicates
 fetch dt.davis.problems
-| fields smartscape.affected_entity.ids  // Includes duplicates
+| fields entity_ids = smartscape.affected_entities[][id]  // Includes duplicates
 ```
 
 ```dql
@@ -371,7 +388,7 @@ fetch logs, from:now() - 1h
 | filter dt.smartscape_source.id in [
     fetch dt.davis.problems, from:now() - 1h
     | filter not(dt.davis.is_duplicate)
-    | fields smartscape.affected_entity.ids
+    | fields entity_ids = smartscape.affected_entities[][id]
 ]
     or dt.source_entity in [
         fetch dt.davis.problems, from:now() - 1h
@@ -384,7 +401,7 @@ fetch logs, from:now() - 1h
 
 1. **Active problems have NULL event.end**: Use `coalesce(event.end, now())`
 2. **Some problems have no root_cause_entity_id**: Use `isNotNull()` check
-3. **smartscape.affected_entity.ids is an array**: Use `in` operator for filtering
+3. **`smartscape.affected_entities[][id]` is an array**: Use the `in` operator for filtering. An `in [ ... ]` subquery flattens an array-valued column, so the array can be projected directly
 4. **Log timestamps may be slightly off**: Expand time window by 5-10 minutes
 
 ## Advanced Patterns

@@ -13,12 +13,12 @@ Covers BUE billable totals, per-source attribution, per-detector breakdown
   - [Step 1a — Coverage Check](#step-1a--coverage-check)
   - [Step 1b — Combined Attribution](#step-1b--combined-attribution)
 - [Step 2 — Identify Source Type](#step-2--identify-source-type)
+  - [Step 2a — AI-Generated Queries](#step-2a--ai-generated-queries)
   - [Step 2b — Drill Down by Bucket](#step-2b--drill-down-by-bucket)
 - [Step 3 — Drill Into QEE for Details](#step-3--drill-into-qee-for-details)
   - [Step 3b — Cross-Validate Execution Count](#step-3b--cross-validate-execution-count)
 - [Step 4 — Per-Detector Scan & Name Resolution (ALERTING pool)](#step-4--per-detector-scan--name-resolution-alerting-pool)
 - [Step 5 — Rank by Cost Weight](#step-5--rank-by-cost-weight)
-- [Best Practices](#best-practices)
 - [Investigating QEE↔BUE Mismatches](#investigating-qeebue-mismatches)
 
 ## Common Principles
@@ -71,6 +71,7 @@ before building attribution queries.
 | `client.internal_service_context` | Internal Dynatrace service name | ALERTING, OPERATIONAL, BILLING |
 | `client.workflow_context` | Workflow ID | AUTOMATION only |
 | `user.id` / `user.email` | User or service account | Most pools |
+| `ai_generated` | `true` when the query was issued by an AI agent (Davis Copilot, MCP assistant) | All Query BUE types |
 
 Use `coalesce(client.source, client.application_context, client.internal_service_context, client.workflow_context, client.function_context, client.client_context, "unknown")` for
 attribution. For app-level results, drill into `client.function_context`.
@@ -136,43 +137,94 @@ The meaning of `attribution` depends on which query pool generated the cost.
 | `https://.../document/...` | Dashboard (DASHBOARDS pool) | Filter Step 1b by `matchesPhrase(client.source, "/ui/dashboard/")` to rank dashboards |
 | Encoded settings UID / opaque ID | Detector settings `objectId` (ALERTING pool) | Step 4 — resolved in combined query |
 | `builtin:davis.anomaly-detectors/...` | Detector type name (ALERTING pool) | Step 4 — parse `client.client_context` |
-| `dynatrace.automations:...` | Automation function (AUTOMATION pool) | Cross-ref with `WORKFLOW_EVENT` |
+| `dynatrace.automations:...` | Automation function (AUTOMATION pool) | Resolve via [workflow-total-cost.md § Cross-Event Field Reference](workflow-total-cost.md#cross-event-field-reference) |
 | `dynatrace.<appname>` | Platform app (from `client.application_context`) | Drill into `client.function_context` |
 | `dt.*` service name | Internal platform service | Review with platform team |
+| `ai_generated == true` | AI agent (Davis Copilot / MCP) | Step 2a — attribute by `session_id`; `client.source` has the MCP tool name |
+
+### Step 2a — AI-Generated Queries
+
+Queries with `ai_generated == true` on BUE Query events represent **indirect** AI costs — the DQL scan volume triggered by an AI agent on top of the direct charges billed as `AI Units` / `AI Function Standard Call` BUEs. For direct AI invocation costs, see [billing-event-types.md § Agentic AppEngine](billing-event-types.md#agentic-appengine).
+
+Filter on `ai_generated == true` to isolate the indirect scan cost:
+
+```dql
+fetch dt.system.events, from: -7d
+| filter event.kind == "BILLING_USAGE_EVENT"
+| filter in(event.type, "Log Management & Analytics - Query", "Events - Query", "Traces - Query", "Files - Query")
+| filter ai_generated == true
+| dedup {event.id, event.type}
+| summarize total_gib = sum(toDouble(billed_bytes) / 1073741824),
+    event_count = count(),
+    by: {event.type}
+```
+
+To see which AI sessions drove the most scan volume, group by `session_id`. The `session_id`
+on these Query BUEs matches the `session_id` on the `AI Units` / `AI Function Standard
+Call` BUEs that initiated them, enabling cross-BUE attribution:
+
+```dql
+fetch dt.system.events, from: -7d
+| filter event.kind == "BILLING_USAGE_EVENT"
+| filter in(event.type, "Log Management & Analytics - Query", "Events - Query", "Traces - Query", "Files - Query")
+| filter ai_generated == true
+| filter isNotNull(session_id) and session_id != ""
+| dedup {event.id, event.type}
+| summarize total_gib = sum(toDouble(billed_bytes) / 1073741824),
+    event_count = count(),
+    by: {session_id, event.type}
+| sort total_gib desc
+| limit 20
+```
+
+> `client.source` on these BUEs typically contains the MCP tool name (e.g.,
+> `dynatrace-mcp.get-problem-by-id`, `dynatrace-mcp.execute-dql`), useful for seeing which
+> AI tools are driving the most scan volume. `conversation_id` may be an empty string on
+> Query BUEs even when present on the AI Units / AI Function Standard Call BUEs in the same
+> session — use `session_id` as the reliable join key.
 
 ### Step 2b — Drill Down by Bucket
 
-Identify which Grail storage buckets drive scan volume. High scan on a specific
-bucket may indicate queries without time filters, over-broad aggregations, or
-detectors running against large-retention data:
+Identify which Grail buckets drive scan volume — high scan on one bucket often
+means missing time filters, over-broad aggregations, or detectors on
+large-retention data.
+
+> **BUE `usage.bucket` coverage varies by BUE `event.type`** (verified:
+> emitted by `Events - Query` and `Digital Experience Monitoring - Query`;
+> not by `Log Management & Analytics - Query`, `Traces - Query`,
+> `Files - Query`) and can change as Dynatrace adds groupers. For **reliable
+> per-bucket attribution across all BUE Query types, use QEE** — carries
+> `table` and `bucket` with 100% coverage.
 
 ```dql
 fetch dt.system.events, from: -7d
 | filter event.kind == "BILLING_USAGE_EVENT"
 | filter in(event.type,
-    "Log Management & Analytics - Query",
     "Events - Query",
-    "Traces - Query",
-    "Files - Query")
+    "Digital Experience Monitoring - Query")
 | dedup {event.id, event.type}
 | summarize total_gib = sum(toDouble(billed_bytes) / 1073741824),
-    query_count = count(),
+    bue_rows = count(),
     by: {usage.bucket, event.type}
 | sort total_gib desc
 | limit 20
 ```
 
-> To join BUE with QEE for per-query details, use `query_id` (present on both).
-> **Cardinality:** one DQL statement (`query_id`) → **multiple QEE records and
-> multiple BUE events, one each per `usage.bucket` touched.** So `count()` on
-> either event kind counts bucket-touches, not DQL statements — use
-> `countDistinct(query_id)` for the statement count (see
-> [Step 3](#step-3--drill-into-qee-for-details)). When aggregating `billed_bytes`
-> from joined results, group by `event.id` (not `query_id`) to avoid inflating
-> totals.
+> ### ⛔ Cardinality rules for BUE + QEE joins
+>
+> Both BUE and QEE can fan out to multiple rows per `query_id`, and grouper
+> dimensions may change over time. Apply universally:
+>
+> | Wrong | Right |
+> |-------|-------|
+> | `count()` on BUE/QEE for query count | `countDistinct(query_id)` |
+> | `sum(billed_bytes)` grouped by `query_id` on BUE+QEE join | `sum(billed_bytes)` grouped by `event.id` |
+>
+> **`event.id` = safe grain for billed volume; `query_id` = safe grain for
+> query counts.** Never mix them.
 
 Join BUE with QEE for per-query details (group by `event.id` when summing
-`billed_bytes` to avoid inflation from the bucket fan-out):
+`billed_bytes`, use `countDistinct(query_id)` for query counts):
 
 ```dql
 fetch dt.system.events, from: -7d
@@ -217,16 +269,12 @@ QEE provides per-query execution details not available on BUE: `query_string`,
 > | `dql_statements = countDistinct(query_id)` | distinct `query_id` | actual DQL queries executed |
 > | workflow / detector **runs** | a **separate** `WORKFLOW_EVENT` / `ANALYZER_EXECUTION_EVENT` query — see [Step 3b](#step-3b--cross-validate-execution-count) | how many times something actually ran |
 >
-> **Never** alias the QEE row count as `queries`, and **never** phrase it as
-> "ran N times" or compute a frequency (per-second / per-minute) from it. The
-> inflation factor is workflow-dependent — it ranges from a few× (one DQL
-> statement touching a handful of buckets) to 50×+ (many statements per run,
-> each touching many buckets). Even a modest 2–3× gap turns a real run count
-> into a wrong one, so the size of the gap is never a reason to trust the QEE
-> count. Always count distinct `query_id` for query volume, and cross-validate
-> run counts with the source event
-> ([Step 3b](#step-3b--cross-validate-execution-count)) before reporting any
-> "how often did this run" conclusion.
+> Never alias the QEE row count as `queries` or phrase it as "ran N times" — the
+> gap between `count()` and `countDistinct(query_id)` is unpredictable (a few× to
+> 50×+), so a raw count is never a safe proxy for query volume or run frequency.
+> Use `countDistinct(query_id)` for query volume, and cross-validate run counts
+> with the source event ([Step 3b](#step-3b--cross-validate-execution-count))
+> before reporting any "how often did this run" conclusion.
 
 ```dql-template
 fetch dt.system.events, from: -7d
@@ -240,73 +288,19 @@ fetch dt.system.events, from: -7d
 | sort total_scanned_gib desc
 ```
 
-> The `qee_events` and `dql_statements` columns will differ whenever queries
-> touch more than one bucket. Report `dql_statements` (or scan volume) — not
-> `qee_events` — when describing how much querying a source did.
-
 ### Step 3b — Cross-Validate Execution Count
 
 **Required whenever you report how often a source ran** (e.g. "this workflow
 runs N times/day", "this detector fires every X"). QEE counts can never answer
-this — the run count lives on the originating event:
+this — QEE `count()` is bucket-touches (see the ⛔ block in Step 3), and the
+real run count lives on the source's **originating** event, which differs by
+pool. Each event has its own fan-out shape — use the exact count expression
+from the table:
 
-| Attribution pool | Run-count event | Filter | True run count |
-|------------------|-----------------|--------|----------------|
-| `dynatrace.automations` (AUTOMATION) | `WORKFLOW_EVENT` | `event.type == "WORKFLOW_EXECUTION"` + workflow id | `countDistinct(dt.automation_engine.workflow_execution.id)` |
-| ALERTING (detectors) | `ANALYZER_EXECUTION_EVENT` | `dt.task.id` | sample first — `count()` may fan out; prefer `countDistinct` on the analyzer execution/run id |
-
-> ### ⛔ `WORKFLOW_EXECUTION` `count()` is NOT the run count either
->
-> `WORKFLOW_EVENT` / `WORKFLOW_EXECUTION` is a **state-change** event: one row
-> per `dt.automation_engine.state` transition, where state ∈
-> `{RUNNING, SUCCESS, ERROR, CANCELLED}` (`dt.automation_engine.state.is_final`
-> is `true` for the terminal states). A run emits a `RUNNING` row
-> (`duration` ≈ `0,00 ns`, no end timestamp) and one terminal row (real
-> `duration` + end timestamp), **both sharing the same**
-> `dt.automation_engine.workflow_execution.id`. A completed run is 2 rows; an
-> in-flight run is 1. So `count()` overstates runs by ≈2× and the exact factor
-> drifts (validated on a live tenant: 2,879 rows vs 1,440 distinct executions
-> for the same workflow over 24h). **Always use
-> `countDistinct(dt.automation_engine.workflow_execution.id)` for the run
-> count** — never bare `count()`. Same lesson as QEE: confirm an event is
-> one-row-per-thing before counting it.
-
-For workflows, count distinct executions and compare against the QEE figure:
-
-```dql-template
-fetch dt.system.events, from: -7d
-| filter event.kind == "WORKFLOW_EVENT"
-| filter event.provider == "AUTOMATION_ENGINE"
-| filter event.type == "WORKFLOW_EXECUTION"
-| filter in(dt.automation_engine.workflow.id, "<workflow-uuid-1>", "<workflow-uuid-2>")
-| summarize
-    workflow_runs = countDistinct(dt.automation_engine.workflow_execution.id),
-    workflow_title = takeFirst(dt.automation_engine.workflow.title),
-    by: {workflow_id = dt.automation_engine.workflow.id}
-| sort workflow_runs desc
-```
-
-> - **Exclude editor test runs:** add `| filter dt.automation_engine.is_draft == false`
->   to count only production executions (drafts are runs from the workflow
->   editor).
-> - **Explain a high run rate:** check
->   `dt.automation_engine.workflow_execution.trigger.type`
->   (`Schedule` = cron cadence, `Event` = event-driven, `Manual`, `Workflow` =
->   triggered by another workflow). A `Schedule` trigger firing every 30–60s is
->   the usual reason for thousands of runs/day.
-> - **Hitting the cap:** `event.type == "WORKFLOW_THROTTLED"` rows mean the
->   workflow exceeded its executions-per-hour limit
->   (`dt.automation_engine.throttle.limit`) — a strong signal in a cost or
->   runaway-automation investigation.
-
-> **Worked example (validated, 24h, one scheduled workflow):** 1,440 distinct
-> runs (≈1/min) → 2,879 `WORKFLOW_EXECUTION` rows (≈2× — start + completion) →
-> 2,867 DQL statements (≈2 per run) → 7,195 QEE events (≈5× runs — bucket
-> fan-out). Reading the QEE `count()` as a run count overstates by 5×; reading
-> the `WORKFLOW_EXECUTION` `count()` as a run count overstates by 2×. Derive any
-> frequency **only** from `workflow_runs` (distinct executions) ÷ timespan. A
-> large gap between any `count()` and the distinct-execution count is expected
-> fan-out, not a spike.
+| Attribution pool | Originating event | Filter on | Count runs with |
+|------------------|-------------------|-----------|-----------------|
+| `dynatrace.automations` (AUTOMATION) | `WORKFLOW_EVENT` (`event.type == "WORKFLOW_EXECUTION"`) | `dt.automation_engine.workflow.id` | `countDistinct(dt.automation_engine.workflow_execution.id)` — fans out ≈2× per run (a `RUNNING` row + a terminal `SUCCESS`/`ERROR`/`CANCELLED` row share one execution id). See [workflow-total-cost.md § How Often Did the Workflow Run](workflow-total-cost.md#how-often-did-the-workflow-run) for the full query. |
+| ALERTING (detectors) | `ANALYZER_EXECUTION_EVENT` | `dt.task.id` | `countDistinct(dt.analyzer.execution.start)` grouped by `dt.task.id` — runs are keyed by `(dt.task.id, dt.analyzer.execution.start)` (no dedicated execution-id field is emitted). `countDistinct` on the start timestamp is safe if the event ever fans out; sample first (`\| limit 3`) to confirm shape. |
 
 ## Step 4 — Per-Detector Scan & Name Resolution (ALERTING pool)
 
@@ -347,19 +341,6 @@ fetch dt.system.events, from: -7d
 ## Step 5 — Rank by Cost Weight
 
 Apply normalization weights from [cost-estimations.md](cost-estimations.md) → [Cost Normalization Weights](cost-estimations.md#cost-normalization-weights).
-
-## Best Practices
-
-1. **Use BUE `client.source` for ALERTING attribution** — covers a subset of
-   detector queries; use `client.client_context` parse on QEE for the full
-   per-detector breakdown.
-2. **`user.id` is never detector-specific** — all anomaly detectors share the
-   same service account; use `dt.task.id` / `client.client_context` instead.
-3. **Sample first, then extend to 30d** — verify field availability on a 7-day
-   slice before running expensive 30-day queries.
-4. **Dedup every BUE aggregation** — Use `| dedup {event.id, event.type}` for
-   multi-type queries. See
-   [Billing Event Deduplication](billing-capabilities.md#billing-event-deduplication).
 
 ## Investigating QEE↔BUE Mismatches
 

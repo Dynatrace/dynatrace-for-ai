@@ -125,8 +125,8 @@ Use these field migrations when the classic field name, not just the entity type
 
 | Classic field | Smartscape field | Notes |
 | --- | --- | --- |
-| `affected_entity_ids` | `smartscape.affected_entity.ids` | Davis events field for affected entity IDs |
-| `affected_entity_types` | `smartscape.affected_entity.types` | Davis events field for affected entity types; values become uppercase Smartscape type names |
+| `affected_entity_ids` | `smartscape.affected_entities` | Davis events field, now a `record[]`; project IDs with `smartscape.affected_entities[][id]`, or `smartscape.affected_entities[id]` after `expand` |
+| `affected_entity_types` | `smartscape.affected_entities` | Same record array; project types with `smartscape.affected_entities[][type]`. Values become uppercase Smartscape type names |
 | `dt.source_entity.type` | `dt.smartscape_source.type` | Davis events field for source entity type |
 | `containerizationType` | `container.containerization_type` | Planned Smartscape container field |
 | `customPgMetadata` | `process.metadata` | Classic process-group metadata now lives on process |

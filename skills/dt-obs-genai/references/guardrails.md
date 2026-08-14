@@ -49,7 +49,7 @@ fetch spans, from: now()-24h
 
 ---
 
-## Blocked responses (content filter)
+## Blocked or safety-filtered responses
 
 Calls where a provider safety filter tripped. Use this to quantify how often guardrails are blocking or redacting output and which models/providers trip them most — a rising trend can indicate adversarial input, a prompt regression, or an over-tight filter harming legitimate responses.
 
@@ -63,7 +63,7 @@ fetch spans, from: now()-24h
 | sort blocked desc
 ```
 
-**How to read it:** Each row is a model+provider combination and `blocked` is the number of responses the safety filter stopped. Correlate a spike here with the `prompt-injection` evaluator in [evaluations.md](evaluations.md#failed-evaluations): simultaneous content-filter trips and prompt-injection failures point to an attack or a jailbreak attempt rather than benign over-filtering.
+**How to read it:** Each row is a model+provider combination and `blocked` is the number of responses the safety filter stopped. Correlate a spike here with the `prompt-injection` evaluator in [evaluations.md](evaluations.md#failed-evaluations): simultaneous `content_filter` trips and prompt-injection failures point to an attack or a jailbreak attempt rather than benign over-filtering.
 
 **Tip:** Add `bin(start_time, 1h)` to the `by:` clause to turn this into a trend and detect a sudden surge. To inspect what triggered a block, take the `trace.id` of an affected span (add it to a `fields` projection) and open the trace.
 
