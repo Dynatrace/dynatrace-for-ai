@@ -33,6 +33,8 @@ Please consult the [Dynatrace MCP server docs
 
 Update with `claude plugin marketplace update && claude plugin update dynatrace@dynatrace-for-ai`.
 
+The bundled MCP server connects to your Dynatrace environment. See the [Dynatrace Privacy Policy](https://www.dynatrace.com/company/trust-center/privacy/) for details on data handling.
+
 ### Manual
 
 Copy skill directories into your agent's skills path (`.agents/skills/`, `.claude/skills/`, `.cursor/skills/`, etc.).
