@@ -1,5 +1,7 @@
 # Dynatrace for AI
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Dynatrace/dynatrace-for-ai/badge)](https://scorecard.dev/viewer/?uri=github.com/Dynatrace/dynatrace-for-ai)
+
 Everything AI agents need to work with [Dynatrace](https://www.dynatrace.com), starting with skills.
 
 **Skills** are portable knowledge packages following the [Agent Skills](https://agentskills.io) open format. They give AI coding agents the domain-specific context to query, analyze, and interpret Dynatrace data. They work with Claude Code, GitHub Copilot, Cursor, OpenCode, Gemini CLI, and [30+ other compatible tools](https://agentskills.io).
