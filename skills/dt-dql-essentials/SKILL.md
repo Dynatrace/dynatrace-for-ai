@@ -444,6 +444,11 @@ ______________________________________________________________________
 
 - Subtracting timestamps yields a duration: `timestamp - timestamp → duration`
 - Duration divided by duration yields a double: e.g. `2h / 1m` = `120.0`
+- Duration literals accept **fractional amounts on fixed-length units only** — `0.5h`, `0.25h`,
+  `1.5m`, `1.5s`, `1.5ms`, `1.5us` are all valid. The **calendar units `d` and `w` reject them**:
+  `0.25d` fails with `CALENDAR_DURATION_UNIT_NOT_SUPPORTED_FOR_FRACTIONAL_AMOUNT`, because a day or
+  week has no fixed nanosecond count (DST, leap seconds). Write `6h` rather than `0.25d`.
+  Note `1.5ns` truncates to `1` — nanosecond is the floor of the type's precision.
 - Scalar times duration yields a duration: e.g. `no_of_h * 1h → duration`
 - For extraction of time elements (hours, days of month, etc):
     - ✅ Use [time functions](references/dql/dql-functions-time.md). They support calendar and time zones properly including DST.
