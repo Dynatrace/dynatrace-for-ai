@@ -15,3 +15,13 @@ Consult the [Dynatrace MCP server docs
 ## Skills for Observability related questions
 
 Please use the included skills for observability related questions.
+
+## Version consistency
+
+The canonical version lives in `.cursor-plugin/plugin.json` (`version` field).
+
+When bumping that version, also update `X-Http-Source` in **both** MCP config files to match:
+- `mcp.json` → `"X-Http-Source": "dynatrace-for-ai/<version>"`
+- `.mcp.json` → `"X-Http-Source": "dynatrace-for-ai/<version>"`
+
+The CI workflow `.github/workflows/check-versions.yml` enforces this and will fail if they drift.
