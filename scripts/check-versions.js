@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Verifies that X-Http-Source in mcp.json and .mcp.json matches the version in .cursor-plugin/plugin.json
+// Verifies that all version fields are consistent with .claude-plugin/plugin.json (canonical source).
+// Run on CI and locally before releasing.
 const fs = require("fs");
 const path = require("path");
 
@@ -9,22 +10,38 @@ function read(file) {
   return JSON.parse(fs.readFileSync(path.join(root, file), "utf8"));
 }
 
-const { version } = read(".cursor-plugin/plugin.json");
-const expected = `dynatrace-for-ai/${version}`;
+const { version } = read(".claude-plugin/plugin.json");
+const expectedHeader = `dynatrace-for-ai/${version}`;
 
 const checks = [
-  { file: "mcp.json", actual: read("mcp.json").mcpServers?.dynatrace?.headers?.["X-Http-Source"] },
-  { file: ".mcp.json", actual: read(".mcp.json").mcpServers?.dynatrace?.headers?.["X-Http-Source"] },
+  {
+    file: ".cursor-plugin/plugin.json",
+    actual: read(".cursor-plugin/plugin.json").version,
+    expected: version,
+  },
+  {
+    file: "mcp.json",
+    actual: read("mcp.json").mcpServers?.dynatrace?.headers?.["X-Http-Source"],
+    expected: expectedHeader,
+  },
+  {
+    file: ".mcp.json",
+    actual: read(".mcp.json").mcpServers?.dynatrace?.headers?.["X-Http-Source"],
+    expected: expectedHeader,
+  },
 ];
 
 let failed = false;
-for (const { file, actual } of checks) {
+for (const { file, actual, expected } of checks) {
   if (actual !== expected) {
-    console.error(`FAIL ${file}: X-Http-Source is "${actual}", expected "${expected}"`);
+    console.error(`FAIL ${file}: got "${actual}", expected "${expected}"`);
     failed = true;
   } else {
-    console.log(`OK   ${file}: X-Http-Source = "${actual}"`);
+    console.log(`OK   ${file}: "${actual}"`);
   }
 }
 
-if (failed) process.exit(1);
+if (failed) {
+  console.error(`\nCanonical version is "${version}" from .claude-plugin/plugin.json`);
+  process.exit(1);
+}

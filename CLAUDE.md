@@ -18,9 +18,10 @@ Please use the included skills for observability related questions.
 
 ## Version consistency
 
-The canonical version lives in `.cursor-plugin/plugin.json` (`version` field).
+The canonical version lives in `.claude-plugin/plugin.json` (`version` field). It must match the latest GitHub release tag (e.g., release `v7.0.0` → version `7.0.0`).
 
-When bumping that version, also update `X-Http-Source` in **both** MCP config files to match:
+When bumping that version, update all of the following to match:
+- `.cursor-plugin/plugin.json` → `"version"`
 - `mcp.json` → `"X-Http-Source": "dynatrace-for-ai/<version>"`
 - `.mcp.json` → `"X-Http-Source": "dynatrace-for-ai/<version>"`
 

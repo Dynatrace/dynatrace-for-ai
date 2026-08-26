@@ -5,7 +5,7 @@
       "url": "${DT_ENVIRONMENT}/platform-reserved/mcp-gateway/v0.1/servers/dynatrace-mcp/mcp",
       "headers": {
         "Authorization": "Bearer ${DT_PLATFORM_TOKEN}",
-        "X-Http-Source": "dynatrace-for-ai/0.2.0"
+        "X-Http-Source": "dynatrace-for-ai/7.0.0"
       }
     }
   }
