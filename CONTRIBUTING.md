@@ -26,6 +26,19 @@ The following files live exclusively in this repository and welcome PRs:
 To report bugs, suggest new skills, or request improvements to existing skill
 content, please [open a GitHub issue](../../issues/new).
 
+## Releasing a New Version
+
+The canonical version is the `version` field in `.claude-plugin/plugin.json`. It must match the GitHub release tag (e.g., release `v7.0.0` → `"version": "7.0.0"`).
+
+When bumping the version, update all of the following to match:
+
+- `.claude-plugin/plugin.json` → `"version"` (canonical)
+- `.cursor-plugin/plugin.json` → `"version"`
+- `mcp.json` → `"X-Http-Source": "dynatrace-for-ai/<version>"`
+- `.mcp.json` → `"X-Http-Source": "dynatrace-for-ai/<version>"`
+
+Run `node scripts/check-versions.js` to verify — CI also enforces this on every PR.
+
 ## License
 
 All contributions are licensed under Apache-2.0.

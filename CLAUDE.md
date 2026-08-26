@@ -15,14 +15,3 @@ Consult the [Dynatrace MCP server docs
 ## Skills for Observability related questions
 
 Please use the included skills for observability related questions.
-
-## Version consistency
-
-The canonical version lives in `.claude-plugin/plugin.json` (`version` field). It must match the latest GitHub release tag (e.g., release `v7.0.0` → version `7.0.0`).
-
-When bumping that version, update all of the following to match:
-- `.cursor-plugin/plugin.json` → `"version"`
-- `mcp.json` → `"X-Http-Source": "dynatrace-for-ai/<version>"`
-- `.mcp.json` → `"X-Http-Source": "dynatrace-for-ai/<version>"`
-
-The CI workflow `.github/workflows/check-versions.yml` enforces this and will fail if they drift.
