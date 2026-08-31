@@ -36,8 +36,21 @@ When bumping the version, update all of the following to match:
 - `.cursor-plugin/plugin.json` → `"version"`
 - `mcp.json` → `"X-Http-Source": "dynatrace-for-ai/<version>"`
 - `.mcp.json` → `"X-Http-Source": "dynatrace-for-ai/<version>"`
+- `server.json` → `"version"` and the `X-Http-Source` header value
 
 Run `node scripts/check-versions.js` to verify — CI also enforces this on every PR.
+
+Pushing the `vX.Y.Z` tag also publishes `server.json` to the
+[official MCP registry](https://registry.modelcontextprotocol.io) via
+`.github/workflows/publish-mcp.yml`. The workflow authenticates with GitHub OIDC, which grants
+only the `io.github.<owner>/*` namespace — and the registry compares namespaces
+case-sensitively. So `server.json` → `"name"` must keep the exact `io.github.Dynatrace/`
+casing, otherwise publishing fails with a 403.
+
+The first publish of a version whose tag already existed before the workflow must be started
+manually with `workflow_dispatch`. The job runs in the `mcp-registry-publish` environment:
+configure that environment with required reviewers, because the OIDC token can publish to the
+whole `io.github.Dynatrace/*` namespace.
 
 ## License
 

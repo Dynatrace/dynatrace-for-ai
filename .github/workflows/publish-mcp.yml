@@ -1,0 +1,40 @@
+name: Publish to MCP Registry
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  MCP_PUBLISHER_URL: https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # The OIDC token can publish to the whole io.github.<owner>/* namespace, so gate
+    # the job behind an environment with required reviewers.
+    environment: mcp-registry-publish
+    permissions:
+      # OIDC grants the io.github.<owner>/* namespace, so no secret is needed
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the tag matches the server.json version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF#refs/tags/v}"
+          actual=$(jq -r .version server.json)
+          if [ "$tag" != "$actual" ]; then
+            echo "FAIL tag v$tag does not match server.json version \"$actual\""
+            exit 1
+          fi
+      - name: Install mcp-publisher
+        run: curl -fsSL "$MCP_PUBLISHER_URL" | tar xz mcp-publisher
+      - name: Authenticate to the MCP registry
+        run: ./mcp-publisher login github-oidc
+      - name: Publish server.json
+        run: ./mcp-publisher publish

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Dynatrace/dynatrace-for-ai",
+  "title": "Dynatrace",
+  "description": "Connect AI assistants to Dynatrace to query observability data and analyze problems.",
+  "version": "7.0.0",
+  "repository": {
+    "url": "https://github.com/Dynatrace/dynatrace-for-ai",
+    "source": "github",
+    "id": "1197177849"
+  },
+  "websiteUrl": "https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/Dynatrace/dynatrace-for-ai/main/Dynatrace_Logo_color_positive.png",
+      "mimeType": "image/png",
+      "sizes": ["1280x1280"]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://{environment_id}.apps.dynatrace.com/platform-reserved/mcp-gateway/v0.1/servers/dynatrace-mcp/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Dynatrace Platform Token with MCP gateway scopes",
+          "value": "Bearer {platform_token}",
+          "isRequired": true,
+          "isSecret": true,
+          "variables": {
+            "platform_token": {
+              "description": "Your Dynatrace Platform Token with MCP gateway scopes",
+              "isRequired": true,
+              "isSecret": true,
+              "format": "string"
+            }
+          }
+        },
+        {
+          "name": "X-Http-Source",
+          "value": "dynatrace-for-ai/7.0.0"
+        }
+      ],
+      "variables": {
+        "environment_id": {
+          "description": "Your Dynatrace environment ID, e.g. abc12345 from https://abc12345.apps.dynatrace.com",
+          "isRequired": true,
+          "format": "string"
+        }
+      }
+    }
+  ]
+}

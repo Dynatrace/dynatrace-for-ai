@@ -13,6 +13,11 @@ function read(file) {
 const { version } = read(".claude-plugin/plugin.json");
 const expectedHeader = `dynatrace-for-ai/${version}`;
 
+const serverJson = read("server.json");
+const serverJsonXHttpSource = serverJson.remotes?.[0]?.headers?.find(
+  (h) => h.name === "X-Http-Source"
+)?.value;
+
 const checks = [
   {
     file: ".cursor-plugin/plugin.json",
@@ -27,6 +32,16 @@ const checks = [
   {
     file: ".mcp.json",
     actual: read(".mcp.json").mcpServers?.dynatrace?.headers?.["X-Http-Source"],
+    expected: expectedHeader,
+  },
+  {
+    file: "server.json (version)",
+    actual: serverJson.version,
+    expected: version,
+  },
+  {
+    file: "server.json (X-Http-Source)",
+    actual: serverJsonXHttpSource,
     expected: expectedHeader,
   },
 ];

@@ -10,6 +10,9 @@ on:
 permissions:
   contents: read
 
+env:
+  MCP_PUBLISHER_URL: https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
+
 jobs:
   check-versions:
     runs-on: ubuntu-latest
@@ -19,3 +22,18 @@ jobs:
         with:
           node-version: "lts/*"
       - run: node scripts/check-versions.js
+      # The registry grants only io.github.<owner>/* and compares case-sensitively,
+      # so a wrong-case name would only fail at publish time with a 403.
+      - name: Check server.json name matches the GitHub namespace
+        run: |
+          expected="io.github.${GITHUB_REPOSITORY%%/*}/${GITHUB_REPOSITORY##*/}"
+          actual=$(jq -r .name server.json)
+          if [ "$expected" != "$actual" ]; then
+            echo "FAIL server.json (name): got \"$actual\", expected \"$expected\""
+            exit 1
+          fi
+          echo "OK   server.json (name): \"$actual\""
+      - name: Validate server.json for the MCP registry
+        run: |
+          curl -fsSL "$MCP_PUBLISHER_URL" | tar xz mcp-publisher
+          ./mcp-publisher validate
