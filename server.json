@@ -1,13 +1,22 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.dynatrace/dynatrace-for-ai",
+  "name": "io.github.Dynatrace/dynatrace-for-ai",
   "title": "Dynatrace",
   "description": "Connect AI assistants to Dynatrace to query observability data and analyze problems.",
   "version": "7.0.0",
   "repository": {
     "url": "https://github.com/Dynatrace/dynatrace-for-ai",
-    "source": "github"
+    "source": "github",
+    "id": "1197177849"
   },
+  "websiteUrl": "https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/Dynatrace/dynatrace-for-ai/main/Dynatrace_Logo_color_positive.png",
+      "mimeType": "image/png",
+      "sizes": ["1280x1280"]
+    }
+  ],
   "remotes": [
     {
       "type": "streamable-http",

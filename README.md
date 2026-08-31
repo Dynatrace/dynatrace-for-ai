@@ -63,6 +63,8 @@ Or install the dtctl skill with dtctl itself: `dtctl skills install`
 
 The **[Dynatrace MCP server](https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server)** provides Dynatrace API access via MCP. The Claude Code plugin bundles the MCP server configuration automatically — just set `DT_ENVIRONMENT` and `DT_PLATFORM_TOKEN` as shown above. For other agents that support MCP natively, see the [MCP server docs](https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server).
 
+The MCP server is remote — Dynatrace hosts it, so there is nothing to install. Releases are published to the [official MCP registry](https://registry.modelcontextprotocol.io) as `io.github.Dynatrace/dynatrace-for-ai`, so MCP hosts that read the registry can add it by name.
+
 ## Skills
 
 ### DQL & Query Language
