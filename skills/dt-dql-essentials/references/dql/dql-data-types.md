@@ -6,7 +6,7 @@
 | `binary` | Binary | A sequence of bytes. |
 | `boolean` | Boolean | Boolean has only two possible values: true and false. |
 | `double` | Double | Double-precision 64-bit IEEE 754 floating point. |
-| `duration` | Duration | A duration between two timestamps, consisting of an amount and a time unit |
+| `duration` | Duration | A duration between two timestamps, consisting of an amount and a time unit. The amount may be fractional on fixed-length units (`ns`, `us`, `ms`, `s`, `m`, `h`) but **not** on the calendar units `d` and `w` |
 | `long` | Long | The signed long has a minimum value of -2^63 and a maximum value of 2^63-1 |
 | `record` | Record | A set of key-value pair data whose value can be any DQL data type. |
 | `string` | String | Sequence of characters with a specified character set. |
