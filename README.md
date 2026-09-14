@@ -19,23 +19,33 @@ Works with Claude Code, Cursor, Cline, GitHub Copilot, OpenCode, and other [comp
 ### Claude Code Plugin
 
 ```bash
-claude plugin marketplace add dynatrace/dynatrace-for-ai
-claude plugin install dynatrace@dynatrace-for-ai
+claude plugin install dynatrace@claude-plugins-official
 ```
 
-The plugin includes the Dynatrace MCP server. Set these environment variables before starting Claude Code to connect it to your environment:
+The plugin includes skills as well as the Dynatrace MCP server. Set these environment variables before starting Claude Code to connect it to your environment:
 
 ```bash
 export DT_ENVIRONMENT=https://<env>.apps.dynatrace.com   # e.g. https://abc12345.apps.dynatrace.com
 export DT_PLATFORM_TOKEN=<your-platform-token>
 ```
 
+Verify that it works via:
+
+```bash
+claude mcp login plugin:dynatrace:dynatrace
+```
+
 Please consult the [Dynatrace MCP server docs
 ](https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server) for a full list of scopes required for using the MCP Server with a Platform Token.
 
-Update with `claude plugin marketplace update && claude plugin update dynatrace@dynatrace-for-ai`.
+To update the plugin, use:
 
-The bundled MCP server connects to your Dynatrace environment. See the [Dynatrace Privacy Policy](https://www.dynatrace.com/company/trust-center/privacy/) for details on data handling.
+```bash
+claude plugin marketplace update
+claude plugin update dynatrace@claude-plugins-official
+```
+
+Note: The bundled MCP server connects to your Dynatrace environment. See the [Dynatrace Privacy Policy](https://www.dynatrace.com/company/trust-center/privacy/) for details on data handling.
 
 ### Manual
 
