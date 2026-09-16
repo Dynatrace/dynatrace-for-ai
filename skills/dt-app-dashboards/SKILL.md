@@ -37,7 +37,7 @@ tiles (content/visualizations), layouts (grid positioning), and variables
 
 ## Reading & Analyzing
 
-Fetch full content with `dtctl get dashboard <id> -o json --plain` (`describe` returns metadata only), then inspect the JSON to discover its available properties. Carefully read [references/analyzing.md](references/analyzing.md) before analyzing.
+Fetch full content with `dtctl get dashboard <id> -o json` (`describe` returns metadata only), then inspect the JSON to discover its available properties. Carefully read [references/analyzing.md](references/analyzing.md) before analyzing.
 
 ## Create/Update Workflow (Mandatory Order)
 
@@ -48,8 +48,8 @@ Carefully follow the workflow described in [references/create-update.md](referen
 - Validate ALL queries before adding to dashboard
 - No time-range filters in queries unless explicitly requested by user
 - Set `name` before deploying
-- **Updating — ALWAYS download first:** `dtctl get dashboard <id> -o json --plain > dashboard.json`, modify, then deploy the downloaded file. Never reconstruct JSON from scratch or inject an `id` manually — both silently overwrite any UI edits the user made since last deployment.
-- **Deploy with `dtctl apply`** — validation runs automatically, and the local file is deleted on success.
+- **Updating — ALWAYS read the current state first:** `dtctl get dashboard <id> -o json`, save it as `dashboard.json`, modify that file, then deploy it. Never reconstruct JSON from scratch or inject an `id` manually — both silently overwrite any UI edits the user made since last deployment.
+- **Deploy with `dtctl apply`** — validation runs automatically. If it fails, fix **all** reported errors before re-applying.
 
 ## Visualization Types
 

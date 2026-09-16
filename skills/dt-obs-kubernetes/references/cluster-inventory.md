@@ -15,6 +15,7 @@ cluster topology, namespace distribution, and resource organization.
   - [List All Clusters](#list-all-clusters)
   - [Cluster by Distribution](#cluster-by-distribution)
   - [Cluster Version Summary](#cluster-version-summary)
+  - [Operator and ActiveGate Metadata](#operator-and-activegate-metadata)
   - [Count Nodes per Cluster](#count-nodes-per-cluster)
 - [Namespace Queries](#namespace-queries)
   - [List All Namespaces](#list-all-namespaces)
@@ -75,6 +76,30 @@ smartscapeNodes K8S_CLUSTER
 smartscapeNodes K8S_CLUSTER
 | fields k8s.cluster.name, k8s.cluster.version, k8s.cluster.distribution
 | sort k8s.cluster.version desc
+```
+
+### Operator and ActiveGate Metadata
+
+`K8S_CLUSTER` exposes Dynatrace instrumentation details via the `dt.metadata` map.
+This is the correct way to get operator and ActiveGate versions — `K8S_CLUSTER` has
+**no `k8s.object` field**, so `parse k8s.object` silently returns null on cluster entities.
+
+```dql
+smartscapeNodes K8S_CLUSTER
+| fieldsAdd operator_version = dt.metadata[operator_version],
+            activegate_version = dt.metadata[activegate_version]
+| fields k8s.cluster.name, k8s.cluster.distribution, operator_version, activegate_version
+| sort k8s.cluster.name
+```
+
+To find clusters running outdated operator versions:
+
+```dql
+smartscapeNodes K8S_CLUSTER
+| fieldsAdd operator_version = dt.metadata[operator_version]
+| filter isNotNull(operator_version)
+| summarize clusters = collectArray(k8s.cluster.name), by: {operator_version}
+| sort operator_version desc
 ```
 
 ### Count Nodes per Cluster

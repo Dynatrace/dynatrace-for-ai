@@ -67,6 +67,64 @@ smartscapeNodes "HOST"
 
 ---
 
+## OneAgent Inventory
+
+OneAgent is a separate smartscape entity type (`ONEAGENT`). Access it by traversing backward from `HOST` via the `monitors` edge (direction: `backward` because the edge runs ONEAGENT → HOST).
+
+**Key ONEAGENT fields:**
+
+| Field | Type | Values |
+|---|---|---|
+| `dt.agent.monitoring_mode` | string | `FULL_STACK`, `INFRASTRUCTURE`, `DISCOVERY` |
+| `dt.agent.module.version` | string | e.g. `1.347.0.20260809-172428` |
+| `dt.network_zone.id` | string | e.g. `default` |
+
+> **Field name gotcha:** `dt.agent.monitoring_mode` uses underscore (not dot) before `mode`.
+
+### Count by Monitoring Mode
+
+```dql
+smartscapeNodes "HOST"
+| traverse edgeTypes: {monitors}, targetTypes: {ONEAGENT}, direction: backward
+| fieldsAdd oa_mode = `dt.agent.monitoring_mode`
+| summarize host_count = count(), by: {oa_mode}
+| sort host_count desc
+```
+
+**Monitoring modes:**
+- `FULL_STACK` — code-level monitoring plus infrastructure metrics
+- `INFRASTRUCTURE` — infrastructure metrics only, no code-level monitoring
+- `DISCOVERY` — topology discovery and basic host monitoring
+
+### Count by Agent Version
+
+```dql
+smartscapeNodes "HOST"
+| traverse edgeTypes: {monitors}, targetTypes: {ONEAGENT}, direction: backward
+| fieldsAdd oa_version = `dt.agent.module.version`
+| summarize host_count = count(), by: {oa_version}
+| sort host_count desc
+```
+
+**Use case:** Identify version spread for upgrade planning or compliance checks.
+
+### List Hosts by Monitoring Mode
+
+Filter to a specific mode for targeted remediation or compliance review:
+
+```dql
+smartscapeNodes "HOST"
+| traverse edgeTypes: {monitors}, targetTypes: {ONEAGENT}, direction: backward
+| fieldsAdd oa_mode = `dt.agent.monitoring_mode`, oa_version = `dt.agent.module.version`
+| filter oa_mode == "INFRASTRUCTURE"
+| fields name, oa_mode, oa_version
+| sort name asc
+```
+
+Replace `"INFRASTRUCTURE"` with `"FULL_STACK"` or `"DISCOVERY"` as needed.
+
+---
+
 ## Technology Inventory
 
 ### Technology Stack Overview
@@ -406,6 +464,39 @@ smartscapeNodes "HOST"
     by: {azure.subscription}
 | sort host_count desc
 ```
+
+### GCP Hosts by Region
+
+Group GCP Compute Engine instances by region:
+
+```dql
+smartscapeNodes "HOST"
+| filter isNotNull(gcp.region)
+| fieldsAdd name, gcp.region, gcp.zone, `gcp.project.id`
+| summarize host_count = count(), by: {gcp.region}
+| sort host_count desc
+```
+
+**Common Regions:** `us-east4`, `us-central1`, `europe-west3`, `us-west1`
+
+> **Field name gotcha:** The GCP project field uses two dots — `gcp.project.id` — not `gcp.project_id` (underscore variant always returns null).
+
+### GCP Project Inventory
+
+List GCP instances grouped by project:
+
+```dql
+smartscapeNodes "HOST"
+| filter isNotNull(`gcp.project.id`)
+| fieldsAdd `gcp.project.id`, gcp.region
+| summarize
+    host_count = count(),
+    regions = collectDistinct(gcp.region),
+    by: {`gcp.project.id`}
+| sort host_count desc
+```
+
+**Use Case:** Multi-project GCP organization management.
 
 ---
 

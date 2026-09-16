@@ -5,7 +5,7 @@
 1. Define purpose and load required skills, references and assets
 2. Explore available data fields/metrics
 3. Plan notebook structure: section order, markdown vs DQL sections
-4. Design and validate all DQL with `dtctl query '<DQL>' --plain`
+4. Design and validate all DQL with `dtctl query '<DQL>'`
 5. **(Update only)** Download existing notebook JSON from the server
 6. Construct new notebook JSON (create) or modify the downloaded JSON (update)
 7. Deploy with `dtctl apply` — when updating, deploy the file downloaded in step 5
@@ -47,12 +47,12 @@ Sections render top-to-bottom in `content.sections` array order. Use markdown se
 
 ### Step 4: Design and Validate Queries
 
-```bash
-dtctl query '<your DQL query>' --plain
+```dtctl
+dtctl query '<your DQL query>'
 ```
 
-Always use **single quotes** around the DQL string to avoid shell interpretation
-of `$`, `\`, and other special characters.
+Always use **single quotes** around the DQL string so `$`, `\`, and other
+special characters survive argument parsing intact.
 
 Use `limit` to cap results. Use `summarize` before visualization. Source queries
 from loaded skills.
@@ -62,9 +62,11 @@ from loaded skills.
 **Skip when creating.** Download the current server state **before** making any
 modifications:
 
-```bash
-dtctl get notebook <id> -o json --plain > notebook.json
+```dtctl
+dtctl get notebook <id> -o json
 ```
+
+Save the result as `notebook.json`.
 
 This preserves user UI edits since the last deployment. The downloaded file
 contains the `id` — do not add or change it manually.
@@ -115,10 +117,10 @@ See [sections.md](./sections.md) for visualization types and field requirements.
 
 ### Step 7: Deploy
 
-```bash
-dtctl apply -f notebook.json -o yaml
+```dtctl
+dtctl apply notebook -f notebook.json -o yaml
 # preview without persisting:
-dtctl apply -f notebook.json -o yaml --dry-run
+dtctl apply notebook -f notebook.json -o yaml --dry-run
 ```
 
 Validation runs automatically before deployment (every DQL query is executed
@@ -130,8 +132,8 @@ re-deploy in a loop.
 missing `id` field means a fresh JSON is being deployed — a new notebook will
 be created instead of updating.
 
-On success, `dtctl apply` outputs the deployment result (action, id, name, url)
-and the local file is deleted automatically. Present the URL to the user.
+On success, `dtctl apply` outputs the deployment result (action, id, name, url).
+Present the URL to the user.
 
 ---
 

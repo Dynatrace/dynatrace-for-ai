@@ -379,7 +379,7 @@ Two conditions extracted from the `classicEntitySelector`:
 Mass data discovery:
 
 ```dtctl
-dtctl query 'fieldsSnapshot metrics, by:{metric.key} | filter metric.key == "dt.host.cpu.idle" | fields field' --plain
+dtctl query 'fieldsSnapshot metrics, by:{metric.key} | filter metric.key == "dt.host.cpu.idle" | fields field'
 ```
 
 Output includes: `dt.entity.host`, `dt.smartscape.host`, `dt.host_group.id`, `host.name`, ... (but NOT `Dtp_Tier` or `host.group.name`)
@@ -387,7 +387,7 @@ Output includes: `dt.entity.host`, `dt.smartscape.host`, `dt.host_group.id`, `ho
 Node discovery:
 
 ```dtctl
-dtctl query 'fieldsSnapshot smartscape.nodes, by:{node.type} | filter node.type == "HOST" | fields field' --plain
+dtctl query 'fieldsSnapshot smartscape.nodes, by:{node.type} | filter node.type == "HOST" | fields field'
 ```
 
 Output includes: `host.group.name`, `tags`, `name`, `cloud.provider`, ...

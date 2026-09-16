@@ -5,7 +5,7 @@
 1. Define purpose and load required skills, references and assets
 2. Explore available data fields/metrics
 3. Plan dashboard structure: variables, tiles, layout
-4. Design and validate all DQL with `dtctl query '<DQL>' --plain`
+4. Design and validate all DQL with `dtctl query '<DQL>'`
 5. **(Update only)** Download existing dashboard JSON from the server
 6. Construct new dashboard JSON (create) or modify the downloaded JSON (update)
 7. Deploy with `dtctl apply` — when updating, deploy the file downloaded in step 5
@@ -64,11 +64,11 @@ Each tile in `tiles` must have a matching entry in `layouts` with `x`, `y`, `w`,
 ### Step 4: Design and Validate Queries
 
 ```dtctl
-dtctl query '<your DQL query>' --plain
+dtctl query '<your DQL query>'
 ```
 
-Always use **single quotes** around the DQL string to avoid shell
-interpretation of `$`, `\`, and other special characters.
+Always use **single quotes** around the DQL string so `$`, `\`, and other
+special characters survive argument parsing intact.
 
 Use `limit` to cap results. Use `summarize` before visualization. Source
 queries from loaded skills.
@@ -78,8 +78,10 @@ queries from loaded skills.
 **Skip when creating.** Download the current server state **before **making any modifications:
 
 ```dtctl
-dtctl get dashboard <id> -o json --plain > dashboard.json
+dtctl get dashboard <id> -o json
 ```
+
+Save the result as `dashboard.json`.
 
 This preserves user UI edits since the last deployment. The downloaded file contains the `id` — do not add or change it manually.
 
@@ -119,16 +121,16 @@ See [variables.md](./variables.md) for variable definitions and usage patterns.
 ### Step 7: Deploy
 
 ```dtctl
-dtctl apply -f dashboard.json -o yaml
+dtctl apply dashboard -f dashboard.json -o yaml
 # preview without persisting:
-dtctl apply -f dashboard.json -o yaml --dry-run
+dtctl apply dashboard -f dashboard.json -o yaml --dry-run
 ```
 
 Validation runs automatically before deployment. If validation fails, fix **all** reported errors before re-running — do not fix one error and re-deploy in a loop.
 
 **When updating:** ensure `dashboard.json` is the file downloaded in Step 5. A missing `id` field means a fresh JSON is being deployed — a new dashboard will be created instead of updating.
 
-On success, `dtctl apply` outputs the deployment result (action, id, name, url) and the local file is deleted automatically. Present the URL to the user.
+On success, `dtctl apply` outputs the deployment result (action, id, name, url). Present the URL to the user.
 
 ---
 

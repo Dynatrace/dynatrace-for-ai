@@ -4,6 +4,7 @@
 
 - [Handling Zero Results](#handling-zero-results)
 - [Setup-Level Zero Results](#setup-level-zero-results)
+- [Old RUM Agent Versions](#old-rum-agent-versions)
 - [Handling Anomalous Results](#handling-anomalous-results)
 - [Decision Tree: Ask vs. Investigate](#decision-tree-ask-vs-investigate)
 - [Common Investigation Steps](#common-investigation-steps)
@@ -60,9 +61,9 @@ Ref: https://docs.dynatrace.com/docs/observe/digital-experience/new-rum-experien
 - CSP inline violation blocking the agent
 - Blocked beacon endpoint
 
-**CSP blocking:** Not adapting CSP rules for the RUM JavaScript silently blocks the RUM agent → zero data. This is distinct from beacon corruption; see [csp-violations.md](csp-violations.md) for CSP violation queries.
+**CSP blocking:** Not adapting CSP rules for the RUM JS silently blocks the RUM agent → zero data. This is distinct from beacon corruption; see [csp-violations.md](csp-violations.md) for CSP violation queries.
 
-**Instrumentation method mismatch:** Automatic injection requires OneAgent on the web server. Selecting automatic injection without OneAgent support produces no data.
+**Instrumentation method mismatch:** Automatic injection requires OneAgent on the web server. Selecting automatic injection without OneAgent support produces no data. See [prerequisites](https://docs.dynatrace.com/docs/observe/digital-experience/rum/web-frontends/initial-setup/enable-new-rum-for-web-apps#prerequisites) for OneAgent version requirements.
 
 **Data mapped to wrong frontend:** Zero results for expected frontend but data exists elsewhere. Caused by detection rules misconfiguration or wrong priority order. Diagnose with:
 
@@ -77,6 +78,47 @@ Ref: https://docs.dynatrace.com/docs/shortlink/finalize-initial-setup-for-auto-i
 **Beacon query string corruption:** If infrastructure (CDN, WAF, proxy, tag manager) modifies beacon URL query parameters, RUM on the latest Dynatrace silently rejects the beacon → data gaps or zero results with no obvious cause. Check browser dev tools for requests to paths starting with `rb_`. Rejection error codes: `3014` (query string CRC mismatch) or `3001` (parameter `ty` missing).
 
 Ref: https://docs.dynatrace.com/docs/observe/digital-experience/new-rum-experience/transition-from-rum-classic
+
+## Old RUM Agent Versions
+
+Two frontend agent types affect RUM on Grail data quality:
+
+- **RUM JS** (web frontend) — part of OneAgent. GA for RUM on Grail from version 1.329; agents below 1.329 are not officially supported (preview versions only).
+- **Mobile agent** (iOS, Android, cross-platform) — part of OneAgent for Mobile. GA for RUM on Grail from version 8.329.
+
+Agent version and type are available as fields on `user.events`: `dt.rum.agent.version` and `dt.rum.agent.type` — see the [Semantic Dictionary](https://docs.dynatrace.com/docs/shortlink/semantic-dictionary-global-field-reference#dynatrace-rum-resource-fields).
+
+**Check the agent version distribution for a frontend:**
+
+```dql
+fetch user.events, from: now() - 24h
+| filter frontend.name == "my-frontend"
+| summarize
+    event_count = count(),
+    by: {dt.rum.agent.type, dt.rum.agent.version}
+| sort event_count desc
+```
+
+Replace `my-frontend` with the actual frontend name.
+
+### Features by minimum version (GA versions only)
+
+| Agent | Minimum version | Feature / field |
+|-------|-----------------|----------------|
+| RUM JS | 1.329 | RUM on Grail GA (web) |
+| Mobile agent | 8.329 | RUM on Grail GA (mobile) |
+| RUM JS | 1.331 | W3C `tracestate` header propagation |
+| Mobile agent | 8.333 | W3C Trace Context for frontend-backend linking (Android/iOS) |
+| Mobile agent | 8.335 | W3C Trace Context for frontend-backend linking (cross-platform) |
+
+### Deprecated field values
+
+| Field | Old value (RUM JS < 1.339) | Current value (RUM JS ≥ 1.339) |
+|-------|-------------------------------------|----------------------------------------|
+| `user_action.type` | `xhr` | `same_view` |
+
+Queries filtering on `user_action.type == "same_view"` will miss traffic from agents below 1.339 still reporting `xhr`. Use `in(user_action.type, "same_view", "xhr")` when the fleet is mixed.
+
 
 ## Handling Anomalous Results
 
@@ -96,7 +138,7 @@ When query results seem unexpected or suspicious:
 
 **Inconsistent Data:**
 - **Metrics vs. Events mismatch**: Different aggregation methods are expected
-- **RUM on the latest Dynatrace vs. RUM Classic mismatch**: The RUM on the latest Dynatrace uses a different underlying data model — metrics are not direct equivalents of RUM Classic metrics. Users migrating from Classic may see different numbers; this is by design, not a data gap. Ref: https://docs.dynatrace.com/docs/observe/digital-experience/new-rum-experience/transition-from-rum-classic
+- **RUM on the latest Dynatrace vs. RUM Classic mismatch**: RUM on the latest Dynatrace uses a different underlying data model — metrics are not direct equivalents of RUM Classic metrics. Users migrating from RUM Classic may see different numbers; this is by design, not a data gap. Ref: https://docs.dynatrace.com/docs/observe/digital-experience/new-rum-experience/transition-from-rum-classic
 - **No limit on user actions per session**: RUM on the latest Dynatrace has no limit on user actions per session, unlike RUM Classic. Sessions with many user actions are not truncated.
 - **Geographic anomalies**: Check timezone assumptions
 - **Device distribution skew**: May reflect actual user base

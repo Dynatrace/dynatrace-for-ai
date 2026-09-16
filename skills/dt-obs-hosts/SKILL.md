@@ -6,10 +6,11 @@ description: >-
   or host discovery. Also use when building timeseries queries for host metrics that feed into
   analytical workflows like anomaly detection, forecasting, or seasonality analysis.
   Trigger: "show hosts", "CPU usage", "memory utilization", "disk space", "high CPU",
-  "host with most free disk", "top hosts by CPU", "top processes by memory",
+  "top hosts by CPU", "top processes by memory",
   "Linux hosts in AWS", "what databases are running", "infrastructure costs by cost center",
   "hosts running EOL Java", "container monitoring", "listening ports",
-  "process resource consumption", "CPU forecast", "memory anomaly", "host seasonality".
+  "process resource consumption", "CPU forecast", "memory anomaly", "host seasonality",
+  "OneAgent mode", "OneAgent version", "GCP hosts".
   Do NOT use for explaining existing queries, product documentation questions,
   Kubernetes pod/workload queries (use dt-obs-kubernetes), AWS cloud resource inventory
   (use dt-obs-aws), or service-level metrics (use dt-obs-services).
@@ -25,6 +26,7 @@ Monitor and manage host and process infrastructure including CPU, memory, disk, 
 Use this skill when the user needs to:
 
 - **Inventory:** "Show me all Linux hosts in AWS us-east-1"
+- **Agent Inventory:** "Which hosts run FULL_STACK, INFRASTRUCTURE, or DISCOVERY mode?" / "Show OneAgent version distribution"
 - **Monitor:** "What hosts have high CPU usage?"
 - **Troubleshoot:** "Which processes are consuming the most memory?"
 - **Discover:** "What databases are running in production?"
@@ -232,6 +234,50 @@ timeseries {
 
 → For multi-resource saturation detection, see [references/host-metrics.md](references/host-metrics.md#resource-saturation)
 
+### 9. OneAgent Inventory
+
+Count and list hosts by OneAgent monitoring mode, version, or cloud region.
+
+**ONEAGENT entity:** OneAgent is a separate smartscape entity type (`smartscapeNodes "ONEAGENT"`). Access it by traversing backward from HOST via the `monitors` edge (the edge runs ONEAGENT → HOST, so HOST→ONEAGENT is `direction: backward`).
+
+**Key ONEAGENT fields:**
+- `dt.agent.monitoring_mode` — monitoring coverage level: `FULL_STACK` / `INFRASTRUCTURE` / `DISCOVERY`
+- `dt.agent.module.version` — installed version string, e.g. `1.347.0.20260809-172428`
+
+**Count by monitoring mode:**
+
+```dql
+smartscapeNodes "HOST"
+| traverse edgeTypes: {monitors}, targetTypes: {ONEAGENT}, direction: backward
+| fieldsAdd oa_mode = `dt.agent.monitoring_mode`
+| summarize host_count = count(), by: {oa_mode}
+| sort host_count desc
+```
+
+**Count by agent version:**
+
+```dql
+smartscapeNodes "HOST"
+| traverse edgeTypes: {monitors}, targetTypes: {ONEAGENT}, direction: backward
+| fieldsAdd oa_version = `dt.agent.module.version`
+| summarize host_count = count(), by: {oa_version}
+| sort host_count desc
+```
+
+**Combined: mode + version** (for upgrade planning):
+
+```dql
+smartscapeNodes "HOST"
+| traverse edgeTypes: {monitors}, targetTypes: {ONEAGENT}, direction: backward
+| fieldsAdd oa_mode = `dt.agent.monitoring_mode`, oa_version = `dt.agent.module.version`
+| summarize host_count = count(), by: {oa_mode, oa_version}
+| sort host_count desc
+```
+
+**Monitoring modes:** `FULL_STACK` (full code-level monitoring + infrastructure), `INFRASTRUCTURE` (infrastructure metrics only, no code-level monitoring), `DISCOVERY` (topology discovery and basic host monitoring)
+
+→ For listing hosts by mode/version, see [references/inventory-discovery.md](references/inventory-discovery.md#oneagent-inventory)
+
 ---
 
 ## Response Construction
@@ -397,7 +443,7 @@ timeseries cpu = avg(dt.host.cpu.usage), by: {dt.smartscape.host}
 - **Custom Metadata:** `host.custom.metadata[OperatorVersion]`, `host.custom.metadata[Cluster]`
 - **Cost:** `dt.cost.costcenter`, `dt.cost.product`
 
-→ For complete tag reference, see [references/inventory-discovery.md](#tags-and-metadata)
+→ For complete tag reference, see [references/inventory-discovery.md](references/inventory-discovery.md#tags-and-metadata)
 
 ---
 
@@ -414,6 +460,12 @@ timeseries cpu = avg(dt.host.cpu.usage), by: {dt.smartscape.host}
 - `azure.location`, `azure.subscription`, `azure.resource.group`
 - `azure.status`, `azure.provisioning_state`
 - `azure.resource.sku.name` (VM size)
+
+### GCP
+- `cloud.provider == "gcp"`
+- `gcp.region`, `gcp.zone`, `gcp.location`
+- `gcp.project.id` (note: two dots)
+- `gcp.resource.type` (e.g. `gce_instance`), `gcp.asset.type` (e.g. `compute.googleapis.com/Instance`)
 
 ### Kubernetes
 - `k8s.cluster.name`, `k8s.cluster.uid`
@@ -451,7 +503,9 @@ timeseries cpu = avg(dt.host.cpu.usage), by: {dt.smartscape.host}
 | Memory values in bytes are unreadable | Raw metric unit is bytes | Divide by `1024 / 1024 / 1024` and use `round(value, decimals: 1)` |
 | `dt.host.cpu.iowait` returns no data | Metric is Linux-only | Check `os.type`; iowait is unavailable on Windows, AIX, Solaris |
 | Container image names missing | Not available in smartscape | Use `k8s.object` parsing for image details; see dt-obs-kubernetes skill |
-| `process.software_technologies` is empty | Process not monitored by deep injection | Verify OneAgent deep monitoring is enabled for the process group |
+| `process.software_technologies` is empty | Process not monitored by deep code-level monitoring | Verify OneAgent deep monitoring is enabled for the process group |
+| `dt.agent.monitoring_mode` always null | Field name uses underscore, not dot | Use `dt.agent.monitoring_mode`; `dt.agent.monitoring.mode` (dot) always returns null |
+| `gcp.project.id` always null | Wrong field name used | GCP project uses two dots: `gcp.project.id` not underscore, `gcp.project_id` always returns null |
 
 ---
 
@@ -482,6 +536,7 @@ This skill uses **progressive disclosure**. Start here for 80% of use cases. Loa
 - Implementing cost attribution and chargeback
 - Validating data quality and metadata completeness
 - Managing multi-cloud infrastructure
+- Listing or filtering hosts by OneAgent mode/version
 
 ---
 

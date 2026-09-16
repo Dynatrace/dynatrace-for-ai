@@ -16,6 +16,7 @@ Before working on specific tasks, load the relevant reference:
 
 | Task                                                                          | Required Reading                                                                             |
 | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Discovering data | [references/discovery.md](references/discovery.md) |   
 | Field names, namespaces, data models, stability levels, query patterns        | [references/semantic-dictionary.md](references/semantic-dictionary.md)                       |
 | Query optimization — make a query faster / more efficient / cheaper, reduce consumption & scanned data (filter early, bucket filters, time ranges, field selection, sampling, cardinality) | [references/optimization.md](references/optimization.md)                                     |
 | Smartscape topology navigation for discovering relationships between entities | [references/smartscape-topology-navigation.md](references/smartscape-topology-navigation.md) |
@@ -150,22 +151,6 @@ The actual ratio applied is accessible via the `dt.system.sampling_ratio` field.
 fetch logs, samplingRatio:10
 | summarize count_extrapolated = sum(dt.system.sampling_ratio)
 ```
-
-______________________________________________________________________
-
-## Metric Discovery
-
-To search for available metrics by keyword, use the command `metrics`:
-
-```dql
-metrics from: now() - 1h
-| filter contains(metric.key, "replay")
-| summarize count(), by: {metric.key}
-| sort `count()` desc
-```
-
-There is **no `fetch dt.metric`** or `fetch dt.metrics` or `fetch dt.system.metrics` — those data objects do not exist.
-
 ______________________________________________________________________
 
 ## Timeseries Aggregation Functions
@@ -459,3 +444,4 @@ ______________________________________________________________________
 - **[references/smartscape-topology-navigation.md](references/smartscape-topology-navigation.md)** — Smartscape topology navigation syntax and patterns
 - **[references/optimization.md](references/optimization.md)** — DQL query optimization: making queries faster, more efficient, and cheaper to run (lower consumption / scanned data per execution) — filter placement, bucket filters, time ranges, field selection, sampling, cardinality, and performance best practices
 - **[references/operators.md](references/operators.md)** — `in` operator (subquery syntax) and full `@` time alignment unit reference
+- **[references/discovery.md](references/discovery.md)** - Discovering data  

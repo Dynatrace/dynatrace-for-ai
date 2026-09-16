@@ -30,12 +30,8 @@ Comprehensive error analysis using both event-based queries (detailed diagnostic
   - [Users with Errors](#users-with-errors)
   - [API-Reported Errors](#api-reported-errors)
 - [Frontend-Backend Linking](#frontend-backend-linking)
-  - [Trace Context Coverage](#trace-context-coverage)
-  - [Trace Context Hint Analysis](#trace-context-hint-analysis)
-  - [Slow Requests with Backend Traces](#slow-requests-with-backend-traces)
   - [Backend Service Impact on Frontend](#backend-service-impact-on-frontend)
   - [Failed Requests with Traces](#failed-requests-with-traces)
-  - [Cross-Origin Tracing Gaps](#cross-origin-tracing-gaps)
 
 ## Metric-Based Queries
 
@@ -166,7 +162,7 @@ fetch user.events, from: now() - 2h
 
 #### Exception Source Analysis (web only)
 
-Identify which scripts cause exceptions. **Web (RUM JavaScript) only** — `exception.file.full` is not populated for mobile exceptions.
+Identify which scripts cause exceptions. **Web (RUM JS) only** — `exception.file.full` is not populated for mobile exceptions.
 
 ```dql
 fetch user.events, from: now() - 2h
@@ -199,7 +195,7 @@ fetch user.events, from: now() - 2h
 
 ### Errors by Device Type (web only)
 
-Analyze exceptions by device type. **Web (RUM JavaScript) only** — `device.type` is not populated for mobile events.
+Analyze exceptions by device type. **Web (RUM JS) only** — `device.type` is not populated for mobile events.
 
 ```dql
 fetch user.events, from: now() - 2h
@@ -303,83 +299,13 @@ fetch user.events, from: now() - 2h
 
 ## Frontend-Backend Linking
 
-Correlate frontend errors with backend traces for end-to-end diagnostics.
-
-**Two mechanisms for frontend-backend linking:**
-- **W3C Trace Context** (`traceparent`/`tracestate` headers): used for XHR/Fetch requests (web) and all HTTP requests (mobile)
-- **Server-Timing header** (`dtTrId`, `dtSInfo`, `dtRpid`): used for HTML document requests (web only; requires OneAgent backend 1.331+; not available for OpenTelemetry)
-
-**Key Fields:**
-
-- `trace.id` - W3C trace ID linking frontend to backend
-- `span.id` - Frontend span ID
-- `request.trace_context_hint` - Whether W3C trace headers were set
-- `request.server_timing_hint` - Whether backend trace info was received via Server-Timing
-
-### Trace Context Coverage
-
-Coverage per frontend — which frontends have tracing gaps?
-
-```dql
-fetch user.events, from: now() - 2h
-| filter characteristics.has_request
-| summarize
-    total_requests = count(),
-    traced_requests = countIf(isNotNull(trace.id)),
-    by: {frontend.name}
-| fieldsAdd trace_rate = 100.0 * traced_requests / total_requests
-| sort trace_rate asc
-```
-
-**Use Case:** Identify frontends with low end-to-end tracing coverage.
-
-### Trace Context Hint Analysis
-
-For untraced requests, `request.trace_context_hint` explains why the RUM agent was not able to propagate the W3C trace context headers — it does not explain whether the backend received or used them.
-
-```dql
-fetch user.events, from: now() - 2h
-| filter characteristics.has_request
-| filter isNull(trace.id)
-| summarize
-    untraced_count = count(),
-    by: {frontend.name, request.trace_context_hint, url.domain, url.path}
-| sort untraced_count desc
-| limit 20
-```
-
-**Use Case:** Diagnose why the RUM agent could not set trace context headers on specific requests. A high count for `cross_origin` on a domain indicates CORS configuration is preventing trace propagation for those endpoints.
-
-### Slow Requests with Backend Traces
-
-Find slow frontend requests and their backend traces:
-
-```dql
-fetch user.events, from: now() - 2h
-| filter characteristics.has_request
-| filter duration > 2s
-| filter isNotNull(trace.id)
-| fields
-    start_time,
-    url.domain,
-    url.path,
-    duration,
-    trace.id,
-    span.id,
-    http.response.status_code,
-    request.trace_context_hint,
-    request.server_timing_hint
-| sort duration desc
-| limit 50
-```
-
-**Use Case:** Get trace IDs for investigating slow requests in backend. `request.trace_context_hint` shows how the RUM agent set headers to the backend; `request.server_timing_hint` shows how the backend communicated trace info back.
+For linking mechanisms, key fields, diagnostic queries, and the `frontend.link` span attribute, see [references/frontend-backend-linking.md](frontend-backend-linking.md).
 
 ### Backend Service Impact on Frontend
 
 A join of `user.events` against `spans` by `trace.id` is not reliably executable — the spans table is too large for the join right side on production tenants. Use a two-step approach instead.
 
-**Step 1 — Find slow traced requests and identify the bottleneck phase (JS agent only):**
+**Step 1 — Find slow traced requests and identify the bottleneck phase (RUM JS only — `performance.*` timing fields are not available on mobile):**
 
 Filter by `frontend.name` to survey all slow requests across a frontend, or replace it with `dt.rum.session.id` to investigate one specific user session.
 
@@ -442,20 +368,3 @@ fetch user.events, from: now() - 2h
 ```
 
 **Use Case:** Debug failed requests using backend trace data.
-
-### Cross-Origin Tracing Gaps
-
-Identify requests missing traces due to CORS:
-
-```dql
-fetch user.events, from: now() - 2h
-| filter characteristics.has_request
-| filter request.trace_context_hint == "cross_origin"
-| summarize
-    request_count = count(),
-    by: {url.domain, url.provider}
-| sort request_count desc
-| limit 20
-```
-
-**Use Case:** Identify third-party domains needing CORS trace headers.
