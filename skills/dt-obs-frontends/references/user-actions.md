@@ -9,8 +9,8 @@ Analyze user actions that capture interaction lifecycles, resource loading, and 
 **Key Fields:**
 
 - `user_action.instance_id` - Unique user action ID
-- `user_action.type` - Action type: `api`, `hard_navigation`, `same_view`, `soft_navigation` (`xhr` deprecated since RUM JS 1.339+, replaced by `same_view`)
-- `user_action.custom_name` - Action name (`user_action.name` will replace this once available)
+- `user_action.type` - Action type: `api`, `hard_navigation`, `same_view`, `soft_navigation` (`xhr` deprecated since RUM JS 1.339, replaced by `same_view`)
+- `user_action.name` - Action name
 - `user_action.complete_reason` - How the action ended: `completed`, `completed_by_api`, `interrupted_by_api`, `interrupted_by_automatic`, `page_hide`, `timeout`
 - `user_action.mutation_count` - DOM mutations during the action
 - `user_action.requests.count` - Requests during the action
@@ -110,10 +110,11 @@ fetch user.events, from: now() - 2h
     action_count = count(),
     unique_sessions = countDistinct(dt.rum.session.id),
     avg_duration = avg(duration),
-    by: {frontend.name}
+    by: {frontend.name, user_action.name, user_action.type}
+| sort action_count desc
 ```
 
-**Use Case:** Baseline user action volume and duration.
+**Use Case:** Baseline user action volume and duration, broken down by action name and type.
 
 ### Completion Reasons
 
@@ -171,12 +172,11 @@ Find actions loading many resources:
 fetch user.events, from: now() - 2h
 | filter characteristics.has_user_action
 | filter user_action.resources.count > 10
-| fieldsAdd action_name = coalesce(user_action.custom_name, interaction.type)
 | summarize
     action_count = count(),
     avg_resources = avg(user_action.resources.count),
     avg_duration = avg(duration),
-    by: {frontend.name, action_name}
+    by: {frontend.name, user_action.name}
 | sort avg_resources desc
 | limit 20
 ```
@@ -225,12 +225,11 @@ Analyze actions that timed out:
 fetch user.events, from: now() - 2h
 | filter characteristics.has_user_action
 | filter user_action.complete_reason == "timeout"
-| fieldsAdd action_name = coalesce(user_action.custom_name, interaction.type)
 | summarize
     timeout_count = count(),
     avg_duration = avg(duration),
     avg_pending = avg(user_action.requests.pending_request_count),
-    by: {frontend.name, action_name}
+    by: {frontend.name, user_action.name}
 | sort timeout_count desc
 | limit 20
 ```
@@ -280,11 +279,10 @@ Analyze actions reported via the API:
 fetch user.events, from: now() - 2h
 | filter characteristics.has_user_action
 | filter characteristics.is_api_reported
-| fieldsAdd action_name = coalesce(user_action.custom_name, interaction.type)
 | summarize
     action_count = count(),
     avg_duration = avg(duration),
-    by: {frontend.name, action_name}
+    by: {frontend.name, user_action.name}
 | sort action_count desc
 ```
 

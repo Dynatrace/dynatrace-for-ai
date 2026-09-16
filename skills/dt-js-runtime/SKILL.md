@@ -43,17 +43,17 @@ dtctl exec function --code 'export default async function() { return "hello" }'
 # Run from file
 dtctl exec function -f script.js
 
-# Pass JSON input — accessed as event.payload inside the function
+# Pass JSON input — the parsed object is the function's argument
 dtctl exec function -f script.js --payload '{"key":"value"}'
 ```
 
-The function may accept an optional `event` parameter:
+The function may accept an optional parameter. `--payload` is parsed and passed
+as that argument directly — it is not wrapped in an `event.payload` field:
 
 ```js
-export default async function(event) {
-  const { payload } = event;   // from --payload
-  // event.environmentId also available
-  return payload;
+export default async function(payload) {
+  // with --payload '{"key":"value"}', payload is {"key": "value"}
+  return payload.key;
 }
 ```
 

@@ -35,7 +35,7 @@ Get all subnets in a specific VNet via backward traversal (Subnet → VNet):
 
 ```dql-template
 smartscapeNodes "AZURE_MICROSOFT_NETWORK_VIRTUALNETWORKS"
-| filter id == "<VNET_ENTITY_ID>"
+| filter id == toSmartscapeId("<VNET_ENTITY_ID>")
 | traverse "*", "AZURE_MICROSOFT_NETWORK_VIRTUALNETWORKS_SUBNETS", direction:backward
 | fields name, id, azure.resource.group
 ```
@@ -79,7 +79,7 @@ Find NICs associated with a specific NSG (NIC → NSG backward on NSG):
 
 ```dql-template
 smartscapeNodes "AZURE_MICROSOFT_NETWORK_NETWORKSECURITYGROUPS"
-| filter id == "<NSG_ENTITY_ID>"
+| filter id == toSmartscapeId("<NSG_ENTITY_ID>")
 | traverse "*", "AZURE_MICROSOFT_NETWORK_NETWORKINTERFACES", direction:backward
 | fields name, id, azure.resource.group
 ```
@@ -88,7 +88,7 @@ Find VMSS instances associated with an NSG (VMSS → NSG backward on NSG):
 
 ```dql-template
 smartscapeNodes "AZURE_MICROSOFT_NETWORK_NETWORKSECURITYGROUPS"
-| filter id == "<NSG_ENTITY_ID>"
+| filter id == toSmartscapeId("<NSG_ENTITY_ID>")
 | traverse "*", "AZURE_MICROSOFT_COMPUTE_VIRTUALMACHINESCALESETS", direction:backward
 | fields name, id, azure.resource.group
 ```

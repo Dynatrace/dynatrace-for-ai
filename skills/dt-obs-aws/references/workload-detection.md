@@ -35,7 +35,7 @@ Determine if the instance is registered in a target group behind an Application 
 
 ```dql-template
 smartscapeNodes "AWS_EC2_INSTANCE"
-| filter id == "<WORKLOAD_EC2_INSTANCE>"
+| filter id == toSmartscapeId("<WORKLOAD_EC2_INSTANCE>")
 | traverse "balanced_by", "AWS_ELASTICLOADBALANCINGV2_TARGETGROUP", direction:backward
 | fieldsAdd targetGroupName = aws.resource.name, targetGroupId = id
 | traverse "balanced_by", "AWS_ELASTICLOADBALANCINGV2_LOADBALANCER", fieldsKeep:{targetGroupName, targetGroupId}
@@ -79,7 +79,7 @@ Detect whether the instance is an ECS container instance, managed by ECS for run
 
 ```dql-template
 smartscapeNodes "AWS_EC2_INSTANCE"
-| filter id == "<WORKLOAD_EC2_INSTANCE>"
+| filter id == toSmartscapeId("<WORKLOAD_EC2_INSTANCE>")
 | filter isNotNull(tags[`AmazonECSManaged`])
 | fields name, id, tags[`aws:autoscaling:groupName`]
 ```
@@ -88,7 +88,7 @@ smartscapeNodes "AWS_EC2_INSTANCE"
 
 ```dql-template
 smartscapeNodes "AWS_EC2_INSTANCE"
-| filter id == "<WORKLOAD_EC2_INSTANCE>"
+| filter id == toSmartscapeId("<WORKLOAD_EC2_INSTANCE>")
 | traverse {"*"}, {"AWS_ECS_CONTAINERINSTANCE"}, direction:backward
 | traverse {"*"}, {"AWS_ECS_CLUSTER"}
 | fields name, id, aws.resource.id
@@ -106,7 +106,7 @@ Detect whether the instance is a Kubernetes worker node managed by EKS, and iden
 
 ```dql-template
 smartscapeNodes "AWS_EC2_INSTANCE"
-| filter id == "<WORKLOAD_EC2_INSTANCE>"
+| filter id == toSmartscapeId("<WORKLOAD_EC2_INSTANCE>")
 | fieldsAdd tagStr = toString(tags)
 | filter matchesPhrase(tagStr, "kubernetes.io/cluster")
 | fieldsAdd
@@ -151,7 +151,7 @@ Detect whether the instance is a compute environment node managed by AWS Batch.
 
 ```dql-template
 smartscapeNodes "AWS_EC2_INSTANCE"
-| filter id == "<WORKLOAD_EC2_INSTANCE>"
+| filter id == toSmartscapeId("<WORKLOAD_EC2_INSTANCE>")
 | filter isNotNull(tags[`AWSBatchServiceTag`])
 | fieldsAdd
     batchJobQueue = tags[`aws:batch:job-queue-name`],

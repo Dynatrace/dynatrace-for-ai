@@ -303,7 +303,7 @@ and applies the chosen model.
 The actual runtime format for `builtin:davis.anomaly-detectors` uses an
 **analyzer-based structure** — not the field paths sometimes shown in older
 documentation. The top-level object to `POST` to `PUT /api/v2/settings/objects`
-(or apply via `dtctl apply -f`) is:
+(or apply via `dtctl apply anomaly-detector -f`) is:
 
 ```json
 {

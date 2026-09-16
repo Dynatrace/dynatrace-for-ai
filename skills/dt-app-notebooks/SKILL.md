@@ -49,7 +49,7 @@ Dynatrace notebooks are JSON documents stored in the Document Store containing a
 
 ## Reading & Analyzing
 
-Fetch full content with `dtctl get notebook <id> -o json --plain` (`describe` returns metadata only), then inspect the JSON to discover its available properties. Carefully read [references/analyzing.md](references/analyzing.md) before analyzing.
+Fetch full content with `dtctl get notebook <id> -o json` (`describe` returns metadata only), then inspect the JSON to discover its available properties. Carefully read [references/analyzing.md](references/analyzing.md) before analyzing.
 
 ## Create/Update Workflow (Mandatory Order)
 
@@ -60,8 +60,8 @@ Carefully follow the workflow described in [references/create-update.md](referen
 - Validate ALL section queries before adding to the notebook.
 - Set `name` before deploying.
 - **Prefer `autoSelectVisualization: true`** in `visualizationSettings` unless the user requested a specific visualization type — when `false`, `state.visualization` must be set explicitly.
-- **Updating — ALWAYS download first:** `dtctl get notebook <id> -o json --plain > notebook.json`, modify, then deploy the downloaded file. Never reconstruct JSON from scratch or inject an `id` manually — both silently overwrite UI edits the user made since last deployment.
-- **Deploy with `dtctl apply`** — validation runs automatically, and the local file is deleted on success.
+- **Updating — ALWAYS read the current state first:** `dtctl get notebook <id> -o json`, save it as `notebook.json`, modify that file, then deploy it. Never reconstruct JSON from scratch or inject an `id` manually — both silently overwrite UI edits the user made since last deployment.
+- **Deploy with `dtctl apply`** — validation runs automatically. If it fails, fix **all** reported errors before re-applying.
 
 ## Visualization Types
 

@@ -7,7 +7,7 @@ license: Apache-2.0
 # Frontend Observability (RUM)
 
 Monitor web and mobile frontends using Real User Monitoring with DQL.
-Targets the **New RUM Experience only** — do not use classic RUM data.
+Targets **RUM on the latest Dynatrace** — do not use RUM Classic data.
 
 **Concepts and data model:** https://docs.dynatrace.com/docs/observe/digital-experience/new-rum-experience/concepts
 
@@ -117,7 +117,8 @@ Each workflow maps to one or more references. Load the reference when you start 
 | Web Vitals (LCP, FCP, FID, INP, CLS) | [references/web-vitals.md](references/web-vitals.md) |
 | Session, bounce, engagement analysis | [references/user-sessions.md](references/user-sessions.md) |
 | User actions — interaction lifecycle, completion reasons, timeouts | [references/user-actions.md](references/user-actions.md) |
-| Errors, exceptions, frontend-backend linking | [references/error-tracking.md](references/error-tracking.md) |
+| Errors, exceptions, failed requests | [references/error-tracking.md](references/error-tracking.md) |
+| Frontend-backend linking — mechanisms, trace coverage, `frontend.link` | [references/frontend-backend-linking.md](references/frontend-backend-linking.md) |
 | CSP violations — security policy enforcement and blocked resources | [references/csp-violations.md](references/csp-violations.md) |
 | Mobile app starts, crashes, ANR, native signals | [references/mobile-monitoring.md](references/mobile-monitoring.md) |
 | Request latency, long tasks, JS profiling, geo performance | [references/web-performance-analysis.md](references/web-performance-analysis.md) |

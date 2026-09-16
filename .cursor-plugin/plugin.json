@@ -1,7 +1,7 @@
 {
   "name": "dynatrace",
   "displayName": "Dynatrace",
-  "version": "7.0.0",
+  "version": "8.0.0",
   "description": "Connect Cursor to your Dynatrace environment and investigate production issues, review deployments, and check for vulnerabilities using real data pulled directly into your session: root cause details, logs, metrics, traces, and CPU/memory profiling. Ask in plain language and get answers grounded in what's actually happening in your environment, not just documentation summaries. Use dtctl, the open source CLI for the Dynatrace platform, alongside the MCP server to manage dashboards, run workflows, and query your environment without leaving Cursor.",
   "author": { "name": "Dynatrace" },
   "homepage": "https://www.dynatrace.com",

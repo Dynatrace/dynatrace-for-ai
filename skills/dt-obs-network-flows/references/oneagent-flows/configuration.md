@@ -25,7 +25,7 @@ The setting applies at `environment`, `HOST_GROUP`, or `HOST` scope. Environment
 
 ## Read Current State
 
-```
+```dtctl
 dtctl get settings --schema builtin:network-connection-monitoring -o json
 ```
 
@@ -33,9 +33,11 @@ dtctl get settings --schema builtin:network-connection-monitoring -o json
 
 Export, edit, and apply back:
 
+```dtctl
+dtctl get settings --schema builtin:network-connection-monitoring -o yaml
 ```
-dtctl get settings --schema builtin:network-connection-monitoring -o yaml > network-connection-monitoring.yaml
-```
+
+Save the result as `network-connection-monitoring.yaml`.
 
 Edit `network-connection-monitoring.yaml`:
 
@@ -55,9 +57,9 @@ value:
 
 Dry-run first, then apply:
 
-```
-dtctl apply -f network-connection-monitoring.yaml --dry-run
-dtctl apply -f network-connection-monitoring.yaml
+```dtctl
+dtctl apply settings -f network-connection-monitoring.yaml --dry-run
+dtctl apply settings -f network-connection-monitoring.yaml
 ```
 
 For HOST_GROUP or HOST scope, set `scope` to the entity ID.

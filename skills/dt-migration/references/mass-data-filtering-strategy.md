@@ -17,7 +17,7 @@ Covers **Situations 1 and 2** from the Query Purpose Classification in SKILL.md:
 Fetch the tagging rule config:
 
 ```dtctl
-dtctl get settings --schema builtin:tags.auto-tagging -o json --plain
+dtctl get settings --schema builtin:tags.auto-tagging -o json
 ```
 
 Find the entry where `value.name` matches the tag key. Rules within a tag have OR semantics; conditions within a rule have AND semantics. If a condition key ends with `_TAG`, recursively resolve that tag's rule.
@@ -59,11 +59,11 @@ The conditions are already explicit in the selector string. Parse each predicate
 Run `fieldsSnapshot` on the data source from the original query to discover enriched dimensions:
 
 ```dtctl
-dtctl query 'fieldsSnapshot metrics, by:{metric.key} | filter metric.key == "<the_metric>" | fields field' --plain
+dtctl query 'fieldsSnapshot metrics, by:{metric.key} | filter metric.key == "<the_metric>" | fields field'
 ```
 
 ```dtctl
-dtctl query 'fieldsSnapshot logs, by:{dt.system.bucket} | filter matchesValue(dt.system.bucket, "<the_bucket>") | fields field' --plain
+dtctl query 'fieldsSnapshot logs, by:{dt.system.bucket} | filter matchesValue(dt.system.bucket, "<the_bucket>") | fields field'
 ```
 
 **Record from the output:**
@@ -77,7 +77,7 @@ dtctl query 'fieldsSnapshot logs, by:{dt.system.bucket} | filter matchesValue(dt
 Run `fieldsSnapshot` on the smartscape node type that matches the entity type from Step 1:
 
 ```dtctl
-dtctl query 'fieldsSnapshot smartscape.nodes, by:{node.type} | filter node.type == "<TYPE>" | fields field' --plain
+dtctl query 'fieldsSnapshot smartscape.nodes, by:{node.type} | filter node.type == "<TYPE>" | fields field'
 ```
 
 **Record from the output:** which node attributes match the resolved conditions (e.g., `host.group.name`, `service.technology`).
@@ -137,11 +137,11 @@ Compare the columns/fields between the original and migrated query. They must ma
 Validate syntax, then run the migrated query with a short timeframe:
 
 ```dtctl
-dtctl verify query '<migrated_query>' --plain
+dtctl verify query '<migrated_query>'
 ```
 
 ```dtctl
-dtctl query '<migrated_query>' --plain
+dtctl query '<migrated_query>'
 ```
 
 Check:

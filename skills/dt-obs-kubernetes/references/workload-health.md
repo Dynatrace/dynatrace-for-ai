@@ -95,17 +95,19 @@ of latency that appears as application slowness rather than crashes.
 
 ```dql
 timeseries {
-  throttled = avg(dt.kubernetes.container.cpu_throttled),
-  limit = avg(dt.kubernetes.container.limits_cpu),
-  usage = avg(dt.kubernetes.container.cpu_usage)
-}, by: {k8s.pod.name, k8s.namespace.name, k8s.cluster.name}
+  throttled = sum(dt.kubernetes.container.cpu_throttled),
+  limit = sum(dt.kubernetes.container.limits_cpu),
+  usage = sum(dt.kubernetes.container.cpu_usage)
+}, by: {k8s.pod.name, k8s.namespace.name, k8s.cluster.name},
+from: now()-1h
 | fieldsAdd throttle_pct = (arrayAvg(throttled) / arrayAvg(limit)) * 100
 | filter throttle_pct > 25
 | sort throttle_pct desc
 ```
 
-`throttle_pct > 25` means the container is throttled more than 25% of the
-time it wants to run. Resolution: raise the CPU limit or reduce usage.
+`throttle_pct > 25` means the pod (aggregated across all its containers) is
+throttled more than 25% of the time it wants to run. Resolution: raise the
+CPU limit or reduce usage.
 
 ## HPA Inspection
 

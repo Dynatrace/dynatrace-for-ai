@@ -44,7 +44,7 @@ Determine if the VM is behind an Azure Load Balancer. VMs connect to LBs through
 
 ```dql-template
 smartscapeNodes "AZURE_MICROSOFT_COMPUTE_VIRTUALMACHINES"
-| filter id == "<WORKLOAD_VM_ENTITY_ID>"
+| filter id == toSmartscapeId("<WORKLOAD_VM_ENTITY_ID>")
 | traverse "*", "AZURE_MICROSOFT_COMPUTE_VIRTUALMACHINESCALESETS"
 | traverse "*", "AZURE_MICROSOFT_NETWORK_LOADBALANCERS_BACKENDADDRESSPOOLS"
 | fields name, id, azure.resource.group
@@ -64,7 +64,7 @@ smartscapeNodes "AZURE_MICROSOFT_NETWORK_LOADBALANCERS"
 
 ```dql-template
 smartscapeNodes "AZURE_MICROSOFT_COMPUTE_VIRTUALMACHINES"
-| filter id == "<WORKLOAD_VM_ENTITY_ID>"
+| filter id == toSmartscapeId("<WORKLOAD_VM_ENTITY_ID>")
 | traverse "*", "AZURE_MICROSOFT_COMPUTE_VIRTUALMACHINESCALESETS"
 | traverse "*", "AZURE_MICROSOFT_NETWORK_VIRTUALNETWORKS_SUBNETS"
 | fields name, id, azure.resource.group
@@ -92,7 +92,7 @@ Determine if the VM is part of a Virtual Machine Scale Set.
 
 ```dql-template
 smartscapeNodes "AZURE_MICROSOFT_COMPUTE_VIRTUALMACHINES"
-| filter id == "<WORKLOAD_VM_ENTITY_ID>"
+| filter id == toSmartscapeId("<WORKLOAD_VM_ENTITY_ID>")
 | traverse "*", "AZURE_MICROSOFT_COMPUTE_VIRTUALMACHINESCALESETS"
 | parse azure.object, "JSON:azjson"
 | fieldsAdd vmSize = azjson[configuration][sku][name],
@@ -133,7 +133,7 @@ Detect whether the VMSS is an AKS node pool. AKS-managed VMSS instances carry sp
 
 ```dql-template
 smartscapeNodes "AZURE_MICROSOFT_COMPUTE_VIRTUALMACHINES"
-| filter id == "<WORKLOAD_VM_ENTITY_ID>"
+| filter id == toSmartscapeId("<WORKLOAD_VM_ENTITY_ID>")
 | traverse "*", "AZURE_MICROSOFT_COMPUTE_VIRTUALMACHINESCALESETS"
 | parse azure.object, "JSON:azjson"
 | fieldsAdd aksPoolName = azjson[configuration][tags][`aks-managed-poolName`],
@@ -179,7 +179,7 @@ If none of the above detection queries return results, the VM is standalone — 
 
 ```dql-template
 smartscapeNodes "AZURE_MICROSOFT_COMPUTE_VIRTUALMACHINES"
-| filter id == "<WORKLOAD_VM_ENTITY_ID>"
+| filter id == toSmartscapeId("<WORKLOAD_VM_ENTITY_ID>")
 | parse azure.object, "JSON:azjson"
 | fieldsAdd vmSize = azjson[configuration][properties][hardwareProfile][vmSize],
             powerState = azjson[configuration][properties][extended][instanceView][powerState][displayStatus],
