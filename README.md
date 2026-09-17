@@ -103,6 +103,8 @@ The MCP server is remote — Dynatrace hosts it, so there is nothing to install.
 | [dt-obs-ext-monitors](skills/dt-obs-ext-monitors/SKILL.md) | Ingest third-party test and monitor results into Dynatrace Grail via the platform events ingest API. |
 | [dt-obs-genai](skills/dt-obs-genai/SKILL.md) | Analyze observability signals from GenAI applications: golden signals, LLM cost/token analytics, agent tool-call behavior, and evaluation results. |
 | [dt-obs-log-semantic-mapping](skills/dt-obs-log-semantic-mapping/SKILL.md) | Suggest and validate semantic dictionary mappings for audit log integrations, using vendor log payloads or live ingested events. |
+| [dt-obs-network-devices](skills/dt-obs-network-devices/SKILL.md) | Analyze SNMP-monitored network devices (switches, routers, firewalls, load balancers): topology, interface metrics, and SNMP trap/syslog events. |
+| [dt-obs-network-flows](skills/dt-obs-network-flows/SKILL.md) | Analyze network flows from OneAgent, NetFlow/IPFIX/sFlow, and cloud VPC flow logs: top talkers, communication dependencies, and connection health. |
 
 ### Security
 
@@ -112,15 +114,17 @@ The MCP server is remote — Dynatrace hosts it, so there is nothing to install.
 | [dt-sec-contextualization](skills/dt-sec-contextualization/SKILL.md) | Resolve security signals and IoC matches to runtime entities, and connect findings across topology levels through a shared runtime entity. |
 | [dt-sec-ioc-hunting](skills/dt-sec-ioc-hunting/SKILL.md) | Hunt threat-intelligence indicators of compromise across logs and spans, producing a threat-exposure score. |
 | [dt-sec-semantic-mapping](skills/dt-sec-semantic-mapping/SKILL.md) | Suggest and validate semantic dictionary mappings for new security integrations, using vendor API samples or live events. |
+| [dt-obs-compliance-assistant](skills/dt-obs-compliance-assistant/SKILL.md) | Monitor and investigate EU DORA compliance posture: compliance score, Critical/Important Function (CIF) health, incident classification, and ICT risk inputs. |
 
-### Mobile Instrumentation
+### Instrumentation Setup
 
 | Skill | Description |
 |-------|-------------|
-| [dt-obs-android](skills/dt-obs-android/SKILL.md) | Instrument an existing Android project (Kotlin or Java) with the Dynatrace Mobile Agent: Gradle plugin, agent config, and user privacy opt-in. |
-| [dt-obs-flutter](skills/dt-obs-flutter/SKILL.md) | Integrate the Dynatrace Flutter Plugin: dependency setup, config, SDK bootstrap, navigation tracking, and verification. |
-| [dt-obs-ios](skills/dt-obs-ios/SKILL.md) | Set up the Dynatrace iOS SDK via Swift Package Manager: SPM dependency, Dynatrace.plist config, privacy opt-in, and Xcode build verification. |
-| [dt-obs-react-native](skills/dt-obs-react-native/SKILL.md) | Integrate the Dynatrace React Native Plugin for bare React Native and Expo: dependency setup, dynatrace.config.js, Babel registration, navigation tracking, and verification. |
+| [dt-setup-oneagent](skills/dt-setup-oneagent/SKILL.md) | Reference for installing Dynatrace OneAgent across VMs, Kubernetes, AWS Lambda, Windows hosts, remote EC2 instances, and Azure VMs/VMSS. |
+| [dt-setup-android](skills/dt-setup-android/SKILL.md) | Instrument an existing Android project (Kotlin or Java) with the Dynatrace Mobile Agent: Gradle plugin, agent config, and user privacy opt-in. |
+| [dt-setup-flutter](skills/dt-setup-flutter/SKILL.md) | Integrate the Dynatrace Flutter Plugin: dependency setup, config, SDK bootstrap, navigation tracking, and verification. |
+| [dt-setup-ios](skills/dt-setup-ios/SKILL.md) | Set up the Dynatrace iOS SDK via Swift Package Manager: SPM dependency, Dynatrace.plist config, privacy opt-in, and Xcode build verification. |
+| [dt-setup-react-native](skills/dt-setup-react-native/SKILL.md) | Integrate the Dynatrace React Native Plugin for bare React Native and Expo: dependency setup, dynatrace.config.js, Babel registration, navigation tracking, and verification. |
 
 ### Platform
 

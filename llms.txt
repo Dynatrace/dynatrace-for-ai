@@ -50,15 +50,26 @@ Observability:
 - dt-obs-problems: Problem entities, root cause, impact assessment.
 - dt-obs-predictive-analytics: Time series forecasting, capacity saturation, trend and anomaly detection.
 - dt-alerting: Alerting lifecycle — anomaly detectors, alert events in Grail, problem grouping, workflow notifications.
+- dt-obs-analytics: Analyze dashboards/notebooks with Davis analyzers — anomaly detection, novelty scoring, metric correlation.
+- dt-obs-ext-monitors: Ingest third-party test and monitor results into Grail via the platform events ingest API.
+- dt-obs-genai: GenAI application observability — golden signals, LLM cost/token analytics, agent tool-call behavior, evaluation results.
+- dt-obs-log-semantic-mapping: Suggest and validate semantic dictionary mappings for audit log integrations.
+- dt-obs-network-devices: SNMP-monitored network devices — topology, interface metrics, trap/syslog events.
+- dt-obs-network-flows: Network flow analysis — OneAgent flows, NetFlow/IPFIX/sFlow, cloud VPC flow logs.
 
 Security:
 - dt-sec-insights: Query security.events — Runtime Vulnerability Analytics, Runtime Application Protection, Automated Detections (MITRE ATT&CK), Security Posture Management (KSPM/CSPM/VSPM).
+- dt-sec-contextualization: Resolve security signals and IoC matches to runtime entities across topology levels.
+- dt-sec-ioc-hunting: Hunt threat-intelligence indicators of compromise across logs and spans, producing a threat-exposure score.
+- dt-sec-semantic-mapping: Suggest and validate semantic dictionary mappings for new security integrations.
+- dt-obs-compliance-assistant: EU DORA compliance posture — compliance score, CIF health, incident classification, ICT risk inputs.
 
-Mobile Instrumentation:
-- dt-obs-android: Instrument Android (Kotlin/Java) with the Dynatrace Mobile Agent via Gradle plugin.
-- dt-obs-flutter: Integrate the Dynatrace Flutter Plugin — dependency setup, SDK bootstrap, navigation tracking.
-- dt-obs-ios-sdk: Set up the Dynatrace iOS SDK via Swift Package Manager — Dynatrace.plist, privacy opt-in, Xcode verification.
-- dt-obs-react-native: Integrate the Dynatrace React Native Plugin for bare RN and Expo — dynatrace.config.js, Babel registration, navigation tracking.
+Instrumentation Setup:
+- dt-setup-oneagent: Reference for installing OneAgent across VMs, Kubernetes, AWS Lambda, Windows, remote EC2, and Azure VMs/VMSS.
+- dt-setup-android: Instrument Android (Kotlin/Java) with the Dynatrace Mobile Agent via Gradle plugin.
+- dt-setup-flutter: Integrate the Dynatrace Flutter Plugin — dependency setup, SDK bootstrap, navigation tracking.
+- dt-setup-ios: Set up the Dynatrace iOS SDK via Swift Package Manager — Dynatrace.plist, privacy opt-in, Xcode verification.
+- dt-setup-react-native: Integrate the Dynatrace React Native Plugin for bare RN and Expo — dynatrace.config.js, Babel registration, navigation tracking.
 
 Dynatrace Apps:
 - dt-app-dashboards: Dashboard JSON, tiles, layouts, DQL queries, variables.
