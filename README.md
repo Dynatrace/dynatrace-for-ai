@@ -22,6 +22,8 @@ Works with Claude Code, Cursor, Cline, GitHub Copilot, OpenCode, and other [comp
 claude plugin install dynatrace@claude-plugins-official
 ```
 
+Prefer browsing interactively? Run `/plugin` in Claude Code, open the **Discover** tab, and search "Dynatrace".
+
 The plugin includes skills as well as the Dynatrace MCP server. Set these environment variables before starting Claude Code to connect it to your environment:
 
 ```bash
@@ -46,6 +48,12 @@ claude plugin update dynatrace@claude-plugins-official
 ```
 
 Note: The bundled MCP server connects to your Dynatrace environment. See the [Dynatrace Privacy Policy](https://www.dynatrace.com/company/trust-center/privacy/) for details on data handling.
+
+### Cursor Plugin
+
+The Dynatrace plugin is listed on the [Cursor Marketplace](https://cursor.com/marketplace/mcp/dynatrace). Install is GUI-only: open **Customize** in the Cursor sidebar, find "Dynatrace", select **Install**, and choose project or user scope.
+
+Set the same `DT_ENVIRONMENT` and `DT_PLATFORM_TOKEN` environment variables shown above before starting Cursor.
 
 ### Manual
 
