@@ -3,7 +3,7 @@
   "name": "io.github.Dynatrace/dynatrace-for-ai",
   "title": "Dynatrace",
   "description": "Connect AI assistants to Dynatrace to query observability data and analyze problems.",
-  "version": "8.0.0",
+  "version": "8.0.1",
   "repository": {
     "url": "https://github.com/Dynatrace/dynatrace-for-ai",
     "source": "github",
@@ -38,8 +38,8 @@
           }
         },
         {
-          "name": "X-Http-Source",
-          "value": "dynatrace-for-ai/8.0.0"
+          "name": "Dt-External-Source",
+          "value": "dynatrace-for-ai/8.0.1"
         }
       ],
       "variables": {

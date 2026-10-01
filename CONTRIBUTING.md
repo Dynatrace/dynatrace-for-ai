@@ -34,9 +34,9 @@ When bumping the version, update all of the following to match:
 
 - `.claude-plugin/plugin.json` → `"version"` (canonical)
 - `.cursor-plugin/plugin.json` → `"version"`
-- `mcp.json` → `"X-Http-Source": "dynatrace-for-ai/<version>"`
-- `.mcp.json` → `"X-Http-Source": "dynatrace-for-ai/<version>"`
-- `server.json` → `"version"` and the `X-Http-Source` header value
+- `mcp.json` → `"Dt-External-Source": "dynatrace-for-ai/<version>"`
+- `.mcp.json` → `"Dt-External-Source": "dynatrace-for-ai/<version>"`
+- `server.json` → `"version"` and the `Dt-External-Source` header value
 
 Run `node scripts/check-versions.js` to verify — CI also enforces this on every PR.
 
