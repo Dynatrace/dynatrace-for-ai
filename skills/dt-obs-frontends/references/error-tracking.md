@@ -11,7 +11,7 @@ Comprehensive error analysis using both event-based queries (detailed diagnostic
 
 **Error types** (`error.type` values): `anr`, `crash`, `csp`, `exception` — failed requests do not have an `error.type` value; use `characteristics.has_failed_request` instead.
 
-**CSP violations** are a separate event type fully documented in [references/csp-violations.md](references/csp-violations.md).
+**CSP violations** are a separate event type fully documented in [csp-violations.md](csp-violations.md).
 
 ## Contents
 

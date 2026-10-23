@@ -1,37 +1,34 @@
 # Cost Estimations
 
-Rank and compare DPS (Dynatrace Platform Subscription) consumption across
-capabilities using normalized cost weights. Enables cross-capability ranking,
-chargeback normalization, and spend trend analysis.
-
-> **RELATIVE RANKINGS ONLY — NOT ACTUAL BILLING DATA.** Every customer has a
-> custom rate card negotiated as part of their DPS contract. The normalization
-> weights used throughout this document **will differ from actual costs**. Use
-> these queries for directional rankings, relative comparisons, and spike
-> detection — **never for invoice reconciliation**.
->
-> For actual billing data, use **Account Management > Subscription > Overview >
-> Cost and usage details**.
+Rank and compare DPS (Dynatrace Platform Subscription) consumption across capabilities. Uses the tenant's contracted rate card when available (rated path) or normalized cost weights when it is not (unrated path) — see [Pre-flight Detection](#pre-flight-detection). Enables cross-capability ranking, chargeback normalization, and spend trend analysis.
 
 ## Contents
 
 - [Important Disclaimers](#important-disclaimers)
-- [Cost Normalization Weights](#cost-normalization-weights)
-- [Cost Estimation Pattern](#cost-estimation-pattern)
+- [Price Source Resolution](#price-source-resolution)
+  - [Pre-flight Detection](#pre-flight-detection)
+  - [Rate Card Join Snippet](#rate-card-join-snippet)
+  - [Validity Labeling Rule](#validity-labeling-rule)
+  - [Output Rules for Rated Path](#output-rules-for-rated-path)
+- [Rated Cost Estimation (rate card present)](#rated-cost-estimation-rate-card-present)
+  - [Estimated Cost by Capability (rated)](#estimated-cost-by-capability-rated)
+  - [Daily Cost Trend (rated)](#daily-cost-trend-rated)
+  - [Period Comparison / WoW / MoM (rated)](#period-comparison--wow--mom-rated)
+- [Cost Estimation Pattern (Unrated / No Rate Card)](#cost-estimation-pattern-unrated--no-rate-card)
+  - [Cost Normalization Weights](#cost-normalization-weights)
   - [Step 1 — DQL: Obtain Usage + Cost Weight](#step-1--dql-obtain-usage--cost-weight)
   - [Step 2 — Post-Query Delta Math (Period Comparison only)](#step-2--post-query-delta-math-period-comparison-only)
-- [Unit Conversion Lookup](#unit-conversion-lookup)
 - [Full Inline Lookup for Cost Rankings](#full-inline-lookup-for-cost-rankings)
-- [Ready-to-Use Queries](#ready-to-use-queries)
-  - [Estimated Cost by Capability](#estimated-cost-by-capability)
+- [Ready-to-Use Queries (Unrated / No Rate Card)](#ready-to-use-queries-unrated--no-rate-card)
+  - [Estimated Cost by Capability (unrated)](#estimated-cost-by-capability-unrated)
   - [Estimated Cost by Cost Center](#estimated-cost-by-cost-center)
   - [Estimated Query Cost by Source](#estimated-query-cost-by-source)
-  - [Daily Cost Trend](#daily-cost-trend)
-  - [Period Comparison (WoW / MoM)](#period-comparison-wow--mom)
+  - [Daily Cost Trend (unrated)](#daily-cost-trend-unrated)
+  - [Period Comparison (WoW / MoM) (unrated)](#period-comparison-wow--mom-unrated)
 
 ## Important Disclaimers
 
-> **1. Relative rankings only.** Every customer has a custom rate card
+> **1. Relative rankings only (unrated path).** Every customer has a custom rate card
 > negotiated as part of their DPS contract. The normalization weights used here
 > will differ from actual costs. Use these queries for directional rankings,
 > relative comparisons, and spike detection — not for invoice reconciliation.
@@ -40,25 +37,28 @@ chargeback normalization, and spend trend analysis.
 > see **SKILL.md § Cost Ranking Rules** — that section is the single source of
 > truth for all user-facing disclaimer text.
 
-> **2. Normalization weights may change.** The weights in this document are
-> based on the Dynatrace public rate card as of March 2026. Always verify
-> current rates before updating this file.
+> **2. Estimated cost is not authoritative billing (rated path).** When the tenant's
+> contracted rate card is available, `estimated_cost` is derived from that rate card
+> but is not an authoritative billing figure. For invoice reconciliation, direct users to
+> **Account Management > Subscription > Overview > Cost and usage details**. For output
+> formatting rules, see [§ Output Rules for Rated Path](#output-rules-for-rated-path).
 
-> **3. Not all BUE types have a weight.** Preview types (`Digital
+> **3. Normalization weights may change.** The normalization weights in the table below are
+> based on the Dynatrace public rate card as of March 2026.
+
+> **4. Not all BUE types have a weight.** Preview types (`Digital
 > Experience Monitoring - Query/Retain`) have no weight.
 > `Files` types use the corresponding `Events` weight — see
 > [billing-capabilities.md § BUE-to-Capability Mapping](billing-capabilities.md#bue-to-capability-mapping).
 
-> **4. Included volume handling.** The cross-capability queries
-> ([Estimated Cost by Capability](#estimated-cost-by-capability),
-> [Daily Cost Trend](#daily-cost-trend)) use the 4-query pattern from
+> **5. Included volume handling.** The cross-capability queries use the 4-query pattern from
 > [billing-capabilities.md § Cross-Capability Usage](billing-capabilities.md#cross-capability-usage-4-queries)
 > which deducts included volume for Metrics Ingest and Traces Ingest. See
 > [billing-capabilities.md § Included Volume](billing-capabilities.md#included-volume)
 > for deduction details.
 
-> **5. DPS only.** The normalization weights, unit conversion lookup, and all cost
-> ranking queries apply exclusively to the Dynatrace Platform Subscription (DPS) license
+> **6. DPS only.** All patterns, queries, and cost estimations in this file apply
+> exclusively to the Dynatrace Platform Subscription (DPS) license
 > model. They cannot be used with classic license models (host units, DDUs, DEM
 > units, ASUs).
 
@@ -68,7 +68,160 @@ chargeback normalization, and spend trend analysis.
 > Single-category questions (e.g., "how much log ingest?") can use raw usage
 > because units are consistent within a category.
 
-## Cost Normalization Weights
+## Price Source Resolution
+
+When a DPS rate card is present at `/dt/dps-cost-control/unit-prices`, append
+the join below after any `| summarize billable_usage = ...` step to convert native usage
+into estimated costs in the customer's contracted currency.
+
+### Pre-flight Detection
+
+Before producing any cost-amount answer, the skill runs a silent pre-flight check to determine
+whether the rate card is present and accessible.
+
+```dql
+fetch dt.system.files
+| filter name == "/dt/dps-cost-control/unit-prices"
+| fields name, records
+| limit 1
+```
+
+**Decision logic:**
+- 1 row returned AND `records > 0` → **rated path**: proceed with cost estimates in contracted
+  currency using the join below.
+- 0 rows returned OR `records == 0` → **unrated path**: fall back to native units + cost-weight
+  ranking (existing behavior), unchanged.
+
+The skill runs this check silently before every cost-related request. It does not inform the
+user that a pre-flight was run; it uses the result to pick a path automatically.
+
+### Rate Card Join Snippet
+
+Append this snippet after any `| summarize billable_usage = ...` step in a BUE query.
+The lookup projects `bue_type, price_per_unit, unit_divisor, currency, valid_from, valid_to`
+and adds three fields to each row:
+
+- `capability_usage` — usage converted to the capability's native unit (GiB, hours, sessions,
+  etc.) using the rate card's `unit_divisor`
+- `estimated_cost` — rounded cost in the contracted currency (2 decimal places)
+- `currency_code` — ISO 4217 code read from the rate card's `currency` field
+
+```dql-snippet
+| join [
+    load "/dt/dps-cost-control/unit-prices"
+    | fields bue_type, price_per_unit, unit_divisor, currency, valid_from, valid_to
+  ], on: {left[`event.type`] == right[bue_type]}, prefix: "lookup.", kind: leftOuter
+// fallback_divisor converts types missing from the rate card (e.g. preview types) to native units
+| fieldsAdd fallback_divisor = if(endsWith(event.type, "- Retain") or endsWith(event.type, "Retain with Included Queries"), 25769803776,
+    else: if(endsWith(event.type, "- Query") or event.type == "Data Egress"
+      or (endsWith(event.type, "- Ingest & Process") and event.type != "Metrics - Ingest & Process"), 1073741824, else: 1))
+| fieldsAdd capability_usage = toDouble(billable_usage) / coalesce(toDouble(lookup.unit_divisor), fallback_divisor)
+| fieldsAdd estimated_cost = round(capability_usage * lookup.price_per_unit, decimals: 2)
+| fieldsAdd currency_code = lookup.currency
+| fieldsAdd valid_from = toTimestamp(lookup.valid_from), valid_to = toTimestamp(lookup.valid_to)
+```
+
+BUE types absent from the rate card (`lookup.*` null under `leftOuter`) keep their row: `fallback_divisor` already converts their `capability_usage` to native units (e.g. `Digital Experience Monitoring - Query` → GiB scanned), and `estimated_cost` stays null. Take the unit label from [billing-capabilities.md § Unit Conversion Table](billing-capabilities.md#unit-conversion-table), show the usage, and leave the cost column empty. Sort them last with `sort isNull(estimated_cost) asc, estimated_cost desc` — a plain `sort estimated_cost desc` puts null rows first.
+
+### Validity Labeling Rule
+
+> After running the join, compare the query's `<START>` against `valid_from` and `<END>` against `valid_to`. If `<START>` is before `valid_from` or `<END>` is after `valid_to` for any rate card entry, add the following warning **before** presenting results:
+>
+> ⚠️ Some periods in this query fall outside the rate card's validity window
+> (`valid_from` / `valid_to`). Estimated costs may not reflect the correct price for those
+> periods.
+>
+> Still proceed with the rated join and present results. Do **not** fall back to the unrated
+> path because of a validity window mismatch. Only an absent or unreadable rate card
+> (pre-flight failure) triggers a fallback to the unrated path — a ⚠️ warning is sufficient
+> for a validity window issue.
+
+### Output Rules for Rated Path
+
+1. **Label cost amounts** as "estimated cost (from BUE) [<currency_code>]" — always, in
+   every table header and in prose. Include the ISO 4217 currency code from `currency_code`
+   in column headers (e.g., "estimated cost (from BUE) [EUR]") and on first mention in prose.
+2. **Show native units alongside the estimated cost** — include a capability-units column
+   next to the cost column for transparency. Do not replace native units with cost amounts.
+3. **Two decimal places** for all cost amounts (`round(..., decimals: 2)`).
+4. **No authoritative billing claim** — always direct to
+   **Account Management > Subscription > Overview > Cost and usage details** for
+   actual invoice reconciliation. Never state that estimated costs are authoritative billing
+   figures.
+5. **No `cost_weight` in rated path** — the rated path uses `estimated_cost` in the
+   contracted currency. Do not also compute or display `cost_weight` or normalization weights
+   when the rate card is present.
+
+## Rated Cost Estimation (rate card present)
+
+When a rate card is available, use the queries below. Append the
+[Rate Card Join Snippet](#rate-card-join-snippet) after each `billable_usage` step.
+The Full Inline Lookup and `cost_weight` are **not** used in the rated path.
+
+### Estimated Cost by Capability (rated)
+
+Runs the same 4-sub-query Combined Query as the unrated path (including Metrics/Traces Ingest
+included-volume deduction — see [billing-capabilities.md § Combined Query](billing-capabilities.md#quick-overview--combined-query)).
+The final `summarize` step must produce `billable_usage` by `event.type`, then append the
+rate-card join.
+
+> Replace `<START>` / `<END>` / `<END_PLUS_2H>` / `<END_PLUS_5H>` with UTC midnight
+> boundaries. **14-day limit:** for any window longer than 14 days, split into ≤ 14-day
+> windows with the [multi-window pattern](billing-capabilities.md#longer-timeframes-multi-window-pattern)
+> and sum — a single longer window silently inflates Traces Ingest several-fold.
+
+Run the [Combined Query](billing-capabilities.md#quick-overview--combined-query)
+from `billing-capabilities.md` (all 4 sub-queries), then append the
+[Rate Card Join Snippet](#rate-card-join-snippet). Finish with
+`| sort isNull(estimated_cost) asc, estimated_cost desc | fields event.type, capability_usage, estimated_cost, currency_code, valid_from, valid_to`.
+
+Present as a ranked table: rank, capability name, native units (`capability_usage` with unit
+label), estimated cost labeled "estimated cost (from BUE) [<currency_code>]". Show the ℹ️
+rated disclaimer before results. Apply ⚠️ validity warning if timeframe extends outside
+`valid_from`/`valid_to`.
+
+### Daily Cost Trend (rated)
+
+Daily bucketing by `bin(usage.start, 24h)` for event types with `usage.start` (or
+`bin(timestamp, 1d)` for Workflow/SPM), then rate-card join. Outputs `day`,
+`capability_usage`, `estimated_cost`, `currency_code`.
+
+> Replace `<START>` / `<END>` / `<END_PLUS_2H>` with UTC midnight boundaries. For windows
+> over 14 days, use the [multi-window pattern](billing-capabilities.md#longer-timeframes-multi-window-pattern).
+
+Run the [Combined Query](billing-capabilities.md#quick-overview--combined-query) with the
+daily-bucketing modification (see [Daily Cost Trend (unrated)](#daily-cost-trend-unrated)
+for the per-sub-query modification rules), then append the
+[Rate Card Join Snippet](#rate-card-join-snippet). Finish with
+`| sort day asc, isNull(estimated_cost) asc, estimated_cost desc | fields event.type, day, capability_usage, estimated_cost, currency_code, valid_from, valid_to`.
+
+### Period Comparison / WoW / MoM (rated)
+
+Run the [Estimated Cost by Capability (rated)](#estimated-cost-by-capability-rated) query
+twice — once per window (Window A = previous, Window B = current) — using explicit UTC
+midnight boundaries. Then compute delta post-query:
+
+```
+estimated_cost_delta = estimated_cost_B − estimated_cost_A   ← sort key
+```
+
+Sort by `abs(estimated_cost_delta) desc` — largest cost movers first. Show "New" for
+capabilities with zero estimated cost in the previous window.
+
+> No weight multiplication needed: the rate-card join already converts to contracted currency.
+
+## Cost Estimation Pattern (Unrated / No Rate Card)
+
+**For all cost rankings, compute `cost_weight` inside DQL** — never mentally.
+Append the [Full Inline Lookup for Cost Rankings](#full-inline-lookup-for-cost-rankings)
+to any billing usage query. DQL returns rows pre-sorted by `cost_weight`; the
+agent only formats them.
+
+> **NEVER multiply normalization weights mentally.** Usage values span 10 orders
+> of magnitude; weights span 5. Mental arithmetic across 20+ rows with small
+> decimals produces silent, undetectable ranking errors. DQL arithmetic is exact.
+
+### Cost Normalization Weights
 
 The `Normalization Weight` column is the normalization weight used internally to rank
 capabilities by relative cost. **Never display these values as dollar estimates**
@@ -117,24 +270,14 @@ capabilities by relative cost. **Never display these values as dollar estimates*
 > - `Files` types use the corresponding `Events` weights (see
 >   [billing-capabilities.md § BUE-to-Capability Mapping](billing-capabilities.md#bue-to-capability-mapping)).
 > - Preview types (`Digital Experience Monitoring - Query/Retain`)
->   have no weight — omit from cost rankings.
+>   have no weight — omit from **unrated** cost rankings. On the rated path they
+>   stay in the result in native units with an empty cost column.
 > - `AI Units` uses `usage.quantity.billable` (double) as its billed field,
 >   not `billed_invocations`.
 
-## Cost Estimation Pattern
-
-**For all cost rankings, compute `cost_weight` inside DQL** — never mentally.
-Append the [Full Inline Lookup for Cost Rankings](#full-inline-lookup-for-cost-rankings)
-to any billing usage query. DQL returns rows pre-sorted by `cost_weight`; the
-agent only formats them.
-
-> **NEVER multiply normalization weights mentally.** Usage values span 10 orders
-> of magnitude; weights span 5. Mental arithmetic across 20+ rows with small
-> decimals produces silent, undetectable ranking errors. DQL arithmetic is exact.
-
 ### Step 1 — DQL: Obtain Usage + Cost Weight
 
-Run the appropriate query from [Ready-to-Use Queries](#ready-to-use-queries),
+Run the appropriate query from [Ready-to-Use Queries](#ready-to-use-queries-unrated--no-rate-card),
 then append the [Full Inline Lookup for Cost Rankings](#full-inline-lookup-for-cost-rankings).
 The lookup computes both `capability_usage` (for display) and `cost_weight`
 (for sorting) in a single DQL step.
@@ -144,6 +287,7 @@ Finish the query with:
 ```dql-snippet
 | filter isNotNull(cost_weight)
 | sort cost_weight desc
+// cost_weight is for sorting only — drop before presenting; see SKILL.md § Cost Ranking Rules step 2
 | fields event.type, capability_usage, cost_weight
 ```
 
@@ -152,52 +296,14 @@ arithmetic required.
 
 ### Step 2 — Post-Query Delta Math (Period Comparison only)
 
-Manual delta computation is only needed for [Period Comparison](#period-comparison-wow--mom),
+Manual delta computation is only needed for [Period Comparison](#period-comparison-wow--mom-unrated),
 where two separate DQL result sets must be subtracted. For all other ranking
 use cases, Step 1 + inline lookup is sufficient.
 
 Show the disclaimer before results (see SKILL.md §
 [Cost Ranking Rules](../SKILL.md#cost-ranking-rules)).
 
-## Unit Conversion Lookup
-
-> **⚠️ Usage-only — NOT for cost rankings.** This snippet converts units but
-> does NOT compute `cost_weight`. For cost rankings, use the
-> [Full Inline Lookup for Cost Rankings](#full-inline-lookup-for-cost-rankings)
-> instead — it handles both unit conversion and cost-weight computation.
-
-Append this snippet to any billing usage query that produces a
-`billable_usage` field **when you need usage in capability units without
-ranking**. It converts raw values to capability units and adds a
-`capability_usage` field. Follow with your own `| fields` clause to select
-the columns you need.
-
-> **Prerequisite:** Upstream queries must dedup before aggregating. Use
-> `| dedup {event.id, event.type}` for multi-type queries — see
-> [Billing Event Deduplication](billing-capabilities.md#billing-event-deduplication).
-
-```dql-snippet
-// --- Unit Conversion Lookup (append after summarize) ---
-| lookup [
-    data json:"""[
-      {"event_types": ["Log Management & Analytics - Ingest & Process", "Log Management & Analytics - Query", "Traces - Ingest & Process", "Traces - Query", "Events - Ingest & Process", "Events - Query", "Files - Ingest & Process", "Files - Query", "Digital Experience Monitoring - Query", "Data Egress"], "unitDivisor": 1073741824},
-      {"event_types": ["Log Management & Analytics - Retain", "Log Management & Analytics - Retain with Included Queries", "Traces - Retain", "Metrics - Retain", "Events - Retain", "Files - Retain", "Digital Experience Monitoring - Retain"], "unitDivisor": 25769803776}
-    ]"""
-    | expand event_type = event_types
-    | fieldsRemove event_types
-  ], sourceField: event.type, lookupField: event_type
-| fieldsAdd capability_usage = toDouble(billable_usage) / coalesce(lookup.unitDivisor, 1)
-```
-
-Uses a grouped `expand` pattern — 2 JSON entries cover 17 byte-based event
-types (including DEM preview types and Data Egress for correct usage reporting). Types not in
-the lookup (sessions, hours, data points) get `lookup.unitDivisor=null` →
-`coalesce(null, 1)` → raw value passes through unchanged.
-
-`1073741824` = 1 GiB in bytes; `25769803776` = 1 GiB-day in byte-hours
-(1073741824 × 24).
-
-## Ready-to-Use Queries
+## Ready-to-Use Queries (Unrated / No Rate Card)
 
 > **IMPORTANT — For cost rankings, append the
 > [Full Inline Lookup for Cost Rankings](#full-inline-lookup-for-cost-rankings)
@@ -205,7 +311,7 @@ the lookup (sessions, hours, data points) get `lookup.unitDivisor=null` →
 > DQL. Never display `cost_weight` as a dollar estimate — present ranked output
 > in native units only.**
 
-### Estimated Cost by Capability
+### Estimated Cost by Capability (unrated)
 
 Total billable usage per billing event type in capability units. Uses the
 [Combined Query](billing-capabilities.md#quick-overview--combined-query) from
@@ -233,35 +339,18 @@ format and disclaimer wording.
 For cost center attribution and chargeback, use the queries in
 [cost-allocation.md](cost-allocation.md). Two cases:
 
-**Cross-capability ranking by cost center** — use the
-[Unified Chargeback](cost-allocation.md#unified-chargeback-all-types) query,
-renaming its output to `billable_usage`, then append the Full Inline Lookup:
-
-```dql-snippet
-// After the Base Usage query (produces {event.type, usage} per event):
-| filter isNotNull(dt.cost.costcenter)
-| expand c = dt.cost.costcenter
-| fieldsAdd
-    cc = coalesce(c[key], c),
-    v = coalesce(c[data_points], c[billed_bytes], usage)
-| summarize billable_usage = sum(v), by: {event.type, dt.cost.costcenter = cc}
-// append Full Inline Lookup here, then:
-| filter isNotNull(cost_weight)
-| sort cost_weight desc
-| fields dt.cost.costcenter, event.type, capability_usage, cost_weight
-```
-
-The Unified Chargeback query produces mixed raw units (bytes for ingest types,
-native for hour types) — exactly what the inline lookup's `unitDivisor` handles.
+**Cross-capability ranking by cost center** — run the
+[Unified Chargeback (All Types, Unrated / No Rate Card)](cost-allocation.md#unified-chargeback-all-types-unrated--no-rate-card)
+query (produces `billable_usage` per `event.type, dt.cost.costcenter`), then
+append the [Full Inline Lookup for Cost Rankings](#full-inline-lookup-for-cost-rankings)
+and finish with `| filter isNotNull(cost_weight) | sort cost_weight desc`.
 
 **Single-capability breakdown by cost center** — the individual per-capability
 queries in [cost-allocation.md](cost-allocation.md) produce already-converted
-fields (e.g. `total_gib_hours`, `total_data_points`). The Full Inline Lookup
-cannot be appended (values are already in capability units). For these, apply
-the normalization weight as a single multiplication:
+fields. Apply the normalization weight as a single multiplication:
 `cost_weight = capability_usage × weight` (look up `weight` from
-[Cost Normalization Weights](#cost-normalization-weights)). This is safe because
-only one weight is involved.
+[Cost Normalization Weights](#cost-normalization-weights)). Safe because only one
+weight is involved.
 
 ### Estimated Query Cost by Source
 
@@ -298,7 +387,7 @@ relative cost within this result set. Sort by `capability_usage desc`.
 > the full investigation workflow — see
 > [query-cost-attribution.md](query-cost-attribution.md).
 
-### Daily Cost Trend
+### Daily Cost Trend (unrated)
 
 Track daily billable usage to detect spikes. Uses the same
 [Combined Query](billing-capabilities.md#quick-overview--combined-query),
@@ -310,6 +399,11 @@ Replace `<START>` / `<END>` with UTC midnight boundaries (e.g.,
 > **14-day limit** — Billed Metrics/Traces Ingest sub-queries use `timeseries`.
 > For longer timeframes, use the
 > [multi-window pattern](billing-capabilities.md#longer-timeframes-multi-window-pattern).
+
+> **Unexplained Log Ingest spike?** A historical Log Import is an uncommon but
+> easy-to-miss cause — it bills in the window the job ran, under the same
+> `Log Management & Analytics - Ingest & Process` event type. Check `isNotNull(dt.job.id)` to rule it out — see
+> [billing-event-types.md § Log Ingest Sources](billing-event-types.md#log-ingest-sources).
 
 **Modification:** In each of the 4 sub-queries, replace the final
 `summarize ... by: {event.type}` with a daily-bucketed variant. Use the
@@ -333,7 +427,7 @@ weight within each day. Output the daily-bucketed table in native units only
 SKILL.md § Cost Ranking Rules step 2 for output formatting — drop `cost_weight`
 and present native units only.
 
-### Period Comparison (WoW / MoM)
+### Period Comparison (WoW / MoM) (unrated)
 
 Compare two equal-length windows to surface what grew, shrank, or appeared.
 Use for "compare last week to the week before", "what changed month over month",
@@ -346,7 +440,7 @@ or "what's trending up in spend".
 
 **Steps:**
 
-1. **Run the [Estimated Cost by Capability](#estimated-cost-by-capability) query
+1. **Run the [Estimated Cost by Capability (unrated)](#estimated-cost-by-capability-unrated) query
    twice** — once per window — using explicit UTC midnight boundaries each time.
    Use identical query structure for both runs; change only `<START>`, `<END>`,
    and their derived values (`<END_PLUS_2H>`, `<END_PLUS_5H>`).
@@ -373,17 +467,6 @@ or "what's trending up in spend".
    percentage. Note in the response that units differ by row and are not
    directly comparable to each other.
 
-**Example output:**
-```
-ℹ️ Rankings show relative spend — for actual dollar figures, see **Account Management > Subscription > Overview > Cost and usage details**.
-
-Capability                Apr 14–20         Apr 21–27        Change
-Full-Stack Monitoring     2.41M GiB-hours   2.33M GiB-hours  ↓ –3%
-Log Mgmt - Ingest         490 GiB           590 GiB          ↑ +20%
-RUM Property              2.57B props/sess  2.57B props/sess  → 0%
-Files - Ingest            0                 6 GiB             New
-```
-
 > **14-day limit** — If either window uses Metrics Ingest or Traces Ingest
 > sub-queries, the included-volume deduction is limited to 14 days. For longer
 > windows, use the
@@ -400,9 +483,7 @@ Append this snippet after any billing usage query that produces a
 > output with `| fields event.type, capability_usage` after sorting). For output
 > rules and disclaimer wording, see SKILL.md § Cost Ranking Rules.
 
-> For `lookup` command syntax and chaining rules, see `dt-dql-essentials`.
-> Each `lookup` **removes all existing `lookup.*` fields** — use `fieldsRename`
-> between chained lookups to preserve results.
+> For `join` command syntax, see `dt-dql-essentials`.
 
 Each entry carries `unitDivisor` (bytes → capability unit conversion) plus
 `factor` / `factorBase` (numerator and denominator of the normalization weight;
@@ -410,7 +491,7 @@ Each entry carries `unitDivisor` (bytes → capability unit conversion) plus
 
 ```dql-snippet
 // --- Full Inline Lookup for Cost Rankings (append after summarize) ---
-| lookup [
+| join [
     data json:"""
     [
       {"event_type": "Full-Stack Monitoring", "unitDivisor": 1, "unit": "GiB-hours", "factor": 1000, "factorBase": 100000},
@@ -451,8 +532,8 @@ Each entry carries `unitDivisor` (bytes → capability unit conversion) plus
       {"event_type": "Database Monitoring", "unitDivisor": 1, "unit": "database-instance-hours", "factor": 1100, "factorBase": 10000}
     ]
     """
-  ], sourceField: event.type, lookupField: event_type
-| fieldsAdd capability_usage = toDouble(billable_usage) / lookup.unitDivisor
+  ], on: {left[`event.type`] == right[event_type]}, prefix: "lookup.", kind: leftOuter
+| fieldsAdd capability_usage = toDouble(billable_usage) / coalesce(lookup.unitDivisor, 1)
 | fieldsAdd cost_weight = capability_usage / lookup.factorBase * lookup.factor
 // finish with: | filter isNotNull(cost_weight) | sort cost_weight desc | fields event.type, capability_usage, cost_weight
 ```
@@ -461,5 +542,6 @@ Each entry carries `unitDivisor` (bytes → capability unit conversion) plus
 > - `Files` types are mapped to `Events` normalization weights (see
 >   [billing-capabilities.md § BUE-to-Capability Mapping](billing-capabilities.md#bue-to-capability-mapping)).
 > - Preview types (`Digital Experience Monitoring - Query/Retain`) are omitted
->   — they return `null` for `cost_weight`. Filter with
->   `| filter isNotNull(cost_weight)` before sorting.
+>   from this unrated ranking — they return `null` for `cost_weight`. Filter with
+>   `| filter isNotNull(cost_weight)` before sorting. (The rated path keeps them;
+>   see [Rate Card Join Snippet](#rate-card-join-snippet).)

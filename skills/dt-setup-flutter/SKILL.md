@@ -3,9 +3,10 @@ name: dt-setup-flutter
 license: Apache-2.0
 description: >-
   Integrate the Dynatrace Flutter Plugin into a Flutter project — dependency setup, config,
-  SDK bootstrap, navigation tracking, and verification.
+  SDK bootstrap, navigation tracking, Session Replay, and verification.
   Trigger: "add Dynatrace to Flutter", "Flutter plugin setup", "instrument Flutter app",
-  "integrate Dynatrace Flutter", "mobile observability Flutter", "dynatrace_flutter_plugin".
+  "integrate Dynatrace Flutter", "mobile observability Flutter", "dynatrace_flutter_plugin",
+  "Flutter session replay", "dynatrace_flutter_plugin_replay".
   Do NOT use for: querying Flutter RUM data (use dt-obs-frontends), non-Flutter mobile setups,
   or Dynatrace server-side configuration.
 ---
@@ -33,8 +34,8 @@ Before asking the user anything, check whether `dynatrace.config.yaml` exists at
 
 Inspect the file for `userOptIn` (Android) and `DTXUserOptIn` (iOS).
 
-- **Present on both platforms:** Trust the value as-is. If `true`, flag Step 7a. If `false`, skip Step 7a.
-- **Absent from either platform:** Ask the user: **"Do you have User Opt-In mode enabled or disabled?"** (If unsure: Experience Vitals → Mobile → [Your App] → Settings → Data Privacy.) Add the missing value to the relevant platform(s), then flag Step 7a if the final value is `true`.
+- **Present on both platforms:** Trust the value as-is. If `true`, flag Step 9. If `false`, skip Step 9.
+- **Absent from either platform:** Ask the user: **"Do you have User Opt-In mode enabled or disabled?"** (If unsure: Experience Vitals → Mobile → [Your App] → Settings → Data Privacy.) Add the missing value to the relevant platform(s), then flag Step 9 if the final value is `true`.
 
 ## Step 2 — Obtain `dynatrace.config.yaml` (only if Step 1 found no file)
 
@@ -45,13 +46,13 @@ Ask the user which approach they prefer:
 1. Open their Dynatrace environment
 1. Navigate to: Experience Vitals → New Frontend → Mobile
 1. Enter app name and choose **Flutter** as the platform
-1. On the **Select capability and settings** screen, configure monitoring features (Crash reporting, user action monitoring, etc.). User action monitoring can be changed later via Experience Vitals → [App] → Settings → Enablement and Cost Control.
+1. On the **Select capability and settings** screen, configure monitoring features (Crash reporting, user action monitoring, Session Replay, etc.). These settings can be changed later via Experience Vitals → [App] → Settings → Enablement and Cost Control.
 1. Download `dynatrace.config.yaml` and place it at the project root (same level as `pubspec.yaml`)
 
-Once the file is in place, apply the `userOptIn` check from Step 1 and flag Step 7a if needed.
+Once the file is in place, apply the `userOptIn` check from Step 1 and flag Step 9 if needed.
 
 **Option B — Provide credentials manually:**
-Read `references/config-yaml.md` for the full template and conditional blocks. Collect all required values from the user before creating any files, then apply the `userOptIn` check and flag Step 7a if needed.
+Read `references/config-yaml.md` for the full template and conditional blocks. Collect all required values from the user before creating any files, then apply the `userOptIn` check and flag Step 9 if needed.
 
 ## Step 3 — Add the dependency
 
@@ -124,13 +125,19 @@ CupertinoApp(
 )
 ```
 
-## Step 7a — Privacy options call (only if `userOptIn: true`)
+## Step 8 — Session Replay (optional)
+
+Ask the user: **"Do you want to enable Session Replay?"** If they already said so, or `dynatrace_flutter_plugin_replay` is already in `pubspec.yaml`, treat it as yes. On no, continue to Step 9.
+
+Read `references/session-replay.md` for the Grail check, replay package, and console capability. Remember the answer — Step 9 needs it.
+
+## Step 9 — Privacy options call (only if `userOptIn: true`)
 
 **Skip this step if `userOptIn` was not set to `true` during Steps 1 or 2.**
 
-Read `references/user-opt-in.md` for the full guidance on `DataCollectionLevel`, `crashReportingOptedIn`, and placement options. Ask the user the questions defined there, then apply the call to the relevant file.
+Read `references/user-opt-in.md` for the full guidance on `DataCollectionLevel`, `crashReportingOptedIn`, Session Replay consent, and placement options. Ask the user the questions defined there, then apply the call to the relevant file.
 
-## Step 8 — HTTP instrumentation (if applicable)
+## Step 10 — HTTP instrumentation (if applicable)
 
 Check `pubspec.yaml` for the `http` package dependency. Separately, search the codebase for `import 'dart:io'` and `HttpClient` usages. If either is present, apply instrumentation:
 
@@ -144,7 +151,7 @@ Check `pubspec.yaml` for the `http` package dependency. Separately, search the c
 
 If none are present, note it for when network calls are added.
 
-## Step 9 — Post-setup summary
+## Step 11 — Post-setup summary
 
 Confirm to the user what is active:
 
@@ -162,16 +169,18 @@ Confirm to the user what is active:
 
 - Privacy mode: [userOptIn: true — consent call added / opt-out (SDK default)]
 - Navigation tracking: [DynatraceNavigationObserver added]
+- Session Replay: [package added, console capability confirmed, screenRecordOptedIn set if opt-in / not enabled]
 - HTTP instrumentation: [applied / not applicable yet]
 
-## Step 10 — Verification
+## Step 12 — Verification
 
 Read `references/verification.md` and show the user the verification checklist. If no data appears after 5 minutes, work through the troubleshooting steps in that file.
 
 ## Reference Files
 
 - `references/config-yaml.md` — Full `dynatrace.config.yaml` template with Grail and userOptIn conditional blocks
-- `references/user-opt-in.md` — `applyUserPrivacyOptions` guidance, `DataCollectionLevel` options, placement options
+- `references/user-opt-in.md` — `applyUserPrivacyOptions` guidance, `DataCollectionLevel` options, Session Replay consent, placement options
+- `references/session-replay.md` — Session Replay setup: Grail check, replay package, console capability
 - `references/verification.md` — Post-setup verification checklist and troubleshooting
 
 ## External References

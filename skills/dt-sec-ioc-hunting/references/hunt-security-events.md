@@ -49,9 +49,9 @@ Entity namespaces differ by event family — never apply one collector list to b
 ## Detection hunt rollup (IPs / domains / URLs)
 
 IoC-filter clauses are owned by `dt-sec-insights` `detections.md`:
-- IPs → `isNotNull(actor.ips)` + `expand actor.ips` + `in(ip(actor.ips), array(toIp("<ip1>"), toIp("<ip2>")))` — `actor.ips` is `ipAddress[]`; expand first so each IP filters independently (canonical pattern from `detections.md` BP #10).
-- Domains/URLs → `lower(url.domain)` / `lower(url.full)` / `lower(server.address)`
-  clauses (see `detections.md § Filter detections by domain/URL/URI IoC list`).
+- IPs → `isNotNull(actor.ips)` + `in(iCollectArray(ip(actor.ips[])), array(toIp("<ip1>"), toIp("<ip2>")))` — `actor.ips` is `ipAddress[]`; `actor.ips[]` iterates elements, `ip()` types each, `iCollectArray` reassembles, `in(array,array)` checks intersection without an expand step.
+- Domains/URLs → `matchesValue(url.domain|server.address|host.fqdn, {…})` / `contains(url.full, …, caseSensitive:false)`
+  clauses (never `lower()` on the field) (see `detections.md § Filter detections by domain/URL/URI IoC list`).
 
 Default window: `from:now()-2h`; widen to `from:now()-24h` only if zero rows.
 
@@ -59,8 +59,7 @@ Default window: `from:now()-2h`; widen to `from:now()-24h` only if zero rows.
 fetch security.events, from:now()-2h
 | filter event.type == "DETECTION_FINDING"
 | filter isNotNull(actor.ips)
-| expand actor.ips
-| filter in(ip(actor.ips), array(toIp("<ip1>"), toIp("<ip2>")))
+| filter in(iCollectArray(ip(actor.ips[])), array(toIp("<ip1>"), toIp("<ip2>")))
 | summarize by:{object.id, object.name, davis_risk=dt.security.risk.level},
   {
     detectionsNum = countDistinctExact(finding.id),

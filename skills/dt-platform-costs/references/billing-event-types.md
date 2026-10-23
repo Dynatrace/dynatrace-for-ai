@@ -93,14 +93,83 @@ Billing fields vary by event type — see the table below.
 
 | Event Type | Billed Field | Type | Notes |
 |------------|-------------|------|-------|
-| `Log Management & Analytics - Ingest & Process` | `billed_bytes` | long | |
+| `Log Management & Analytics - Ingest & Process` | `billed_bytes` | long | Includes historical Log Import — see [Log Ingest Sources](#log-ingest-sources) |
 | `Events - Ingest & Process` | `billed_bytes` | double | Has `event.billing.category` subcategories |
 | `Files - Ingest & Process` | `billed_bytes` | long | Same normalization weight as **Events - Ingest & Process** (see [cost-estimations.md](cost-estimations.md)) |
 | `Metrics - Ingest & Process` | `data_points` | long | |
 | `Traces - Ingest & Process` | `ingested_bytes` + `ingested_spans` | long | `licensing_type` available |
 
-**Additional fields:** `usage.bucket`, `usage.start`, `usage.end`,
-`dt.cost.costcenter`, `dt.cost.product`
+**Additional fields:** `usage.bucket`, `usage.start`, `usage.end`. May be
+present: `dt.cost.costcenter`, `dt.cost.product`.
+
+**Log-ingest-only additional field:** `dt.job.id` (string) — present only on
+historical Log Import events.
+
+#### Log Ingest Sources
+
+`Log Management & Analytics - Ingest & Process` events are produced by two sources.
+Ingest of logs as they are generated from monitored hosts and services is the
+primary source; log import is a one-off migration event. Treat this split as something
+to rule out when log ingest looks wrong, not as a routine reporting dimension.
+
+**Imported logs are billed exactly like log ingest** — same `event.type`, same
+`billed_bytes` (uncompressed bytes), same normalization weight, same rate. There
+is no zero-rating, no discount, and no dedicated import `event.type`. Reading
+the source data out of the external data store produces **no**
+`Log Management & Analytics - Query` BUE — the fetch is not billed as a query.
+
+`dt.job.id` is the Grail job-framework ID of the import job that produced the
+event. **Only import BUEs carry `dt.job.id`**, which makes it the reliable
+discriminator:
+
+```dql-snippet
+| fieldsAdd is_import = isNotNull(dt.job.id)
+```
+
+Group by that flag to separate import from the rest, or report import volume
+and its share of the total in one pass:
+
+```dql
+fetch dt.system.events, from: -30d
+| filter event.kind == "BILLING_USAGE_EVENT"
+  and event.type == "Log Management & Analytics - Ingest & Process"
+| dedup event.id
+| summarize
+    total_gib = sum(toDouble(billed_bytes) / 1073741824),
+    import_gib = sum(if(isNotNull(dt.job.id), toDouble(billed_bytes) / 1073741824, else: 0))
+| fieldsAdd import_share_pct = round(import_gib / total_gib * 100, decimals: 1)
+```
+
+Import cost per job:
+
+```dql
+fetch dt.system.events, from: -7d
+| filter event.kind == "BILLING_USAGE_EVENT"
+  and event.type == "Log Management & Analytics - Ingest & Process"
+  and isNotNull(dt.job.id)
+| dedup event.id
+| summarize billed_bytes = sum(billed_bytes), by: {dt.job.id, usage.bucket}
+| fieldsAdd billed_gib = toDouble(billed_bytes) / 1073741824
+| sort billed_gib desc
+```
+
+Import jobs write to the Grail bucket named in the import job request, so there
+is no fixed import bucket to filter on — the name is chosen per job and must be
+discovered from the data. `usage.bucket` is therefore a useful secondary split
+for reporting by target bucket, but prefer `dt.job.id` when the question is
+"what did the import cost".
+
+> ⚠️ **Billing timestamps reflect import time, not log age.** `timestamp`,
+> `usage.start`, and `usage.end` come from the moment each imported segment
+> finished loading, **not** from the original log record timestamps — importing
+> 2024 archives today bills in today's window. Do not report imported data as
+> billed to a historical period.
+
+**Cost allocation on imports:** `dt.cost.costcenter` and `dt.cost.product` are
+passed through from the import job request when supplied, and are validated
+against the allow-list configured in Account Management. A value that is not on
+the allow-list is stored as the literal string `not-allowlisted` — see
+[cost-allocation.md](cost-allocation.md#log-import--cost-center-attribution).
 
 **Events subcategories** (via `event.billing.category`):
 - `"Business events"`

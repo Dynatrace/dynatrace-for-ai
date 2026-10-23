@@ -192,7 +192,7 @@ smartscapeNodes "AZURE_MICROSOFT_CONTAINERSERVICE_MANAGEDCLUSTERS"
 | parse azure.object, "JSON:azjson"
 | fieldsAdd vmSize = azjson[configuration][sku][name],
     capacity = azjson[configuration][sku][capacity],
-    poolName = tags[`aks-managed-poolName`]
+    poolName = `tags:azure`[`aks-managed-poolName`]
 | fields name, vmSize, capacity, poolName, azure.resource.group
 ```
 

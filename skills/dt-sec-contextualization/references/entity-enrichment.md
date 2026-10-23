@@ -378,11 +378,11 @@ fetch security.events, from:now()-24h
                          "VULNERABILITY_FINDING",
                          "DETECTION_FINDING",
                          "COMPLIANCE_FINDING"})
-| filter contains(lower(object.name), lower("<entity-name>"))
-      OR contains(lower(affected_entity.name), lower("<entity-name>"))
-      OR iAny(contains(lower(related_entities.services.names[]), lower("<entity-name>")))
-      OR iAny(contains(lower(related_entities.kubernetes_workloads.names[]), lower("<entity-name>")))
-      OR iAny(contains(lower(related_entities.hosts.names[]), lower("<entity-name>")))
+| filter contains(object.name, "<entity-name>", caseSensitive:false)
+      OR contains(affected_entity.name, "<entity-name>", caseSensitive:false)
+      OR iAny(contains(related_entities.services.names[], "<entity-name>", caseSensitive:false))
+      OR iAny(contains(related_entities.kubernetes_workloads.names[], "<entity-name>", caseSensitive:false))
+      OR iAny(contains(related_entities.hosts.names[], "<entity-name>", caseSensitive:false))
 | fieldsKeep timestamp, event.type, event.provider, product.name,
              finding.title, vulnerability.title, dt.security.risk.level,
              object.id, object.name, affected_entity.id, affected_entity.name,

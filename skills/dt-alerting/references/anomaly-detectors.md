@@ -495,8 +495,8 @@ pattern. Requires at least 2 weeks of stable history before the model stabilizes
 | `AVAILABILITY_EVENT` | AVAILABILITY | Service or host unreachable |
 | `ERROR_EVENT` | ERROR | Error rate spikes |
 | `PERFORMANCE_EVENT` | SLOWDOWN | Latency degradation, throughput drop |
-| `RESOURCE_CONTENTION_EVENT` | RESOURCE | CPU, memory, disk saturation |
-| `CUSTOM_ALERT` | CUSTOM | Business KPIs, custom conditions |
+| `RESOURCE_CONTENTION_EVENT` | RESOURCE_CONTENTION | CPU, memory, disk saturation |
+| `CUSTOM_ALERT` | CUSTOM_ALERT | Business KPIs, custom conditions |
 | `CUSTOM_INFO` | INFO | Informational — does not open a problem |
 
 ### DQL query notes

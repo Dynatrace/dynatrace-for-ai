@@ -15,8 +15,8 @@ All ownership queries follow the same pattern — filter by a tag, then summariz
 
 ```dql-template
 smartscapeNodes "AZURE_*"
-| filter isNotNull(tags[`<TAG_NAME>`])
-| summarize resource_count = count(), by: {tags[`<TAG_NAME>`], type}
+| filter isNotNull(`tags:azure`[`<TAG_NAME>`])
+| summarize resource_count = count(), by: {`tags:azure`[`<TAG_NAME>`], type}
 | sort resource_count desc
 ```
 
@@ -52,8 +52,8 @@ For service-specific queries, you can also select detail fields instead of summa
 
 ```dql
 smartscapeNodes "AZURE_MICROSOFT_SQL_SERVERS_DATABASES"
-| filter isNotNull(tags[`dt_owner_email`])
-| fields name, id, tags[`dt_owner_email`], azure.resource.group, azure.location
+| filter isNotNull(`tags:azure`[`dt_owner_email`])
+| fields name, id, `tags:azure`[`dt_owner_email`], azure.resource.group, azure.location
 ```
 
 Ownership by resource group (useful when tags are not consistently applied):

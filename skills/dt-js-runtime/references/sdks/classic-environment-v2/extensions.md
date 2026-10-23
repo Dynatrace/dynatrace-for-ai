@@ -1,5 +1,15 @@
 # `extensions_2_0Client`
 
+> For new code, prefer the platform client instead:
+> [`@dynatrace-sdk/client-extensions-v2`](../extensions-v2/README.md). This
+> classic client's own docstrings mark `updateExtensionEnvironmentConfiguration`
+> and `activateExtensionEnvironmentConfiguration` (below) `@deprecated` --
+> "Deprecated since version 1.342. Use the successor API
+> `/platform/extensions/v2` instead" -- and most Extensions 2.0 scope
+> declarations in this repo already assume the platform client's scopes
+> (`extensions:definitions:read`), not this client's classic
+> `environment-api:extensions:*` scopes.
+
 Manage Extensions 2.0 — extension lifecycle, monitoring configurations, schemas. Import:
 
 ```ts

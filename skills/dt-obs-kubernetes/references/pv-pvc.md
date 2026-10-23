@@ -52,7 +52,7 @@ smartscapeNodes K8S_PERSISTENTVOLUMECLAIM
     storage_class = config[`spec`][`storageClassName`],
     capacity = config[`status`][`capacity`][`storage`]
 | filter in(phase, array("Pending", "Lost"))
-| fields k8s.cluster.name, k8s.namespace.name, k8s.pvc.name, phase,
+| fields k8s.cluster.name, k8s.namespace.name, k8s.persistentvolumeclaim.name, phase,
     storage_class, capacity
 ```
 
@@ -76,7 +76,7 @@ smartscapeNodes K8S_PERSISTENTVOLUME
     storage_class = config[`spec`][`storageClassName`],
     capacity = config[`spec`][`capacity`][`storage`],
     reclaim_policy = config[`spec`][`persistentVolumeReclaimPolicy`]
-| fields k8s.cluster.name, entity.name, phase, storage_class, capacity, reclaim_policy
+| fields k8s.cluster.name, k8s.persistentvolume.name, phase, storage_class, capacity, reclaim_policy
 ```
 
 **Released PVs** — the PVC was deleted but the PV (and its data) still exists.
@@ -90,7 +90,7 @@ smartscapeNodes K8S_PERSISTENTVOLUME
     phase = config[`status`][`phase`],
     reclaim_policy = config[`spec`][`persistentVolumeReclaimPolicy`]
 | filter phase == "Released"
-| fields k8s.cluster.name, entity.name, phase, reclaim_policy
+| fields k8s.cluster.name, k8s.persistentvolume.name, phase, reclaim_policy
 ```
 
 **Filter by provisioner** — because `K8S_STORAGECLASS` is not a smartscape entity type, the annotation `pv.kubernetes.io/provisioned-by` (values like `ebs.csi.aws.com`, `pd.csi.storage.gke.io`) is the only way to scope PV queries to a specific CSI driver:
@@ -104,7 +104,7 @@ smartscapeNodes K8S_PERSISTENTVOLUME
     storage_class = config[`spec`][`storageClassName`],
     capacity = config[`spec`][`capacity`][`storage`]
 | filter provisioner == "<provisioner>"
-| fields k8s.cluster.name, entity.name, provisioner, phase, storage_class, capacity
+| fields k8s.cluster.name, k8s.persistentvolume.name, provisioner, phase, storage_class, capacity
 ```
 
 ## StorageClass Distribution

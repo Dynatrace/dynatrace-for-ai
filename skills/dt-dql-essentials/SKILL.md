@@ -68,7 +68,7 @@ ______________________________________________________________________
 | `filter field in ["a", "b"]` | `filter in(field, {"a", "b"})` | `[` and `]` wrap sub-queries in DQL but do not wrap **static** array literals. Use `{}` or `array()` for static values. |
 | `filter: { in(field, [sub-query]) }` (e.g. in `timeseries filter:`) | `filter: { field in [sub-query] }` | `in()` does not accept execution blocks as arguments. When the right-hand side is a sub-query (execution block), use the `in` operator: `field in [execution block]`. |
 | `by: severity, status` | `by: {severity, status}` | List of fields must be grouped by curly braces in `by:` clauses (`summarize`, `makeTimeseries`, etc.). |
-| `contains(toLowercase(field), "err")` | `contains(field, "err", false)` | Don't wrap in `lower()` for case-insensitive matching. `contains()` has a built-in third positional `caseSensitive` parameter (default `true`). |
+| `contains(lower(field), "err")` / `lower(field) == "err"` (also `toLowercase`) | substring: `contains(field, "err", caseSensitive:false)` or `matchesValue(field, "*err*")`; whole word in free text: `matchesPhrase(field, "err")`; equality: `matchesValue(field, "err")` | Never wrap the filtered field in `lower()`/`upper()` — it defeats the Grail index and can scan far more data. `contains()` has a built-in `caseSensitive` parameter (default `true`) that must be named — a positional third argument fails; `matchesValue()` and `matchesPhrase()` are case-insensitive by default. Pick by intent: `matchesValue` without `*` is an exact match, `*x*`/`x*` widen it to substring/prefix, and `matchesPhrase` matches whole tokens, not arbitrary substrings. |
 | `filter name == "*serv*9*"` | `filter matchesValue(name, "*serv*") and matchesValue(name, "*9*")` | `==` does not support wildcards. `matchesValue()` supports `*` wildcards but only at the beginning and/or end of the pattern—split mid-string wildcard intent into multiple calls combined with `and`. |
 | `matchesValue(field, "prod")` on string field | `contains(field, "prod")` | Without wildcards, `matchesValue()` performs an exact (case-insensitive) match — it will not find `"production"`. Use `contains()` for substring matching (or `matchesValue(field, "*prod*")` for wildcard matching). |
 | `iAny(matchesValue(arr[], "x") OR matchesValue(arr[], "y"))` | `matchesValue(arr, {"x", "y"})` | `matchesValue` accepts an array field in the first param and an array literal `{}` in the second — no `iAny` or `[]` needed. The same applies when consolidating multiple `contains(f, x) OR contains(f, y)` on the same field: use `matchesValue(f, {"*x*", "*y*"})`. |
@@ -76,14 +76,14 @@ ______________________________________________________________________
 | `contains(field, "pip")` on a short or common token | `matchesPhrase(field, "pip")` | `contains` is a pure substring match — `"pip"` also fires on `"pipenv"`, `"gripping"`. `matchesPhrase` tokenizes the string and matches whole words only, giving fewer false positives. |
 | `iAny(in(lower(arr[]), array("a", "b")))` | `matchesValue(arr, {"a", "b"}, caseSensitive: false)` | `matchesValue` is case-insensitive by default — no `lower()`, `in()`, or `iAny` wrapper needed. `caseSensitive: false` shown explicitly here only to mirror the intent of the `lower()` it replaces. |
 | `iAny(f1[] == "a" AND f2[] == "b")` iterating two separate arrays | `in(f1, "a") AND in(f2, "b")` | Multi-array `iAny` is **pairwise**, not a cross-product: element `i` of `f1[]` is tested against element `i` of `f2[]`. If the arrays differ in length the result is `null`. Use independent `in()` checks instead. See [references/iterative-expressions.md](references/iterative-expressions.md). |
-| `toLowercase(field)` | `lower(field)` | The function is `lower()`, not `toLowercase()`. Only type-casting functions use the `to` prefix (`toString()`, `toLong()`, etc.). |
+| `toLowercase(field)` | `lower(field)` | The function is `lower()`, not `toLowercase()` (use it for output, not filters — see above). Only type-casting functions use the `to` prefix (`toString()`, `toLong()`, etc.). |
 | `arrayAvg(field[])` or `arraySum(field[])` | `arrayAvg(field)` or `field[]` | `field[]` = element-wise iterative expression (array→array); `arrayAvg(field)` = collapse to scalar (array→single value). Never mix both — `arrayAvg(field[])` is semantically wrong. |
 | `my_field` after `lookup` or `join` | `lookup.my_field` / `right.my_field` | `lookup` prefixes added fields with `lookup.` by default (configurable via `prefix:`). `join` prefixes right-side fields with `right.`. |
 | `substring(field, 0, 200)` | `substring(field, from: 0, to: 200)` | The first parameter (expression) is positional, but `from:` and `to:` are named optional parameters and must include their names. |
 | `filter host = "A"` | `filter host == "A"` | DQL uses `==` for equality comparison, not `=`. Single `=` is assignment (e.g., in `fieldsAdd`, summarize aliases). |
 | `fetch logs, from: toTimestamp('2026-01-01')` | `fetch logs, from: -24h` | `from:` / `to:` accept duration literals (e.g., `-24h`, `-7d`) or `now()` expressions — not `toTimestamp()`. For absolute ranges use `timeframe: "start/end"` (ISO 8601). |
 | `filter log.level == "ERROR"` | `filter loglevel == "ERROR"` | Log severity field is `loglevel` (no dot) — `log.level` does not exist. |
-| `sort count() desc` | `` sort `count()` desc `` | Fields with special characters (like parentheses) must be wrapped in backticks. |
+| `sort count() desc` | `summarize n = count()` … `sort n desc` (or `` sort `count()` desc ``) | Bare `count()` in `sort` is read as an aggregation → `PARAMETER_MUST_NOT_BE_AN_AGGREGATION`. Alias the aggregate in `summarize`, or backtick the generated column name. |
 | `length(field)` | `stringLength(field)` | DQL string length function is `stringLength` — there is no `length()`. |
 | `metrics dt.host.cpu.usage` | `timeseries avg(dt.host.cpu.usage)` | `metrics` loads metric metadata, not values — use `timeseries` for data. |
 | `join [...], on:{left.a.b == right.a.b}` | `` join [...], on:{left[`a.b`] == right[`a.b`]} `` | Dotted field names in join/lookup conditions require bracket notation with backticks. |
@@ -101,6 +101,8 @@ ______________________________________________________________________
 | `data record(key: "val")` | `data record(key = "val")` | `record()` uses `=` for named fields, not `:` — `:` is for command parameters like `rollup:`. |
 | `getNodeField(dt.smartscape.host, "tags")["tag.key"]` | `getNodeField(dt.smartscape.host, "tags")[tag.key]` | In this tag-map access pattern, bracket keys must use unquoted identifier syntax; quoted keys cause a parse error. |
 | `by: {dt.entity.host}` or `dt.entity.*` | `by: {dt.smartscape.host}` or `dt.smartscape.*` | `dt.entity.*` is **deprecated** — always use `dt.smartscape.*` in new queries. |
+| `fieldsAdd n = entityName(dt.entity.service)` | `fieldsAdd n = getNodeName(dt.smartscape.service)` | `entityName()` is **not available on every tenant** — where it is absent it fails with ``UNKNOWN_FUNCTION: There's no function `entityName` ``. It also rejects `dt.smartscape.*` fields with `INVALID_ENTITY_TYPE`. `getNodeName()` resolves **both** `dt.entity.*` and `dt.smartscape.*` and is present on tenants where `entityName()` is not, so prefer it unconditionally — paired here with the non-deprecated `dt.smartscape.*` field. |
+| `getNodeName(id)` / `entityName(id)` on a bare ID field | `getNodeName(dt.smartscape.host)` | Both functions derive the entity **type from the field name**, not from the value — so a generic field such as `id` cannot resolve even when it holds a valid `HOST-…` ID. **`getNodeName(id)` silently returns `null`**; `entityName(id)` raises `INVALID_ENTITY_TYPE` where the function exists at all (on a tenant without it you get `UNKNOWN_FUNCTION` first). Always pass the typed `dt.*` field itself. |
 
 ______________________________________________________________________
 
@@ -270,6 +272,8 @@ Entity fields are scoped per type — `entity.id` does not exist. Use `smartscap
 | K8s cluster | `dt.smartscape.k8s_cluster`  | `"K8S_CLUSTER"`        |
 
 Use `toSmartscapeId()` for ID conversion from strings (required!).
+
+**Resolving a readable name: use `getNodeName()`, not `entityName()`.** `getNodeName()` works on both `dt.smartscape.*` and classic `dt.entity.*` fields, and is available on tenants where `entityName()` is not (`entityName()` is not present on every tenant and raises `UNKNOWN_FUNCTION` where it is missing). Pass the typed `dt.*` field — the entity type is read from the field name, so `getNodeName(id)` on a generic ID field returns `null` without an error.
 
 → [references/smartscape-topology-navigation.md](references/smartscape-topology-navigation.md)
 

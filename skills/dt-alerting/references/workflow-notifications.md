@@ -105,7 +105,7 @@ available for filtering and notification content:
 | `{{event.display_id}}` | Human-readable ID (P-XXXXX) |
 | `{{event.name}}` | Problem title |
 | `{{event.description}}` | Detailed description in Markdown format |
-| `{{event.category}}` | AVAILABILITY, ERROR, SLOWDOWN, INFO, RESOURCE, CUSTOM |
+| `{{event.category}}` | AVAILABILITY, ERROR, SLOWDOWN, INFO, WARNING, RESOURCE_CONTENTION, CUSTOM_ALERT |
 | `{{event.status}}` | ACTIVE or CLOSED |
 | `{{event.start}}` | Problem start timestamp |
 | `{{root_cause_entity_name}}` | Name of the root cause entity |
@@ -139,7 +139,7 @@ in(event.category, {"AVAILABILITY", "ERROR"})
 Send to capacity team only for resource problems:
 
 ```
-event.category == "RESOURCE"
+event.category == "RESOURCE_CONTENTION"
 ```
 
 ### Filter by affected entity
@@ -365,7 +365,7 @@ notification routing and makes both independently maintainable.
    with a close-notification. Responders need to know when the incident is resolved,
    not just when it opened.
 
-6. **Test with a low-severity detector first** — Create a CUSTOM category detector
+6. **Test with a low-severity detector first** — Create a CUSTOM_ALERT category detector
    with a threshold that will fire in a test environment to validate the full
    workflow before connecting production alerts to on-call systems.
 

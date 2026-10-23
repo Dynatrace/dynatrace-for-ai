@@ -4,7 +4,11 @@ Full field definitions: https://developer.dynatrace.com/develop/sdks/client-hub/
 
 ## Overview / detail / release types
 
-`OverviewsList`, `Detail`, `DetailSection`, `MarkdownSection`, `GallerySection`, `GalleryImage`, `GalleryImageResolutions`, `Release`, `ReleasesList`, `Manifest`, `ManifestScope`, `ExtensionMetadata`, `Link`, `Author`, `Dependency`, `AssetCount`, `ContentCount`, `DocumentCount`, `DocumentCountTypes`, `Revocation`, `ResourceContext`.
+`Overview` (`id`, `name`, `description`, `keywords[]`, `type` -- e.g.
+`'EXTENSION_2'` -- plus `version`, `author`, `links`), `OverviewsList`
+(`{ items: Overview[] }`), `Detail` (extends `Overview`, adds
+`detailSections` and `relatedItems: Overview[]` for finding neighbors of a
+match), `DetailSection`, `MarkdownSection`, `GallerySection`, `GalleryImage`, `GalleryImageResolutions`, `Release`, `ReleasesList`, `Manifest`, `ManifestScope`, `ExtensionMetadata`, `Link`, `Author`, `Dependency`, `AssetCount`, `ContentCount`, `DocumentCount`, `DocumentCountTypes`, `Revocation`, `ResourceContext`.
 
 ## Category types
 

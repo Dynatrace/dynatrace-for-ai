@@ -105,7 +105,7 @@ dependencies change. Circular dependencies are not allowed.
   { "key": "Cluster", "type": "query",
     "input": "smartscapeNodes K8S_CLUSTER | fields name" },
   { "key": "Namespace", "type": "query",
-    "input": "smartscapeNodes K8S_NAMESPACE | filter belongs_to == $Cluster | fields name" }
+    "input": "smartscapeNodes K8S_NAMESPACE | filter k8s.cluster.name == $Cluster | fields name" }
 ]
 ```
 

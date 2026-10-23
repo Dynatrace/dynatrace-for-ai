@@ -163,7 +163,7 @@ timeseries rt_now = avg(dt.service.request.response_time),
   use `TREND_IN_VALUES` for gradual directional movement
 - Week-over-week joins require identical `interval:` values on both sides
   so join keys align; right-side fields are prefixed with `right.`
-- `dt.service.request.response_time` is in nanoseconds — divide by
-  `1000000` for ms
+- `dt.service.request.response_time` is in microseconds — divide by
+  `1000` for ms
 - A positive acceleration (`arrayAvg(arrayDiff(arr)) > 0`) means the metric
   is speeding up — worth flagging even if the current value is acceptable

@@ -78,7 +78,7 @@ Identify the Load Balancer SKU and AKS association (if any):
 smartscapeNodes "AZURE_MICROSOFT_NETWORK_LOADBALANCERS"
 | parse azure.object, "JSON:azjson"
 | fieldsAdd skuName = azjson[configuration][sku][name]
-| fieldsAdd aksCluster = azjson[tags][`aks-managed-cluster-name`]
+| fieldsAdd aksCluster = `tags:azure`[`aks-managed-cluster-name`]
 | fields name, skuName, aksCluster, azure.resource.group, azure.location
 ```
 
@@ -108,9 +108,8 @@ Check VMSS-to-AKS association to distinguish generic VMSS from AKS node pools:
 
 ```dql
 smartscapeNodes "AZURE_MICROSOFT_COMPUTE_VIRTUALMACHINESCALESETS"
-| parse azure.object, "JSON:azjson"
-| fieldsAdd aksPoolName = azjson[configuration][tags][`aks-managed-poolName`],
-            aksOrchestrator = azjson[configuration][tags][`aks-managed-orchestrator`]
+| fieldsAdd aksPoolName = `tags:azure`[`aks-managed-poolName`],
+            aksOrchestrator = `tags:azure`[`aks-managed-orchestrator`]
 | filter isNotNull(aksPoolName)
 | fields name, id, aksPoolName, aksOrchestrator, azure.resource.group
 ```
@@ -135,9 +134,8 @@ Detect whether the VMSS is an AKS node pool. AKS-managed VMSS instances carry sp
 smartscapeNodes "AZURE_MICROSOFT_COMPUTE_VIRTUALMACHINES"
 | filter id == toSmartscapeId("<WORKLOAD_VM_ENTITY_ID>")
 | traverse "*", "AZURE_MICROSOFT_COMPUTE_VIRTUALMACHINESCALESETS"
-| parse azure.object, "JSON:azjson"
-| fieldsAdd aksPoolName = azjson[configuration][tags][`aks-managed-poolName`],
-            aksOrchestrator = azjson[configuration][tags][`aks-managed-orchestrator`]
+| fieldsAdd aksPoolName = `tags:azure`[`aks-managed-poolName`],
+            aksOrchestrator = `tags:azure`[`aks-managed-orchestrator`]
 | filter isNotNull(aksPoolName)
 | fields name, id, aksPoolName, aksOrchestrator, azure.resource.group
 ```

@@ -175,7 +175,7 @@ showed no significant novel behavior in the analysis window.
 - Combine with `adaptive-anomaly-detector` or `seasonal-baseline-anomaly-detector`
   for cross-validation: novelty detection finds *when* the character changed;
   threshold detectors confirm *how much* it exceeds acceptable limits
-- `dt.service.request.response_time` is in nanoseconds — results are returned
-  in that unit; divide by `1000000` when presenting ms values
+- `dt.service.request.response_time` is in microseconds — results are returned
+  in that unit; divide by `1000` when presenting ms values
 - Keep `| limit N` in the DQL query low (10–20) for faster results; increase
   only when a full fleet sweep is required

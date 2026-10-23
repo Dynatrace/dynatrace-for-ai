@@ -314,6 +314,21 @@ For **Dynatrace RVA** matches, run the canonical RVA 30m snapshot pipeline (see
 [vulnerabilities-dynatrace.md](vulnerabilities-dynatrace.md)) and `filter in(vulnerability.references.cve, <cveList>)`,
 or join the RVA stream on `vulnerability.references.cve` the same way.
 
+> **CISA KEV vs `THREAT_REPORT` — they answer different questions.** The Dynatrace Library
+> Vulnerability Feed carries a CISA KEV flag per vulnerability. KEV is **binary**: it tells you
+> *that* exploitation is known, and nothing more. Threat reports carry the **evidence and detail** —
+> which campaign, which actor, which IOCs, what was observed.
+>
+> - *"Is CVE-X known to be exploited?"* / *"which of my vulnerabilities are actively exploited?"* — a
+>   KEV hit is a sufficient answer on its own. Use
+>   [vulnerability-feed.md § KEV in your environment](vulnerability-feed.md#kev-in-your-environment)
+>   (RVA snapshot + `lookup` of the feed's KEV entries); no `THREAT_REPORT` needed.
+> - **No KEV flag, or the user wants the concrete threat** — who is exploiting it, in what campaign,
+>   with which indicators — fall back to `THREAT_REPORT` as described in this reference. Absence of a
+>   KEV flag is not evidence that nothing is exploiting it; it only means CISA has not catalogued it.
+>
+> Report which source the answer came from, and never present a KEV flag as campaign detail.
+
 ### Attacker IPs → detections
 
 "Have any IPs flagged in threat intel shown up as attackers?" — join report IPs to

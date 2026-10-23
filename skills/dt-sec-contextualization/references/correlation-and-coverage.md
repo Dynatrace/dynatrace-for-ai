@@ -139,7 +139,7 @@ This is the cheapest path — no edge traversal needed.
 
 ```dql
 smartscapeNodes K8S_POD, from:now()-2h
-| filter contains(lower(k8s.pod.name), lower("<pod-name-substring>"))
+| filter contains(k8s.pod.name, "<pod-name-substring>", caseSensitive:false)
 | fields k8s.cluster.name, k8s.namespace.name, k8s.pod.name, k8s.node.name, k8s.workload.name, id, id_classic
 | sort k8s.pod.name asc
 | limit 50
@@ -156,7 +156,7 @@ When `k8s.node.name` is unavailable (e.g. older agent versions), traverse the
 
 ```dql
 smartscapeNodes K8S_POD, from:now()-2h
-| filter contains(lower(k8s.pod.name), lower("<pod-name-substring>"))
+| filter contains(k8s.pod.name, "<pod-name-substring>", caseSensitive:false)
 | traverse edgeTypes:{runs_on}, targetTypes:{K8S_NODE}, direction:forward
 | fields k8s.cluster.name, k8s.node.name, id, id_classic
 ```
@@ -176,7 +176,7 @@ After resolving `k8s.node.name` from the pod, compare it to the
 ```dql
 // Example: check if pod 'unguard-backend-*' resolves to a node that matches RVA affected_entity.name
 smartscapeNodes K8S_POD, from:now()-2h
-| filter contains(lower(k8s.workload.name), lower("unguard-backend"))
+| filter contains(k8s.workload.name, "unguard-backend", caseSensitive:false)
 | fields k8s.cluster.name, k8s.namespace.name, k8s.pod.name, k8s.node.name, k8s.workload.name
 | summarize resolvedNodes = collectDistinct(k8s.node.name), by:{k8s.cluster.name, k8s.workload.name}
 ```

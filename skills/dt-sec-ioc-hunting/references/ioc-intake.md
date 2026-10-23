@@ -8,7 +8,7 @@ before running hunt queries.
 | Type | Description | Field in THREAT_REPORT | Hunt targets |
 |---|---|---|---|
 | IPs | IPv4 / IPv6 attacker or C2 addresses | `threat.observables.ips` | Logs (`content`), Spans (`client.ip`, `server.resolved_ips`, `request_attribute.SourceIP`), Detections (`actor.ips`) |
-| Domains | Hostnames and domain names (hostnames fold here - there is no `threat.observables.hosts`) | `threat.observables.domains` | Logs (`content`), Spans (`http.host`, `url.full`), Detections (`url.full`, `url.domain`, `server.address`, `host.fqdn` — matched case-insensitively via `lower()`; provide IoCs in lowercase) |
+| Domains | Hostnames and domain names (hostnames fold here - there is no `threat.observables.hosts`) | `threat.observables.domains` | Logs (`content`), Spans (`http.host`, `url.full`), Detections (`url.full`, `url.domain`, `server.address`, `host.fqdn` — matched case-insensitively via `matchesValue` / `contains(…, caseSensitive:false)`; no need to lowercase IoCs) |
 | URLs | Full URLs including C2 beacon endpoints, dropper URLs | `threat.observables.urls` | Logs (`content`), Spans (`url.full`), Detections (`url.full`, `url.path`) |
 | Emails | Email addresses used in phishing, spear-phishing | `threat.observables.emails` | Logs (`content`) only - no span field |
 | CVEs | Known vulnerabilities (for example `CVE-2025-12345`) mapped to vulnerable components | `threat.observables.cves` | Detections via `dt-sec-insights` only |

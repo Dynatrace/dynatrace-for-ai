@@ -10,6 +10,16 @@ Run through these steps after completing setup:
 4. Open Dynatrace console → Experience Vitals → select your mobile app
 5. A user session should appear within 1–2 minutes
 6. Confirm route changes appear as views in the session timeline
+7. If Session Replay was enabled, confirm a replay is playable for the session (may take a few minutes after the session closes)
+
+## Sessions Appear but Session Replay Is Missing
+
+Check in order:
+
+1. The console capability is enabled (Experience Vitals → [Your App] → Settings → Enablement and Cost Control)
+2. The Grail flags are present in `dynatrace.config.yaml`
+3. The config has no `sessionReplay: enabled: false`, and `dart run dynatrace_flutter_plugin` was re-run after any change
+4. With `userOptIn: true`, the privacy call uses `DataCollectionLevel.UserBehavior` and `screenRecordOptedIn: true`
 
 ## No Data After 5 Minutes
 

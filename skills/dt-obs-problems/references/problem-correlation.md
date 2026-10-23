@@ -28,6 +28,8 @@ Writing `smartscape.affected_entities[id]` **without** a preceding `expand` retu
 | `dt.davis.event_ids` | Underlying Davis event IDs | Query dt.davis.events for details |
 | `event.start` / `event.end` | Problem timeframe | Define log query time window |
 
+> **`dt.source_entity` is deprecated.** Use `dt.smartscape_source.id` for entity correlation queries and as the preferred `fields` projection. Queries may still include `or dt.source_entity in [...]` as a backward-compatible fallback during the migration period, but `dt.source_entity` will be removed in a future release.
+
 ## Problem-to-Logs Correlation
 
 ### Basic Pattern
@@ -76,7 +78,7 @@ fetch logs, from:now() - 1h
     | fields affected_entity_ids
   ]
 | filter in(loglevel, {"ERROR", "WARN"})
-| fields timestamp, dt.source_entity, loglevel, content
+| fields timestamp, dt.smartscape_source.id, loglevel, content
 | limit 200
 ```
 
@@ -139,9 +141,9 @@ fetch dt.davis.problems
 | join [
     fetch logs
     | filter in(loglevel, {"ERROR", "WARN"})
-    | fields content, timestamp, dt.source_entity, loglevel
+    | fields content, timestamp, dt.smartscape_source.id, loglevel
     | limit 100
-], on:{left[entity_id] == right[dt.source_entity]}
+], on:{left[entity_id] == right[dt.smartscape_source.id]}
 | fieldsAdd time_offset = timestamp - problem_start
 | sort timestamp asc
 | fields timestamp, time_offset, right.loglevel, right.content
@@ -196,7 +198,7 @@ fetch logs, from:now() - 2h
         | filter not(dt.davis.is_duplicate) and event.status == "ACTIVE"
         | fields affected_entity_ids
 ]
-| summarize problems_affected = countDistinct(dt.source_entity), by:{content}
+| summarize problems_affected = countDistinct(dt.smartscape_source.id), by:{content}
 | filter problems_affected > 1
 | sort problems_affected desc
 ```
@@ -231,7 +233,7 @@ fetch dt.davis.events
     | filter display_id == "P-12345678"
     | fields dt.davis.event_ids
 ]
-| fields event.start, event.name, event.description, dt.source_entity
+| fields event.start, event.name, event.description, dt.smartscape_source.id
 | sort event.start asc
 ```
 
@@ -316,7 +318,7 @@ fetch logs, from: "2026-05-18T22:50:00Z", to: "2026-05-18T23:35:00Z"
     | fields affected_entity_ids
   ]
 | filter loglevel == "ERROR"
-| fields timestamp, dt.source_entity, loglevel, content
+| fields timestamp, dt.smartscape_source.id, loglevel, content
 | sort timestamp desc
 | limit 100
 ```

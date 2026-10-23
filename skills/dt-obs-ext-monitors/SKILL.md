@@ -102,8 +102,10 @@ fetch events, from:now()-1h
 - Step events must include `test.step.id` (unique within the run) in addition to `test.run.id`.
 - `event.kind: "EXTERNAL_TEST_EVENT"` must be present — used by Grail for event classification.
   Routing to the correct pipeline is driven by `event.type`, not `event.kind`.
-- Do **not** send `dt.smartscape.ext_test` or `result.status.category` — these are written by
-  the pipeline after ingestion and will be overwritten if included.
+- Do **not** send `dt.smartscape.ext_test`, `dt.smartscape_source.id`, `dt.source_entity`, or
+  `result.status.category` — these are written by the pipeline after ingestion and will be
+  overwritten if included. Note: `dt.source_entity` is a **deprecated** alias for
+  `dt.smartscape_source.id` and will be removed in a future release.
 - `dt.security_context` controls data access policies; it’s recommended to set it on every event to enable
   per-team access control and cost attribution in multi-team tenants.
 

@@ -76,5 +76,5 @@ or
 
 ## After Writing the File
 
-- If `userOptIn` is `true`: the privacy options call (Step 7a) is required — flag it.
-- If `userOptIn` is `false`: Step 7a can be skipped.
+- If `userOptIn` is `true`: the privacy options call (Step 9) is required — flag it.
+- If `userOptIn` is `false`: Step 9 can be skipped.

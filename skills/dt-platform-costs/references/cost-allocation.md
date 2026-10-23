@@ -14,7 +14,8 @@ chargeback and showback reports.
   - [Record-Type Cost Attribution](#record-type-cost-attribution)
   - [Metrics Ingest — Billable Volume per Cost Center](#metrics-ingest--billable-volume-per-cost-center)
   - [Traces Ingest — Billable Volume per Cost Center](#traces-ingest--billable-volume-per-cost-center)
-  - [Unified Chargeback (All Types)](#unified-chargeback-all-types)
+  - [Log Import — Cost Center Attribution](#log-import--cost-center-attribution)
+  - [Unified Chargeback (All Types, Unrated / No Rate Card)](#unified-chargeback-all-types-unrated--no-rate-card)
 
 ## Entity Attribution Fields
 
@@ -479,7 +480,32 @@ fetch dt.system.events, from: "<START>", to: "<END>"
 > rounding and differences in included volume computation. Account Management
 > is the source of truth for billable totals.
 
-### Unified Chargeback (All Types)
+### Log Import — Cost Center Attribution
+
+Historical Log Import BUEs (`Log Management & Analytics - Ingest & Process` with
+`dt.job.id` present — see
+[billing-event-types.md § Log Ingest Sources](billing-event-types.md#log-ingest-sources))
+take `dt.cost.costcenter` / `dt.cost.product` from the **import job request**,
+not from a monitored entity's tags. An allow-listed value is stored as supplied;
+a value that is not on the Account Management allow-list is stored as the
+literal string `not-allowlisted`; an unsupplied value leaves the field absent.
+
+> **`not-allowlisted` is a value, not an error marker.** It aggregates like any
+> other cost center and appears as its own row — surface it rather than folding
+> it into `unassigned`.
+
+```dql
+fetch dt.system.events, from: -30d
+| filter event.kind == "BILLING_USAGE_EVENT"
+  and event.type == "Log Management & Analytics - Ingest & Process"
+  and isNotNull(dt.job.id)
+| dedup event.id
+| summarize billed_bytes = sum(billed_bytes), by: {dt.cost.costcenter, dt.job.id}
+| fieldsAdd billed_gib = toDouble(billed_bytes) / 1073741824
+| sort billed_gib desc
+```
+
+### Unified Chargeback (All Types, Unrated / No Rate Card)
 
 Single query handling both string and record[] cost center types. Builds on the
 [Base Usage](billing-capabilities.md#base-usage) query from
@@ -518,3 +544,8 @@ DQL behavior exploited:
 > field to `billable_usage` and append the
 > [Full Inline Lookup for Cost Rankings](cost-estimations.md#full-inline-lookup-for-cost-rankings)
 > — it handles both unit conversion and cost-weight computation in DQL.
+
+**Rated path:** When a rate card is available, apply the rate-card join from
+[cost-estimations.md § Price Source Resolution](cost-estimations.md#price-source-resolution)
+after the `billable_usage` summarize step. For output rules and disclaimer wording, see
+[cost-estimations.md § Output Rules for Rated Path](cost-estimations.md#output-rules-for-rated-path).

@@ -288,8 +288,7 @@ your environment. Distinct from the `join`-based correlation in
 fetch security.events, from:now()-24h
 | filter event.type == "DETECTION_FINDING"
 | filter isNotNull(actor.ips)
-| expand actor.ips
-| filter in(ip(actor.ips), array(toIp("<ip1>"), toIp("<ip2>")))
+| filter in(iCollectArray(ip(actor.ips[])), array(toIp("<ip1>"), toIp("<ip2>")))
 | fields timestamp, finding.id, finding.title, dt.security.risk.level,
          finding.type, finding.action, actor.ips, actor.geo.country.name,
          object.id, object.name, object.type, event.provider, product.name
@@ -329,17 +328,17 @@ fields are null and the provider is known to carry the header in raw payload.
 
 **Safety:** DQL-escape all IoC values before inserting into string literals (replace `\` with `\\` and `"` with `\"`). See `dt-sec-ioc-hunting/references/ioc-intake.md` § URL Cleaning step 7.
 
-**Domain casing:** Domains and hostnames are case-insensitive — provide them in lowercase and the template normalizes field values with `lower()` before comparison. URL/path IoCs are matched as-is (URL paths can be case-sensitive on the target server).
+**Domain casing:** Domains and hostnames are case-insensitive — `matchesValue` and `contains(..., caseSensitive:false)` ignore case, so no `lower()` is applied to the fields (that would defeat the index). Domains appear twice (the `Domains` array for `url.full` substring matches and the inline sets for exact matches) — fill both. URL/path IoCs are matched as-is (URL paths can be case-sensitive on the target server).
 
 ```dql-template
 fetch security.events, from:now()-2h
 | filter event.type == "DETECTION_FINDING"
-| fieldsAdd Domains = array("<domain1_lowercase>", "<domain2_lowercase>"),
+| fieldsAdd Domains = array("<domain1>", "<domain2>"),
             URLs    = array("<url1>")
-| filter iAny(contains(lower(url.full),      Domains[]))
-      OR in(lower(url.domain),    Domains)
-      OR in(lower(server.address), Domains)
-      OR iAny(in(lower(host.fqdn[]), Domains))
+| filter iAny(contains(url.full, Domains[], caseSensitive:false))
+      OR matchesValue(url.domain, {"<domain1>", "<domain2>"})
+      OR matchesValue(server.address, {"<domain1>", "<domain2>"})
+      OR matchesValue(host.fqdn, {"<domain1>", "<domain2>"})
       OR iAny(contains(url.full, URLs[]))
       OR iAny(contains(url.path, URLs[]))
 | fields timestamp, finding.id, finding.title, dt.security.risk.level,
@@ -421,7 +420,7 @@ relevant key.
 fetch security.events, from:now()-24h
 | filter event.type == "DETECTION_FINDING"
      AND product.name == "Runtime Application Protection"
-     AND contains(lower(finding.type), "sql")
+     AND contains(finding.type, "sql", caseSensitive:false)
 | filter dt.entity.process_group == "PROCESS_GROUP-XXXXXXXXXXXXXXXX"
 | sort timestamp desc
 | limit 50
@@ -440,7 +439,7 @@ fetch security.events, from:now()-24h
 
 `finding.type` is a **vendor-original free-form string** — not a normalized enum. RAP emits
 display strings whose exact form can differ across OneAgent versions; observed values:
-`SQL injection`, `CMD injection`, `JNDI injection`, `SSRF`. Use `contains(lower(finding.type), …)`
+`SQL injection`, `CMD injection`, `JNDI injection`, `SSRF`. Use `contains(finding.type, "…", caseSensitive:false)`
 rather than exact-match literals. JNDI/SSRF are Java-only; SQL/command/path injection cover
 Java + .NET + Go. Discover active values on any tenant with the summarize query in UC-D3 below.
 
@@ -848,7 +847,7 @@ fetch security.events, from:now()-7d
 // Filter for a specific type — match both finding.type and finding.title (vendor-original):
 fetch security.events, from:now()-2h
 | filter event.type == "DETECTION_FINDING"
-| filter contains(lower(finding.type), "sql") OR contains(lower(finding.title), "sql")
+| filter contains(finding.type, "sql", caseSensitive:false) OR contains(finding.title, "sql", caseSensitive:false)
 | fields timestamp, "dt.smartscape*", "dt.entity*",
          event.provider, finding.title, dt.security.risk.level,
          object.name, object.type, event.description

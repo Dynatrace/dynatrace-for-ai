@@ -415,7 +415,7 @@ fetch spans
 |-----------|-----------|------------|-----------|
 | HTTP server (incoming) | `span.kind == "server" and isNotNull(http.request.method)` | `http.route`, `http.request.method`, `http.response.status_code` | [http-spans.md](references/http-spans.md) |
 | HTTP client (outgoing) | `span.kind == "client" and isNotNull(http.request.method)` | `server.address`, `server.port` | [http-spans.md](references/http-spans.md) |
-| Database | `span.kind == "client" and isNotNull(db.system)` | `db.system`, `db.namespace`, `db.statement` | [database-spans.md](references/database-spans.md) |
+| Database | `span.kind == "client" and isNotNull(db.system)` | `db.system`, `db.namespace`, `db.query.text` | [database-spans.md](references/database-spans.md) |
 | Messaging | `isNotNull(messaging.system)` | `messaging.system`, `messaging.destination.name`, `messaging.operation.type` | [messaging-spans.md](references/messaging-spans.md) |
 | RPC / gRPC | `isNotNull(rpc.system)` | `rpc.system`, `rpc.service`, `rpc.method`, `rpc.grpc.status_code` | [rpc-spans.md](references/rpc-spans.md) |
 | Serverless / FaaS | `isNotNull(faas.name) and span.kind == "server"` | `faas.name`, `faas.trigger.type`, `cloud.provider` | [serverless-spans.md](references/serverless-spans.md) |

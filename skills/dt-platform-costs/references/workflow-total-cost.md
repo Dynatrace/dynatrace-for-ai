@@ -157,9 +157,28 @@ fetch dt.system.events, from: -30d
 > 1 workflow-hour. The standard `coalesce()` pattern cannot capture this; query
 > it separately.
 
-> **Output rule:** Present `total_invocations` and `total_workflow_hours` in
-> native units. Apply **SKILL.md § Cost Ranking Rules** for any cross-capability
-> cost comparison — do not compute or display dollar estimates from these values.
+> **Output rule:** Always present `total_invocations` and `total_workflow_hours` in
+> native units. Whether a currency figure is shown depends on the price source
+> (**SKILL.md § Cost Ranking Rules** step 0):
+>
+> - **Rated (rate card present):** per-signal estimated cost is allowed — compute it
+>   in DQL, never by hand. Keep `event.type` in the group-by, name the total
+>   `billable_usage`, and append the
+>   [Rate Card Join Snippet](cost-estimations.md#rate-card-join-snippet). For this step:
+>
+>   ```dql-snippet
+>   | summarize hourly_wf = countDistinct(workflow.id), by: {hour, event.type}
+>   | summarize billable_usage = sum(hourly_wf), by: {event.type}
+>   ```
+>
+>   Apply the rated output rules and ℹ️ disclaimer from
+>   [cost-estimations.md § Output Rules for Rated Path](cost-estimations.md#output-rules-for-rated-path).
+> - **Unrated (no rate card):** do not compute or display dollar estimates —
+>   normalization weights give relative rankings, not amounts. Show native units per
+>   signal; for a cross-signal comparison use `cost_weight` internally per
+>   **SKILL.md § Cost Ranking Rules** and present the ranking only.
+>
+> For a fleet-wide figure rather than one workflow, drop the `workflow.id` filter.
 > For `SIMPLE`/`DRAFT` workflows, label Signal 3 **"N/A (workflow type)"** — not `0` or `missing`.
 
 ## Step 4 — AI Invocation Cost (BUE)

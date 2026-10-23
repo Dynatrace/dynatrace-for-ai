@@ -85,11 +85,11 @@ timeseries {
 | fieldsAdd host_name = getNodeName(dt.smartscape.host)
 | lookup [
     smartscapeNodes HOST
-    | fieldsAdd cpuCores
-  ], sourceField:dt.smartscape.host, lookupField:id, fields:{cpuCores}
+    | fieldsAdd cores
+  ], sourceField:dt.smartscape.host, lookupField:id, fields:{cores}
 | fieldsAdd
-    load_per_core_1m = arrayAvg(load_1m) / toLong(cpuCores),
-    load_per_core_5m = arrayAvg(load_5m) / toLong(cpuCores)
+    load_per_core_1m = arrayAvg(load_1m) / toLong(cores),
+    load_per_core_5m = arrayAvg(load_5m) / toLong(cores)
 | filter load_per_core_1m > 1.0
 ```
 
@@ -165,7 +165,7 @@ timeseries {
 | fieldsAdd host_name = getNodeName(dt.smartscape.host)
 | lookup [
     smartscapeNodes HOST
-    | fields id, memoryTotal
+    | fields id, memory
   ], sourceField:dt.smartscape.host, lookupField:id
 ```
 
@@ -247,110 +247,6 @@ timeseries memory_used = avg(dt.host.memory.used), by: {dt.smartscape.host}, int
     increase_pct = toDouble(last_value - first_value) * 100 / first_value
 | filter increase_pct > 20  // 20% increase over time window
 | sort increase_pct desc
-```
-
----
-
-## Disk Monitoring
-
-### Disk Space Usage
-
-Track disk space utilization:
-
-```dql
-timeseries {
-  disk_used_pct = avg(dt.host.disk.used.percent),
-  disk_used_bytes = avg(dt.host.disk.used),
-  disk_avail_bytes = avg(dt.host.disk.avail)
-}, by: {dt.smartscape.host, dt.smartscape.disk}
-| fieldsAdd host_name = getNodeName(dt.smartscape.host)
-| filter arrayAvg(disk_used_pct) > 80
-| sort arrayAvg(disk_used_pct) desc
-```
-
-**Alert Thresholds:**
-- **< 80%**: Normal usage
-- **80-90%**: Warning - plan cleanup
-- **> 90%**: Critical - immediate action required
-- Very large or auto-scaling cloud disks can keep percentages low despite high absolute usage; pair this with `disk_avail_bytes` for capacity decisions.
-
-### Disk I/O Performance
-
-Monitor disk read/write performance:
-
-```dql
-timeseries {
-  read_bytes_per_sec = avg(dt.host.disk.bytes_read),
-  write_bytes_per_sec = avg(dt.host.disk.bytes_written),
-  read_ops_per_sec = avg(dt.host.disk.read_ops),
-  write_ops_per_sec = avg(dt.host.disk.write_ops)
-}, by: {dt.smartscape.host, dt.smartscape.disk}
-| fieldsAdd
-    host_name = getNodeName(dt.smartscape.host),
-    total_throughput = arrayAvg(read_bytes_per_sec) + arrayAvg(write_bytes_per_sec)
-| filter total_throughput > 50000000  // > 50 MB/s
-| sort total_throughput desc
-```
-
-### Disk Latency Analysis
-
-Identify disk latency issues:
-
-```dql
-timeseries {
-  read_latency = avg(dt.host.disk.read_time),
-  write_latency = avg(dt.host.disk.write_time),
-  util_pct = avg(dt.host.disk.util_time),
-  queue_length = avg(dt.host.disk.queue_length)
-}, by: {dt.smartscape.host, dt.smartscape.disk}
-| fieldsAdd host_name = getNodeName(dt.smartscape.host)
-| filter arrayAvg(read_latency) > 20 or arrayAvg(write_latency) > 20
-| sort arrayAvg(read_latency) desc
-```
-
-**Performance Indicators:**
-- **< 10ms**: Good (SSD/NVMe)
-- **10-20ms**: Acceptable (SSD under load)
-- **> 20ms**: Bottleneck - investigate
-- **Queue length > 2**: I/O saturation
-
-### Inode Exhaustion Detection
-
-Monitor inode usage (Linux):
-
-```dql
-timeseries {
-  inodes_avail_pct = avg(dt.host.disk.inodes_avail),
-  inodes_total = avg(dt.host.disk.inodes_total)
-}, by: {dt.smartscape.host, dt.smartscape.disk}
-| fieldsAdd
-    host_name = getNodeName(dt.smartscape.host),
-    inodes_used_pct = 100 - arrayAvg(inodes_avail_pct)
-| filter inodes_used_pct > 80
-| sort inodes_used_pct desc
-```
-
-Inode exhaustion can prevent file creation even with available space.
-
-### Disk Full Prediction
-
-Predict when disks will fill:
-
-```dql
-timeseries {
-  disk_used = avg(dt.host.disk.used),
-  disk_avail = avg(dt.host.disk.avail)
-}, by: {dt.smartscape.host, dt.smartscape.disk}, interval: 1h
-| fieldsAdd
-    host_name = getNodeName(dt.smartscape.host),
-    current_used = arrayLast(disk_used),
-    current_avail = arrayLast(disk_avail),
-    first_used = arrayFirst(disk_used)
-| fieldsAdd growth_rate_per_hour = (current_used - first_used) / 24  // Assuming 24h window
-// Negative growth indicates cleanup or transient data effects and is excluded from "time to full" prediction.
-| fieldsAdd hours_until_full = if(growth_rate_per_hour > 0, current_avail / growth_rate_per_hour, else: -1)
-| filter hours_until_full > 0 and hours_until_full < 48
-| sort hours_until_full asc
 ```
 
 ---
@@ -499,7 +395,7 @@ Analyze resource trends for capacity planning:
 timeseries {
   cpu = avg(dt.host.cpu.usage),
   memory = avg(dt.host.memory.usage),
-  disk = avg(dt.host.disk.used.percent)
+  disk_free = avg(dt.host.disk.free)
 }, by: {dt.smartscape.host}, interval: 1h
 | fieldsAdd
     host_name = getNodeName(dt.smartscape.host),
@@ -507,7 +403,7 @@ timeseries {
     cpu_p95 = arrayPercentile(cpu, 95),
     memory_avg = arrayAvg(memory),
     memory_p95 = arrayPercentile(memory, 95),
-    disk_avg = arrayAvg(disk)
+    disk_avg = 100 - arrayAvg(disk_free)
 | fieldsAdd
     cpu_capacity_remaining = 100 - cpu_p95,
     memory_capacity_remaining = 100 - memory_p95
@@ -519,6 +415,7 @@ timeseries {
 
 ## Related Documentation
 
+For disk metrics and shared disks, see [disk-monitoring.md](disk-monitoring.md).  
 For process-level resource monitoring, see [process-monitoring.md](process-monitoring.md).  
 For infrastructure discovery and inventory, see [inventory-discovery.md](inventory-discovery.md).  
 For container metrics, see [container-monitoring.md](container-monitoring.md).

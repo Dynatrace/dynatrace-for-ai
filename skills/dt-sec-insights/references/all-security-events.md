@@ -89,11 +89,11 @@ the per-domain references link here rather than restating it.
 
 If the same integration appears via multiple paths (e.g. `event.provider == "Amazon GuardDuty"` for the direct integration and `event.provider == "AWS Security Hub" AND product.name == "GuardDuty"` for the Security Hub relay), combine both exact conditions with `OR`.
 
-**During discovery only — fuzzy match.** Use `contains(lower(...))` only when the exact string is not yet known:
+**During discovery only — fuzzy match.** Use `contains(<field>, "…", caseSensitive:false)` only when the exact string is not yet known:
 
 ```dql-snippet
-| filter contains(lower(event.provider), "<provider>")
-      OR contains(lower(product.vendor), "<provider>")
+| filter contains(event.provider, "<provider>", caseSensitive:false)
+      OR contains(product.vendor, "<provider>", caseSensitive:false)
 ```
 
 - **All external** (exclude Dynatrace-native): `filterOut event.provider=="Dynatrace" or product.vendor=="Dynatrace"`.

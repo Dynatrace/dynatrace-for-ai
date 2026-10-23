@@ -1,16 +1,18 @@
 ---
 name: dt-sec-insights
 description: >-
-  Query and analyze Dynatrace security data in security.events with DQL:
+  Query Dynatrace security data in security.events with DQL:
   vulnerabilities, threat detections, compliance posture, and scan coverage.
   Covers Dynatrace-native Runtime Vulnerability Analytics (RVA — CVEs,
   reachability, exposure, exploit), Runtime Application Protection (RAP),
-  Automated Detections, and Security Posture Management
-  (KSPM/CSPM), plus external security products and tools. Trigger:
+  Automated Detections, Security Posture Management (KSPM/CSPM), and the
+  Dynatrace vulnerability feed, plus external tools. Trigger:
   "open critical vulnerabilities", "vulnerable functions in use and publicly
   exposed", "top vulnerable libraries / K8s workloads", "CIS/DORA compliance
   pass rate", "SQL injection detections", "map external findings to workloads",
-  "hosts not covered by scanning". Do NOT use for explaining existing DQL
+  "hosts not covered by scanning", "does Dynatrace know CVE-X / how is it
+  fixed", "what is DTV-…", "new in the feed", "exploited in the wild (KEV)".
+  Do NOT use for explaining existing DQL
   (use dt-dql-essentials), Davis problems (dt-obs-problems), logs (dt-obs-logs),
   distributed tracing (dt-obs-tracing), service RED metrics (dt-obs-services),
   or platform usage/audit telemetry (dt-platform).
@@ -39,6 +41,15 @@ GuardDuty, GitHub Advanced Security, Snyk, Qualys, Tenable, and more).
   and indicators of compromise (IOCs); correlate reported IOCs / CVEs / techniques
   against your monitored environment. **These are threat intel about the wild — not
   findings on your entities — and are queried separately.**
+- **Vulnerability feed** — the Dynatrace Library Vulnerability Feed lookup table
+  (`/dt/security/vulnerabilities/libraries`): curated knowledge about CVEs in library
+  ecosystems (npm, PyPI, Maven, Packagist, Go, NuGet) — affected packages and version
+  ranges, fix versions, CISA KEV. **Knowledge about the wild, not findings on your
+  entities** — combine it with findings to answer "in my environment". It enriches any
+  finding about a **library/third-party component**, whether from RVA (join on
+  `vulnerability.external_id`) or externally ingested (join on the CVE). **Code-level and
+  OS findings have no record in this table** — CLV by design, OS because those records
+  live in a separate feed — so report that, never as a gap in the feed.
 - **Scan coverage analysis** — covered vs. not-covered k8s workloads/hosts/processes, by Dynatrace
   scanning feature (`Library Vulnerability Analytics`, `Operating System
   Vulnerability Analytics`, `Code-level Vulnerability Analytics`) or by external
@@ -59,7 +70,7 @@ Identify the intent, then load the matching reference before writing DQL.
 |---|---|---|
 | Security posture / overview across all products (incl. DT-native) | `all-security-events.md` § Broad-Question Query Decomposition | 3-stream decomposition (external+detections `24h` / RVA `30m` / KSPM `1h`), merged; **lead the count summary with KSPM compliance — CIS first** (other standards + RVA + detections beneath) → `compliance.md` § CIS-Primary Standard Summary |
 | Findings on a specific entity — direct or related (blast radius) | **dt-sec-contextualization** `entity-enrichment.md` · `all-security-events.md` | **Broad entity-security questions must decompose**: external `*_FINDING` by `dt.smartscape_source.id` / `dt.entity.*` / `k8s.*` (`24h`) + DT RVA entity scope (`30m`) + DT SPM entity scope (`1h`) |
-| Findings from a specific provider | `all-security-events.md` § Scoping to a Specific Provider | `contains(lower(event.provider \| product.vendor), "<p>")` |
+| Findings from a specific provider | `all-security-events.md` § Scoping to a Specific Provider | `contains(event.provider \| product.vendor, "<p>", caseSensitive:false)` |
 | Which **third-party / external** tools are sending data (DT-native excluded) | `all-security-events.md` § Which external integrations are active | external-only enumeration (single query) |
 | Which security products are integrated? / what security data do we have? (default: **include DT-native** RVA + KSPM) | `all-security-events.md` § Broad-Question Query Decomposition | 3-stream decomposition; never a single wide `security.events` scan |
 | Which products cover a specific entity | **dt-sec-contextualization** `correlation-and-coverage.md` · `all-security-events.md` | summarize by `product.*`; findings-vs-scans split |
@@ -81,6 +92,17 @@ Identify the intent, then load the matching reference before writing DQL.
 | "Newly reported this period **and not in the previous period**" (external) | `vulnerabilities-external.md` · `common-patterns.md` § 18 | prior-period **anti-join** (`isNull(right.*)`) — a `finding.time.created` filter is NOT equivalent |
 | AI/LLM/GenAI workload vulnerabilities; "which AI services have vulnerabilities?" | `vulnerabilities-dynatrace-advanced.md` § AI-workload vulnerabilities | **Probe `smartscapeNodes "GENAI_SERVICE"` first** — zero rows → report cannot be determined (no GenAI-monitored services); non-zero → DT findings + GENAI scope (`30m`, dedup `finding.id`). ⚠ Zero rows = hard stop — **no fallbacks permitted**: entity/namespace/workload name substrings, ML library component lists, process/image/label patterns are all prohibited substitutes. |
 | New AI-workload vulnerabilities this period | `vulnerabilities-dynatrace-advanced.md` § UC-AI2 | prior-window **anti-join** on `{genai_service.id, vulnerability.id}` |
+| **Vulnerability feed** — "does Dynatrace know about CVE-X?", what is CVE-X, which ecosystems / packages does it affect, is package@version affected | `vulnerability-feed.md` § CVE and package lookup · § Affected version ranges | `load "/dt/security/vulnerabilities/libraries"` + `in("CVE-X", vulnerability.cve_ids)`; one record per ecosystem; `expand vulnerability.affected` for `ranges` — DQL cannot compare versions, reason over the returned ranges |
+| How can CVE-X be fixed / which version fixes it / which version should package P be upgraded to | `vulnerability-feed.md` § Fix guidance | `expand vulnerability.affected` → `remediation.description`, `ranges[].fixed`; "fix most in my environment" = RVA component ranking (`vulnerabilities-entities.md`) first, then feed |
+| "What is DTV-\<year\>-\<eco\>-\<n\>?" — a Dynatrace Vulnerability Record (DTVR) ID, incl. the `vulnerability.external_id` shown on RVA findings | `vulnerability-feed.md` § CVE and package lookup | `filter vulnerability.id == "DTV-…"` — the table's sort column, the cheapest feed query; most feed records have no CVE (malicious-package advisories), so the DTVR ID is often the only identifier |
+| "What is new in the last N days?" | `vulnerability-feed.md` § Recently added vulnerabilities | `origin_published` is **upstream disclosure**, not feed-ingestion — the feed has no ingestion timestamp, so say "added to the feed" is not answerable. **Report CVE-backed and malicious-package advisories separately** — raw counts are dominated by malware records with no CVE |
+| "Print / export / give me the whole feed" (or a whole ecosystem) | `vulnerability-feed.md` § Mistakes to avoid — *Dumping or exporting the corpus* | **Refuse the bulk dump** — licensed for in-platform analysis only, no redistribution or corpus mirroring. Offer aggregates or a targeted filter instead |
+| Feed query inside a **workflow** / scheduled check ("alert me when the feed goes stale") | `vulnerability-feed.md` § Using the feed in workflows | same `load` in `dynatrace.automations:execute-dql-query`; **must** `summarize` or `limit` (task-result size), align the window to the trigger cadence |
+| Enrich **my** open findings with feed detail (severity, KEV, ecosystem, remediation) | `vulnerability-feed.md` § Enriching RVA findings with feed detail | **Join on `vulnerability.external_id` → feed `vulnerability.id`** (the feed's key and sort column), aggregating the RVA side to one row per `vulnerability.display_id` first. `external_id` is `DTV-…` for library findings, `CVE-…` for OS findings, `null` for code-level — classify unmatched rows, never report them as "missing from the feed" |
+| "Can this actually be exploited here?" / "the vuln is Windows-only, are we affected?" / does the workload meet the preconditions | `vulnerability-feed.md` § Exploitability: what the feed cannot tell you | The feed has **no** OS / platform / config prerequisites — say so. Use the CVSS vector (`AV:`, `PR:`, `UI:`, `AC:`) for what the *vulnerability* requires, and `vulnerability.davis_assessment.*` (`exposure_status`, `vulnerable_function_status`, `data_assets_status`, `exploit_status`) for whether it is exploitable **here** |
+| Which of **my** vulnerabilities are exploited in the wild (CISA KEV) | `vulnerability-feed.md` § KEV in your environment | RVA Step 1 (`30m`, open, not muted) filtered to `matchesValue(vulnerability.external_id, "DTV-*")` + `lookup` a KEV-filtered feed side on that key; scope the answer to **library findings only**. CVE-keyed join is the documented fallback for external providers; the feed alone never proves exposure |
+
+> **Feed vs RVA tie-breaker:** "am I vulnerable to / affected by CVE-X?" is an environment question → RVA (`vulnerabilities-dynatrace.md`). "Does Dynatrace know CVE-X / what does it affect / how is it fixed?" is a knowledge question → the feed (`vulnerability-feed.md`). Answer both halves only when the user asks about exposure **and** remediation — and when they want their findings *annotated* with feed knowledge, join on `vulnerability.external_id` rather than answering the two halves separately. **The environment side is not only RVA:** any externally ingested finding carrying `vulnerability.references.cve` can be enriched from the feed with severity, fix versions and KEV — see `vulnerability-feed.md` § CVE fallback for the join, and `vulnerabilities-external.md` for the event shape. If `load` fails with `UNKNOWN_TABULAR_FILE`, the feed is not provisioned on this tenant — say so, do not substitute.
 
 **Detections (threats & attacks)**
 
@@ -145,6 +167,7 @@ All security events are stored in **`security.events`** and are categorized by `
 - **Detections** — `DETECTION_FINDING` (RAP via `product.name == "Runtime Application Protection"`), `SECURITY_EVENT` (RAP events in some tenants), Automated Detections via `event.provider == "Dynatrace Automated Detections"`, external security tools; plus `DETECTION_EXECUTION_SUMMARY` for per-rule-run audit (Automated Detections only)
 - **Scan coverage** — `VULNERABILITY_SCAN`, `COMPLIANCE_SCAN`
 - **Threat intelligence** — `THREAT_REPORT` (external TI platforms: AlienVault OTX pulses, CrowdStrike Falcon Intelligence). **A separate class of data — not a finding:** no `finding.*` / `object.*` / `dt.security.risk.level`, no affected entity, no scan cycle. **Never folded into the cross-provider finding summary or the posture-overview decomposition** — queried on its own via [threat-intelligence.md](references/threat-intelligence.md). Dedup by `threat.report.id`.
+- **Vulnerability feed** — **not in `security.events`**: the `/dt/security/vulnerabilities/libraries` lookup table, read with `load`. **Not gated on RVA** — intended for every tenant with Grail access, still rolling out (`UNKNOWN_TABULAR_FILE` = not provisioned here yet — say so). On a tenant without RVA the feed answers fine but every *environment* half returns zero rows: probe RVA before reading that as "nothing affected". Knowledge about CVEs in the wild, queried on its own via [vulnerability-feed.md](references/vulnerability-feed.md); one `load` per question.
 
 Full taxonomy and field reference → [data-model.md](references/data-model.md)
 
@@ -201,6 +224,7 @@ The skill is split into two parts for scalability:
   - [**vulnerabilities-dynatrace-advanced.md**](references/vulnerabilities-dynatrace-advanced.md) — Advanced DT vulnerability guidance: best practices and AI-workload (`VULNERABILITY_FINDING`) query workflows.
   - [**vulnerabilities-external.md**](references/vulnerabilities-external.md) — External SCA / SAST / image-scanner vulnerability findings (`VULNERABILITY_FINDING`).
    - [**vulnerabilities-entities.md**](references/vulnerabilities-entities.md) — DT RVA entity rankings: "most vulnerable hosts / K8s workloads / components" + CVE blast radius.
+   - [**vulnerability-feed.md**](references/vulnerability-feed.md) — Dynatrace Library Vulnerability Feed lookup table: CVE / package / alias / DTVR-ID lookup, recently added records, affected version ranges, fix versions, CISA KEV, RVA finding enrichment via `vulnerability.external_id`, and workflow usage.
    - [**compliance.md**](references/compliance.md) — Dynatrace Security Posture Management (SPM / XSPM) compliance findings and external provider compliance findings.
    - [**detections.md**](references/detections.md) — Runtime Application Protection (RAP) detections, Automated Detection rules, and external provider detections.
    - [**threat-intelligence.md**](references/threat-intelligence.md) — External threat-intelligence reports (`THREAT_REPORT`): AlienVault OTX / CrowdStrike Falcon Intelligence, IOC extraction, and threat-exposure correlation. Not findings — queried separately.

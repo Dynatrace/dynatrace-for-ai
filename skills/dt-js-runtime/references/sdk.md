@@ -37,6 +37,7 @@ Load the per-SDK file for methods, scopes, and examples.
 | [app-engine-registry](sdks/app-engine-registry/README.md) | `@dynatrace-sdk/client-app-engine-registry` | Install / list / uninstall apps | ✅ server | current |
 | [edge-connect](sdks/edge-connect/README.md) | `@dynatrace-sdk/client-app-engine-edge-connect` | EdgeConnect configs for private-network forwarding | ✅ server | current |
 | [hub](sdks/hub/README.md) | `@dynatrace-sdk/client-hub` | Hub catalog — apps, extensions, technologies | ✅ server | current |
+| [extensions-v2](sdks/extensions-v2/README.md) | `@dynatrace-sdk/client-extensions-v2` | Extensions 2.0 — lifecycle, environment configuration, monitoring configs, schemas (platform API) | ✅ server | current |
 | [platform-management](sdks/platform-management/README.md) | `@dynatrace-sdk/client-platform-management-service` | Env info, license, effective permissions | ✅ server | current |
 | [units](sdks/units/README.md) | `@dynatrace-sdk/units` | Convert/format units, numbers, dates | ✅ server | current |
 | [navigation](sdks/navigation/README.md) | `@dynatrace-sdk/navigation` | App navigation & intents — **browser-only, not available in server runtime** | ⚠️ browser | current |

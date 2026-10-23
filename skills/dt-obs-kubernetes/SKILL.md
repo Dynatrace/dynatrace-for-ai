@@ -305,14 +305,39 @@ the results accordingly — do not report unrelated events:
 #### Fetch Kubernetes Events via DQL
 
 Pod restart and operational events can also be queried via DQL from the events
-table:
+table.
+
+**Check which providers are active first.** Not all clusters ingest all event
+types. Confirm with:
+
+```dql
+fetch events, from: now() - 24h
+| filter contains(event.provider, "KUBERNETES")
+| summarize event_count = count(), by: {event.provider}
+```
+
+Three providers may appear — each covers different signals and uses different
+field names:
+
+| Provider | What it covers | Key fields |
+|---|---|---|
+| `KUBERNETES_EVENT` | Raw K8s API events forwarded to DT | `dt.kubernetes.event.reason`, `dt.kubernetes.event.message`, `dt.kubernetes.event.important` |
+| `KUBERNETES_INFERRED_EVENT` | Pod/workload lifecycle events inferred by DT (OOMKills, spec changes) | `event.name`, `event.description`, `k8s.workload.name`, `k8s.container.name` |
+| `KUBERNETES_ANOMALY_DETECTION` | Davis anomaly findings on K8s entities (stuck deployments, memory pressure, throttling) | `event.name`, `event.description`, `event.type` |
+
+If none appear, use the `get-events-for-kubernetes-cluster` tool or the
+metrics-based queries above instead.
+
+**`KUBERNETES_EVENT` — raw K8s API events**
+
+All Warning-type events (those flagged `type: Warning` in the Kubernetes API):
 
 ```dql
 fetch events
-| filter event.kind == "K8S_EVENT"
-| filter event.type == "Warning"
+| filter event.provider == "KUBERNETES_EVENT"
+| filter dt.kubernetes.event.important == "true"
 | fields timestamp, k8s.cluster.name, k8s.namespace.name, k8s.pod.name,
-    event.reason, event.message
+    dt.kubernetes.event.reason, dt.kubernetes.event.message
 | sort timestamp desc
 | limit 50
 ```
@@ -321,16 +346,65 @@ Filter for specific event reasons:
 
 ```dql
 fetch events
-| filter event.kind == "K8S_EVENT"
-| filter in(event.reason, {"OOMKilling", "BackOff", "Evicted", "FailedScheduling"})
+| filter event.provider == "KUBERNETES_EVENT"
+| filter in(dt.kubernetes.event.reason, {"OOMKilling", "BackOff", "Evicted", "FailedScheduling"})
 | fields timestamp, k8s.cluster.name, k8s.namespace.name, k8s.pod.name,
-    event.reason, event.message
+    dt.kubernetes.event.reason, dt.kubernetes.event.message
 | sort timestamp desc
 ```
 
-**Field names in `fetch events`:** Use `event.reason` and `event.message` — not
-`dt.kubernetes.event.reason`. The `dt.kubernetes.*` prefix is for timeseries metrics,
-not the events table. Queries using the wrong prefix return zero results.
+**`KUBERNETES_INFERRED_EVENT` — DT-inferred pod lifecycle events**
+
+OOMKilled containers — prefer this over `KUBERNETES_EVENT` for OOM analysis
+because it includes workload and container context:
+
+```dql
+fetch events
+| filter event.provider == "KUBERNETES_INFERRED_EVENT"
+| filter event.name == "OOMKilled"
+| fields timestamp, k8s.cluster.name, k8s.namespace.name,
+    k8s.pod.name, k8s.container.name, k8s.workload.name, event.description
+| sort timestamp desc
+```
+
+Workload spec changes (deployment, StatefulSet, DaemonSet rollouts):
+
+```dql
+fetch events
+| filter event.provider == "KUBERNETES_INFERRED_EVENT"
+| filter event.group_label == "Workload spec change"
+| fields timestamp, k8s.cluster.name, k8s.namespace.name,
+    k8s.workload.name, k8s.workload.kind, event.name, event.description
+| sort timestamp desc
+```
+
+**`KUBERNETES_ANOMALY_DETECTION` — Davis anomaly findings**
+
+Error-severity anomalies (no-pod-ready, deployment stuck, pod evictions, backoff):
+
+```dql
+fetch events
+| filter event.provider == "KUBERNETES_ANOMALY_DETECTION"
+| filter event.type == "ERROR_EVENT"
+| fields timestamp, k8s.cluster.name, event.name, event.description
+| sort timestamp desc
+```
+
+All anomalies including warnings (memory pressure, CPU throttling, pending pods):
+
+```dql
+fetch events
+| filter event.provider == "KUBERNETES_ANOMALY_DETECTION"
+| fields timestamp, k8s.cluster.name, event.name, event.description, event.type
+| sort timestamp desc
+| limit 50
+```
+
+> **Field names differ by provider.** `dt.kubernetes.event.reason`,
+> `dt.kubernetes.event.message`, and `dt.kubernetes.event.important` only exist
+> on `KUBERNETES_EVENT` records — they are null on the other two providers. Use
+> `event.name` and `event.description` for `KUBERNETES_INFERRED_EVENT` and
+> `KUBERNETES_ANOMALY_DETECTION` instead.
 
 ### 4. Security Assessment
 
@@ -534,6 +608,6 @@ fetch dt.davis.problems, from:now() - 2h
 
 ## Related Skills
 
-- **dt-obs-problems** — For problems associated with Kubernetes clusters (use `dt.smartscape_source.id` with K8S_ prefix filters)
+- **dt-obs-problems** — For problems associated with Kubernetes clusters (expand `affected_entity_ids` and filter for K8S_ entity types; `dt.smartscape_source.id` is null on `dt.davis.problems`)
 - **dt-dql-essentials** — Core DQL syntax and query structure
 - **dt-obs-hosts** — Host-level metrics for K8s nodes
