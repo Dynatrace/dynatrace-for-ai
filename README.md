@@ -55,6 +55,23 @@ The Dynatrace plugin is listed on the [Cursor Marketplace](https://cursor.com/ma
 
 Set the same `DT_ENVIRONMENT` and `DT_PLATFORM_TOKEN` environment variables shown above before starting Cursor.
 
+### Google Antigravity Plugin
+
+Install the plugin with the Antigravity CLI:
+
+```bash
+agy plugin install https://github.com/Dynatrace/dynatrace-for-ai
+```
+
+In the Antigravity CLI you can also run `/plugin install https://github.com/Dynatrace/dynatrace-for-ai`.
+
+The plugin includes all skills and the Dynatrace MCP server. It stays disabled until you configure the MCP server. Open `/plugin`, select **dynatrace**, and turn it on. Then enter:
+
+- `DT_ENVIRONMENT`: your environment URL, e.g. `https://abc12345.apps.dynatrace.com` (`https://` is required; leave off the trailing slash)
+- `DT_PLATFORM_TOKEN`: a platform token with the [MCP gateway scopes](https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server)
+
+You can change these values later from **Configure MCP servers...** in `/plugin`. Antigravity does not read them from your shell environment.
+
 ### Manual
 
 Copy skill directories into your agent's skills path (`.agents/skills/`, `.claude/skills/`, `.cursor/skills/`, etc.).
