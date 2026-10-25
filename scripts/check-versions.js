@@ -25,6 +25,16 @@ const checks = [
     expected: version,
   },
   {
+    file: ".antigravity-plugin/plugin.json",
+    actual: read(".antigravity-plugin/plugin.json").version,
+    expected: version,
+  },
+  {
+    file: "mcp_config.json",
+    actual: read("mcp_config.json").mcpServers?.dynatrace?.headers?.["Dt-External-Source"],
+    expected: expectedHeader,
+  },
+  {
     file: "mcp.json",
     actual: read("mcp.json").mcpServers?.dynatrace?.headers?.["Dt-External-Source"],
     expected: expectedHeader,

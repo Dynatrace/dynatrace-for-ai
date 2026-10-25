@@ -18,6 +18,7 @@ The following files live exclusively in this repository and welcome PRs:
 - `README.md`, `CONTRIBUTING.md`, `llms.txt`
 - `prompts/**` — reusable prompt templates
 - `plugins/**` — plugin manifests and agent configurations
+- `.claude-plugin/**`, `.cursor-plugin/**`, `.antigravity-plugin/**`, `mcp_config.json` — harness plugin manifests and MCP configs
 - `tests/**` — CI test scripts
 - `.github/**` — GitHub Actions workflows
 
@@ -34,6 +35,8 @@ When bumping the version, update all of the following to match:
 
 - `.claude-plugin/plugin.json` → `"version"` (canonical)
 - `.cursor-plugin/plugin.json` → `"version"`
+- `.antigravity-plugin/plugin.json` → `"version"` (the Antigravity Marketplace requires every published update to increment it)
+- `mcp_config.json` → `"Dt-External-Source": "dynatrace-for-ai/<version>"`
 - `mcp.json` → `"Dt-External-Source": "dynatrace-for-ai/<version>"`
 - `.mcp.json` → `"Dt-External-Source": "dynatrace-for-ai/<version>"`
 - `server.json` → `"version"` and the `Dt-External-Source` header value
