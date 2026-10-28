@@ -95,6 +95,7 @@ or copy into .github/prompts/ for VS Code/Copilot slash command support.
 ## Installation
 
 Claude Code:  claude plugin marketplace add dynatrace/dynatrace-for-ai
+Antigravity:  agy plugin install https://github.com/Dynatrace/dynatrace-for-ai
 Skills.sh:    npx skills add dynatrace/dynatrace-for-ai
 Manual:       Copy skill directories into .agents/skills/
 

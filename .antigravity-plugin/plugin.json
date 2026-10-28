@@ -1,0 +1,22 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "dynatrace",
+  "displayName": "Dynatrace",
+  "version": "8.0.1",
+  "description": "Investigate production issues with real Dynatrace data: problems and root causes, logs, metrics, traces, and vulnerabilities, via skills and the MCP server.",
+  "logo": "Dynatrace_Logo_color_positive.png",
+  "suggestedPrompts": [
+    "What are the active problems in my Dynatrace environment and their root causes?",
+    "Show me the top error logs from the last hour and the services producing them",
+    "Write a DQL query for the p95 response time of my slowest services"
+  ],
+  "category": "Observability",
+  "author": {
+    "name": "Dynatrace",
+    "url": "https://www.dynatrace.com"
+  },
+  "homepage": "https://www.dynatrace.com",
+  "repository": "https://github.com/Dynatrace/dynatrace-for-ai",
+  "license": "Apache-2.0",
+  "keywords": ["dynatrace", "observability", "monitoring", "dql", "apm", "logs", "tracing"]
+}

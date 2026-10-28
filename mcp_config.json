@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "dynatrace": {
+      "serverUrl": "${DT_ENVIRONMENT}/platform-reserved/mcp-gateway/v0.1/servers/dynatrace-mcp/mcp",
+      "headers": {
+        "Authorization": "Bearer ${DT_PLATFORM_TOKEN}",
+        "Dt-External-Source": "dynatrace-for-ai/8.0.1"
+      },
+      "variables": [
+        {
+          "name": "DT_ENVIRONMENT",
+          "description": "Your Dynatrace environment URL, including https:// and without a trailing slash, e.g. https://abc12345.apps.dynatrace.com"
+        },
+        {
+          "name": "DT_PLATFORM_TOKEN",
+          "description": "A Dynatrace platform token with the MCP gateway scopes: https://docs.dynatrace.com/docs/shortlink/dynatrace-mcp-server"
+        }
+      ]
+    }
+  }
+}
