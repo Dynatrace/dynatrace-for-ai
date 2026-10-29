@@ -11,26 +11,41 @@ The Semantic Dictionary is itself queryable as a Grail table: `dt.semantic_dicti
 | Column | Type | Description |
 |--------|------|-------------|
 | `name` | string | The fully qualified field name (e.g., `service.name`, `k8s.pod.uid`) |
-| `type` | string | The field's data type (`string`, `long`, `double`, `boolean`, `timestamp`, `duration`, `uid`, `ipAddress`, `binary`, `timeframe`, `smartscapeId`, `string[]`, `array`, `record`, `record[]` , etc.) |
+| `type` | string[] | May either be a `string[]` (simple types are single-element arrays (e.g. `["string"]`, `["long"]`, `["boolean"]`, `["timestamp"]`, `["uid"]`, `["ipAddress"]`, etc.); array variants add `[]` to the element (e.g. `["string[]"]`); combined same-type fields yield multi-element arrays (e.g. `["string", "string[]"]`)) or for enum fields a nested object instead. |
 | `stability` | string | The stability level: `stable`, `experimental`, or `deprecated` |
 | `description` | string | Human-readable description of what the field represents |
 | `tags` | string[] | Semantic tags assigned to the field (e.g., `entity-id`, `permission`, `primary-field`, `smartscape-id`, `sensitive-spans`, `sensitive-user-events`) |
 | `unit` | string | The unit of measurement for the field (e.g., `kBy`, `zl`); null when no unit applies |
 | `supported_values` | string[] | Enumerated set of allowed values for fields with a fixed value set (e.g., `span.kind` supports `internal`, `server`, `client`, `producer`, `consumer`) |
 | `examples` | string[] | Example values illustrating typical field content (e.g., `"Rome"` for `actor.geo.city.name`) |
+| `model_id` | string | The model this field belongs to; `null` for global fields that apply across all models |
+| `is_resource` | boolean | Whether this field is a resource attribute |
+
+To list only global fields. Global fields maintain consistent semantics across the entire Grail product, offering standardized data references.
+
+```dql
+fetch dt.semantic_dictionary.fields
+| filter isNull(model_id)
+| dedup name
+```
 
 ### The `dt.semantic_dictionary.models` Table
 
 Data models describe predefined schemas for Grail data objects — which fields belong together and how they map to Grail tables. Each row represents one model definition. The table exposes these columns:
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `name` | string | The model name (e.g., `audit_event`, `bizevents`, `dt.smartscape.host`) |
-| `description` | string | Human-readable description of what the model represents |
-| `data_object` | string | The Grail table this model maps to (e.g., `spans`, `logs`, `events`, `smartscape.nodes`, `dt.system.events`) |
-| `fields` | string[] | Ordered list of field names that belong to this model |
-| `relationships` | string[] | Entity relationships (e.g., `uses[dt.smartscape.aws_s3_bucket]`, `runs_on[dt.entity.host]`) |
+| Column                 | Type | Description |
+|------------------------|------|-------------|
+| `name`                 | string | The model name (e.g., `audit_event`, `bizevents`, `dt.smartscape.host`) |
+| `display_name`         | string | Human-readable display name for the model |
+| `description`          | string | Human-readable description of what the model represents |
+| `data_object`          | string | The Grail table this model maps to (e.g., `spans`, `logs`, `events`, `smartscape.nodes`, `dt.system.events`) |
+| `fields`               | string[] | Ordered list of field names that belong to this model |
+| `relationships`        | string[] | Entity relationships (e.g., `uses[dt.smartscape.aws_s3_bucket]`, `runs_on[dt.entity.host]`) |
 | `smartscape_node_name` | string | The field used as display name for Smartscape nodes (e.g., `aws.resource.name`, `k8s.cluster.name`); null for non-entity models |
+| `smartscape_node_type` | string | The Smartscape entity type for this model (e.g., `dt.smartscape.host`, `dt.smartscape.service`); null for non-entity models |
+| `smartscape_id_inputs` | string[] | Fields used to compute the Smartscape entity ID for this model; null for non-entity models |
+| `classic_models` | string[] | Classic models associated with this model |
+
 
 ### Namespace Lookup Queries
 
@@ -47,6 +62,15 @@ Replace `<namespace_prefix>` with the target namespace (e.g., `aws`, `azure`, `k
 Many namespaces have **sub-namespaces** (e.g., `k8s.pod.*`, `http.request.*`). Drill into them with the same pattern: `filter startsWith(name, "k8s.pod.")`. **Always use these queries** to discover fields beyond what is listed below.
 
 ### Model Lookup Queries
+
+To find all fields belonging to a **specific model** (using `model_id` on `dt.semantic_dictionary.fields`):
+`model_id` on `dt.semantic_dictionary.fields` equals the `name` column on `dt.semantic_dictionary.models` (e.g., `"audit_event"`, `"bizevents"`, `"dt.smartscape.host"`).
+
+```dql
+fetch dt.semantic_dictionary.fields
+| filter model_id == "<model_id>"
+| dedup name
+```
 
 To find all models for a specific Grail data object:
 
@@ -210,8 +234,8 @@ Key system fields:
 Key metadata fields:
 - `dt.host_group.id` - Host group name (stable, primary-field)
 - `dt.security_context` - Security context for permissions (stable, permission)
-- `dt.source_entity` - Source entity IDs (stable, entity-id)
-- `dt.source_entity.type` - Source entity type (stable)
+- `dt.source_entity` - Source entity IDs (**deprecated** — use `dt.smartscape_source.id` instead; will be removed in the future)
+- `dt.source_entity.type` - Source entity type (**deprecated** — use `dt.smartscape_source.type` instead; will be removed in the future)
 - `dt.cost.costcenter` - Cost center assignment (stable)
 - `dt.cost.product` - Product/application assignment (stable)
 

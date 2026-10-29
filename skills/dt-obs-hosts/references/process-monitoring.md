@@ -433,16 +433,16 @@ Identify processes by listening ports:
 
 ```dql
 smartscapeNodes "PROCESS"
-| fieldsAdd name, process.listen_ports, dt.process_group.detected_name
-| filter isNotNull(process.listen_ports) and arraySize(process.listen_ports) > 0
-| expand listen_port = process.listen_ports
+| fieldsAdd name, port, dt.process_group.detected_name
+| filter isNotNull(port) and arraySize(port) > 0
+| expand listen_port = port
 | summarize
     process_count = countDistinct(id),
     by: {listen_port, dt.process_group.detected_name}
 | sort toLong(listen_port) asc
 ```
 
-**Use Case:** Discover port conflicts or identify services by standard ports (80, 443, 3306, etc.).
+**Use Case:** Discover port conflicts or identify services by standard ports (80, 443, 3306, etc.). Port values are numeric — filter a specific port with an unquoted integer (`listen_port == 22`), not `"22"`.
 
 ---
 

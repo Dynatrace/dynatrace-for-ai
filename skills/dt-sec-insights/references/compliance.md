@@ -26,7 +26,7 @@ external provider compliance findings.
 > `NIST`, `DISA STIG`.** Note STIG specifically: the short_name is the full
 > `"DISA STIG"` label, not bare `"STIG"`. A filter like
 > `compliance.standard.short_name == "STIG"` returns nothing. For all standard
-> scoping, prefer **`contains(lower(compliance.standard.short_name), "<keyword>")`**
+> scoping, prefer **`contains(compliance.standard.short_name, "<keyword>", caseSensitive:false)`**
 > over exact equality — it tolerates the DISA prefix, version suffixes, and
 > case mismatches uniformly across all four standards. PCI DSS, ISO 27001,
 > HIPAA, GDPR, BSI C5, TISAX, Cyber Essentials, Essential Eight, etc. arrive
@@ -647,7 +647,7 @@ one result row:
 
 If a standard filter is also needed (e.g. "DORA posture on eks-live"), add it as a second
 pre-aggregation filter right after the cluster filter:
-`| filter contains(lower(compliance.standard.short_name), "dora")`
+`| filter contains(compliance.standard.short_name, "dora", caseSensitive:false)`
 
 ---
 

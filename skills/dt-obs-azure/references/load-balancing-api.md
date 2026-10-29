@@ -110,7 +110,7 @@ Identify AKS-managed load balancers via tags:
 
 ```dql
 smartscapeNodes "AZURE_MICROSOFT_NETWORK_LOADBALANCERS"
-| fieldsAdd aksCluster = tags[`aks-managed-cluster-name`]
+| fieldsAdd aksCluster = `tags:azure`[`aks-managed-cluster-name`]
 | filter isNotNull(aksCluster)
 | fields name, aksCluster, azure.resource.group, azure.location
 ```

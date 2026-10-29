@@ -172,9 +172,9 @@ List all Kubernetes versions across worker nodes:
 
 ```dql
 smartscapeNodes "HOST"
-| fieldsAdd process.software_technologies
-| filter isNotNull(process.software_technologies)
-| expand tech = process.software_technologies
+| fieldsAdd host.software_technologies
+| filter isNotNull(host.software_technologies)
+| expand tech = host.software_technologies
 | filter tech[type] == "KUBERNETES"
 | fieldsAdd k8s_version = tech[version], k8s_edition = tech[edition]
 | summarize host_count = count(), by: {k8s_version, k8s_edition}
@@ -190,8 +190,8 @@ Group Kubernetes versions by cluster:
 ```dql
 smartscapeNodes "HOST"
 | filter isNotNull(k8s.cluster.name)
-| fieldsAdd process.software_technologies, k8s.cluster.name
-| expand tech = process.software_technologies
+| fieldsAdd host.software_technologies, k8s.cluster.name
+| expand tech = host.software_technologies
 | filter tech[type] == "KUBERNETES"
 | fieldsAdd k8s_version = tech[version]
 | summarize
@@ -210,8 +210,8 @@ Identify clusters with version skew (mixed versions):
 ```dql
 smartscapeNodes "HOST"
 | filter isNotNull(k8s.cluster.name)
-| fieldsAdd process.software_technologies, k8s.cluster.name
-| expand tech = process.software_technologies
+| fieldsAdd host.software_technologies, k8s.cluster.name
+| expand tech = host.software_technologies
 | filter tech[type] == "KUBERNETES" and tech[edition] == "worker"
 | fieldsAdd k8s_version = tech[version]
 | summarize
@@ -231,8 +231,8 @@ Compare control plane and worker node versions:
 
 ```dql
 smartscapeNodes "HOST"
-| fieldsAdd process.software_technologies, k8s.cluster.name
-| expand tech = process.software_technologies
+| fieldsAdd host.software_technologies, k8s.cluster.name
+| expand tech = host.software_technologies
 | filter tech[type] == "KUBERNETES"
 | fieldsAdd k8s_version = tech[version], k8s_edition = tech[edition]
 | summarize host_count = count(), by: {k8s.cluster.name, k8s_edition, k8s_version}
@@ -247,8 +247,8 @@ Identify hosts running EOL or outdated K8s versions:
 
 ```dql
 smartscapeNodes "HOST"
-| fieldsAdd process.software_technologies, k8s.cluster.name, name
-| expand tech = process.software_technologies
+| fieldsAdd host.software_technologies, k8s.cluster.name, name
+| expand tech = host.software_technologies
 | filter tech[type] == "KUBERNETES"
 | fieldsAdd k8s_version = tech[version]
 | filter k8s_version < "1.30.0" or isNull(k8s_version)
@@ -265,8 +265,8 @@ List clusters eligible for upgrade:
 ```dql
 smartscapeNodes "HOST"
 | filter isNotNull(k8s.cluster.name)
-| fieldsAdd process.software_technologies, k8s.cluster.name
-| expand tech = process.software_technologies
+| fieldsAdd host.software_technologies, k8s.cluster.name
+| expand tech = host.software_technologies
 | filter tech[type] == "KUBERNETES" and tech[edition] == "worker"
 | fieldsAdd k8s_version = tech[version]
 | summarize
@@ -285,8 +285,8 @@ Calculate compliance rate against target version:
 
 ```dql
 smartscapeNodes "HOST"
-| fieldsAdd process.software_technologies
-| expand tech = process.software_technologies
+| fieldsAdd host.software_technologies
+| expand tech = host.software_technologies
 | filter tech[type] == "KUBERNETES" and tech[edition] == "worker"
 | fieldsAdd k8s_version = tech[version]
 | fieldsAdd
@@ -349,15 +349,15 @@ smartscapeNodes "HOST"
 
 Identify hosts running older operator versions:
 
-```dql
+```dql-template
 smartscapeNodes "HOST"
 | fieldsAdd operator_version = host.custom.metadata[OperatorVersion], name, k8s.cluster.name
 | filter isNotNull(operator_version)
-| filter operator_version != "v1.6.3" and operator_version != "v1.7.1"
+| filter operator_version != "<TARGET_VERSION>"
 | sort operator_version, k8s.cluster.name
 ```
 
-**Alert:** Target specific version for upgrades (adjust filter based on latest version).
+**Alert:** Replace `<TARGET_VERSION>` with the version you are upgrading to.
 
 ### Operator Version Consistency Check
 
@@ -383,13 +383,13 @@ smartscapeNodes "HOST"
 
 Monitor upgrade progress by comparing versions:
 
-```dql
+```dql-template
 smartscapeNodes "HOST"
 | fieldsAdd operator_version = host.custom.metadata[OperatorVersion]
 | filter isNotNull(operator_version)
 | fieldsAdd
-    version_category = if(operator_version == "v1.7.1", "latest",
-                      else: if(operator_version == "v1.6.3", "current",
+    version_category = if(operator_version == "<TARGET_VERSION>", "latest",
+                      else: if(operator_version == "<PREVIOUS_VERSION>", "current",
                       else: "legacy"))
 | summarize host_count = count(), by: {version_category}
 | sort version_category desc

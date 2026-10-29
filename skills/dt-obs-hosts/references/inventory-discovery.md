@@ -246,9 +246,9 @@ List all listening ports and process counts:
 
 ```dql
 smartscapeNodes "PROCESS"
-| fieldsAdd process.listen_ports, dt.process_group.detected_name
-| filter isNotNull(process.listen_ports) and arraySize(process.listen_ports) > 0
-| expand listen_port = process.listen_ports
+| filter isNotNull(port) and arraySize(port) > 0
+| fieldsAdd port, dt.process_group.detected_name
+| expand listen_port = port
 | summarize process_count = countDistinct(id), by: {listen_port}
 | sort toLong(listen_port) asc
 ```
@@ -261,9 +261,9 @@ Identify services on standard ports:
 
 ```dql
 smartscapeNodes "PROCESS"
-| fieldsAdd process.listen_ports, dt.process_group.detected_name
-| filter isNotNull(process.listen_ports)
-| expand listen_port = process.listen_ports
+| filter isNotNull(port) and arraySize(port) > 0
+| fieldsAdd port, dt.process_group.detected_name
+| expand listen_port = port
 | filter toLong(listen_port) <= 1024
 | summarize
     process_count = countDistinct(id),
@@ -292,13 +292,14 @@ Find all processes listening on a specific port:
 
 ```dql
 smartscapeNodes "PROCESS"
-| fieldsAdd process.listen_ports, dt.process_group.detected_name, name
-| expand listen_port = process.listen_ports
-| filter listen_port == "443"
+| filter isNotNull(port) and arraySize(port) > 0
+| fieldsAdd port, dt.process_group.detected_name, name
+| expand listen_port = port
+| filter listen_port == 443
 | limit 50
 ```
 
-**Example:** Replace "443" with your target port.
+**Example:** Replace `443` with your target port. `listen_port` is a long, so do not quote it.
 
 ### Port Conflict Detection
 
@@ -306,8 +307,9 @@ Identify ports with multiple different process types:
 
 ```dql
 smartscapeNodes "PROCESS"
-| fieldsAdd process.listen_ports, dt.process_group.detected_name
-| expand listen_port = process.listen_ports
+| filter isNotNull(port) and arraySize(port) > 0
+| fieldsAdd port, dt.process_group.detected_name
+| expand listen_port = port
 | summarize
     process_count = countDistinct(id),
     process_types = countDistinct(dt.process_group.detected_name),
@@ -325,8 +327,9 @@ Identify HTTP/HTTPS services:
 
 ```dql
 smartscapeNodes "PROCESS"
-| fieldsAdd process.listen_ports, dt.process_group.detected_name
-| expand listen_port = process.listen_ports
+| filter isNotNull(port) and arraySize(port) > 0
+| fieldsAdd port, dt.process_group.detected_name
+| expand listen_port = port
 | filter in(listen_port, {80, 443, 8080, 8443, 3000, 4000, 5000, 9090})
 | summarize
     process_count = countDistinct(id),
@@ -340,8 +343,9 @@ Find all database services:
 
 ```dql
 smartscapeNodes "PROCESS"
-| fieldsAdd process.listen_ports, dt.process_group.detected_name
-| expand listen_port = process.listen_ports
+| filter isNotNull(port) and arraySize(port) > 0
+| fieldsAdd port, dt.process_group.detected_name
+| expand listen_port = port
 | filter in(listen_port, {3306, 5432, 1521, 1433, 27017, 6379, 9042, 7000})
 | summarize
     process_count = countDistinct(id),
@@ -361,6 +365,15 @@ smartscapeNodes "PROCESS"
 ---
 
 ## Multi-Cloud Hosts
+
+### Cloud Attribute Reference
+
+Filter on `cloud.provider` (`aws` / `azure` / `gcp`), then use the provider's attributes:
+
+- **AWS:** `aws.region`, `aws.availability_zone`, `aws.account.id`, `aws.resource.id`, `aws.resource.name`, `aws.state` (running / stopped / terminated)
+- **Azure:** `azure.location`, `azure.subscription`, `azure.resource.group`, `azure.status`, `azure.provisioning_state`, `azure.resource.sku.name` (VM size)
+- **GCP:** `gcp.region`, `gcp.zone`, `gcp.location`, `gcp.project.id` (two dots — `gcp.project_id` always returns null), `gcp.resource.type` (e.g. `gce_instance`), `gcp.asset.type` (e.g. `compute.googleapis.com/Instance`)
+- **Kubernetes:** `k8s.cluster.name`, `k8s.cluster.uid`, `k8s.namespace.name`, `k8s.node.name`, `k8s.pod.name`, `k8s.workload.name`, `k8s.workload.kind`
 
 ### Cloud Provider Distribution
 
@@ -603,48 +616,48 @@ smartscapeNodes "HOST"
 
 List all Azure-specific tags:
 
-```dql
+```dql-template
 smartscapeNodes "HOST"
 | filter isNotNull(azure.location)
-| fieldsAdd `tags:azure`[dt_owner_team], `tags:azure`[dt_owner_capability]
-| filter isNotNull(`tags:azure`[dt_owner_team])
-| summarize host_count = count(), by: {`tags:azure`[dt_owner_team], `tags:azure`[dt_owner_capability]}
+| fieldsAdd `tags:azure`[<owner_team_tag>], `tags:azure`[<owner_department_tag>]
+| filter isNotNull(`tags:azure`[<owner_team_tag>])
+| summarize host_count = count(), by: {`tags:azure`[<owner_team_tag>], `tags:azure`[<owner_department_tag>]}
 | sort host_count desc
 ```
 
-**Azure Pattern:** Tags prefixed with `tags:azure` for resource organization.
+**Azure Pattern:** Tags prefixed with `tags:azure` for resource organization. Replace `<owner_team_tag>` and `<owner_department_tag>` with your Azure tag key names.
 
 ### Azure Cost Tags
 
 Analyze Azure cost allocation tags:
 
-```dql
+```dql-template
 smartscapeNodes "HOST"
 | filter isNotNull(azure.location)
 | fieldsAdd
-    capability = `tags:azure`[dt_cloudcost_capability],
-    service = `tags:azure`[dt_cloudcost_service],
-    cluster = `tags:azure`[dt_cloudcost_clustername]
-| filter isNotNull(capability)
-| summarize host_count = count(), by: {capability, service}
+    department = `tags:azure`[<cloudcost_department_tag>],
+    service = `tags:azure`[<cloudcost_service_tag>],
+    cluster = `tags:azure`[<cloudcost_cluster_tag>]
+| filter isNotNull(department)
+| summarize host_count = count(), by: {department, service}
 | sort host_count desc
 ```
 
-**Use Case:** Cost allocation and chargeback reporting.
+**Use Case:** Cost allocation and chargeback reporting. Replace the tag key placeholders with your Azure cost tag names.
 
 ### Azure Owner Tags
 
 Track resource ownership via Azure tags:
 
-```dql
+```dql-template
 smartscapeNodes "HOST"
 | filter isNotNull(azure.location)
 | fieldsAdd
-    owner_team = `tags:azure`[dt_owner_team],
-    owner_email = `tags:azure`[dt_owner_email],
-    owner_capability = `tags:azure`[dt_owner_capability]
+    owner_team = `tags:azure`[<owner_team_tag>],
+    owner_email = `tags:azure`[<owner_email_tag>],
+    owner_department = `tags:azure`[<owner_department_tag>]
 | filter isNotNull(owner_team)
-| summarize host_count = count(), by: {owner_team, owner_capability}
+| summarize host_count = count(), by: {owner_team, owner_department}
 | sort host_count desc
 ```
 

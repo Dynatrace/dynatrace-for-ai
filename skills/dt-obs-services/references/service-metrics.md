@@ -270,7 +270,7 @@ Custom SLA calculation with complex conditions:
 fetch spans, from: now() - 1h
 | filter request.is_root_span == true
 | fieldsAdd
-    meets_sla = if(request.is_failed == false AND duration < 3000000000, 1, else: 0)
+    meets_sla = if(request.is_failed == false AND duration < 3s, 1, else: 0)
 | summarize
     total_requests = count(),
     sla_compliant = sum(meets_sla),

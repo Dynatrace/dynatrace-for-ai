@@ -18,7 +18,7 @@ Covers BUE billable totals, per-source attribution, per-detector breakdown
 - [Step 3 — Drill Into QEE for Details](#step-3--drill-into-qee-for-details)
   - [Step 3b — Cross-Validate Execution Count](#step-3b--cross-validate-execution-count)
 - [Step 4 — Per-Detector Scan & Name Resolution (ALERTING pool)](#step-4--per-detector-scan--name-resolution-alerting-pool)
-- [Step 5 — Rank by Cost Weight](#step-5--rank-by-cost-weight)
+- [Step 5 — Rank by Cost Weight](#step-5--rank-by-cost-weight--estimated-cost)
 - [Investigating QEE↔BUE Mismatches](#investigating-qeebue-mismatches)
 
 ## Common Principles
@@ -81,6 +81,10 @@ attribution. For app-level results, drill into `client.function_context`.
 Start with BUE — billable truth. First run a **coverage check** to see which
 attribution field to use, then run the attribution query.
 
+> **Rated path:** When a rate card is available (pre-flight passes), use the
+> rated variant of [Step 1b](#step-1b--combined-attribution) — it sums raw
+> `billed_bytes` so the rate-card join converts to GiB exactly once.
+
 ### Step 1a — Coverage Check
 
 Verify which attribution fields are populated before building the attribution
@@ -127,6 +131,20 @@ fetch dt.system.events, from: -30d
 | sort total_billed_gib desc
 | limit 20
 ```
+
+**Rated path:** When a rate card is available, replace the `summarize` above with one
+that keeps **raw bytes** — the join divides by `lookup.unit_divisor` (`1073741824` for
+all Query BUE types), so summing values already in GiB divides twice and rounds every
+cost to `0.00`:
+
+```dql-snippet
+| summarize billable_usage = sum(billed_bytes), by: {attribution, event.type}
+```
+
+Then append the [Rate Card Join Snippet](cost-estimations.md#rate-card-join-snippet) —
+it yields `capability_usage` in GiB scanned and `estimated_cost` — and sort with
+`isNull(estimated_cost) asc, estimated_cost desc`. For output rules and disclaimer wording, see
+[cost-estimations.md § Output Rules for Rated Path](cost-estimations.md#output-rules-for-rated-path).
 
 ## Step 2 — Identify Source Type
 
@@ -308,6 +326,7 @@ For ALERTING sources, parse `client.client_context` from QEE to get per-detector
 scan volume, then resolve detector names from `ANALYZER_EXECUTION_EVENT` via
 `join`.
 
+
 **`dt.task.id` is the full encoded settings UID** (base64-encoded, e.g.,
 `vu9U3hXa3q0AAAAB...vu9U3hXa3q0`) — not a plain UUID. This same encoded UID
 appears in QEE `client.client_context` → `dt.task.id`, AEE `dt.task.id`, and
@@ -338,9 +357,17 @@ fetch dt.system.events, from: -7d
 > **`user.id` is NOT detector-specific.** All anomaly detectors share a service
 > account. Use `dt.task.id` / `client.client_context` instead.
 
-## Step 5 — Rank by Cost Weight
+## Step 5 — Rank by Cost Weight / Estimated Cost
 
-Apply normalization weights from [cost-estimations.md](cost-estimations.md) → [Cost Normalization Weights](cost-estimations.md#cost-normalization-weights).
+**Unrated path:** Apply normalization weights from [cost-estimations.md](cost-estimations.md) →
+[Cost Normalization Weights](cost-estimations.md#cost-normalization-weights).
+
+**Rated path:** When a rate card is available, use `estimated_cost` from the rate-card join
+(Steps 1b Rated / Dashboard Ranking Rated above) as the ranking key. No weight multiplication
+is needed — the join already converts scan volume to the contracted currency. Sort with
+`isNull(estimated_cost) asc, estimated_cost desc`.
+
+The detector table is a ranking, so it opens with the unrated ℹ️ disclaimer from [SKILL.md Cost Ranking Rules step 3](../SKILL.md#cost-ranking-rules).
 
 ## Investigating QEE↔BUE Mismatches
 

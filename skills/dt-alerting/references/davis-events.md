@@ -42,9 +42,10 @@ The `event.category` field classifies what kind of condition was detected:
 | `AVAILABILITY` | Entity became unavailable — synthetic failure, process down, service unreachable |
 | `ERROR` | Error rate exceeded threshold — service errors, database errors |
 | `SLOWDOWN` | Response time or throughput degraded below / above threshold |
-| `RESOURCE` | Resource saturation — CPU, memory, disk, network |
+| `RESOURCE_CONTENTION` | Resource saturation — CPU, memory, disk, network |
 | `INFO` | Information context changes — Deployment or config changes, process restarts, other infos |
-| `CUSTOM` | User-defined event rule without a specific semantic category |
+| `CUSTOM_ALERT` | User-defined event rule without a specific semantic category |
+| `WARNING` | Non-critical condition that does not match another category |
 
 ---
 
@@ -55,7 +56,7 @@ The `event.category` field classifies what kind of condition was detected:
 | `event.id` | System-generated unique identifier for the Davis event — the ultimate technical identity of an individual Davis event record |
 | `event.kind` | Always `"DAVIS_EVENT"` for detector-triggered alerts |
 | `event.name` | Alert title — set by the detector's `eventTemplate.title`; should be short, precise, and follow a consistent naming convention (see below) |
-| `event.category` | Alert category (AVAILABILITY, ERROR, SLOWDOWN, RESOURCE, CUSTOM) |
+| `event.category` | Alert category (AVAILABILITY, ERROR, SLOWDOWN, RESOURCE_CONTENTION, INFO, WARNING, CUSTOM_ALERT) |
 | `event.status` | `"ACTIVE"` — threshold still breached; `"CLOSED"` — condition resolved |
 | `event.status_transition` | Describes the lifecycle update that produced this Davis event record: `CREATED` — first occurrence; `UPDATED` — properties changed while active; `REFRESHED` — keep-alive report received within the timeout window; `TIMED_OUT` — no refresh arrived before `dt.davis.timeout` expired, Davis event closed; `RECOVERED` — condition cleared normally |
 | `timestamp` | UNIX Epoch time in nanoseconds when the Davis event originated — set by the source when available, otherwise populated at ingest time. Required for all Davis events. For correlated Davis events (e.g. ITIL updates) this may differ from `event.start`, as it represents when the specific update record was created rather than when the condition first began |

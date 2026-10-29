@@ -120,7 +120,6 @@ fetch dt.davis.problems, from:now() - 1h
     event.description,                    // Detailed description
     event.category,                       // Problem type
     event.status,                         // ACTIVE or CLOSED
-    dt.smartscape_source.id,              // The smartscape ID for the affected resource
     dt.davis.affected_users_count,        // Number of affected users
     affected_entity_ids = smartscape.affected_entities[][id],  // Array of affected entity IDs
     dt.smartscape.service,                // Affected services (may be array)
@@ -327,19 +326,7 @@ See `references/problem-trending.md` for complete query patterns and best practi
 
 ### Problems Associated with Kubernetes Clusters
 
-Use `affected_entity_ids` or `dt.smartscape_source.id` to find problems related to Kubernetes:
-
-```dql
-fetch dt.davis.problems, from:now() - 7d
-| filter not(dt.davis.is_duplicate)
-| filter matchesPhrase(dt.smartscape_source.id, "KUBERNETES_CLUSTER")
-    OR matchesPhrase(dt.smartscape_source.id, "K8S_")
-| fields event.start, display_id, event.name, event.category, event.status,
-    dt.smartscape_source.id, affected_entity_ids
-| sort event.start desc
-```
-
-Alternative: expand affected entities and filter for K8s entity types:
+Expand `affected_entity_ids` and filter for Kubernetes entity types:
 
 ```dql
 fetch dt.davis.problems, from:now() - 7d
@@ -350,6 +337,10 @@ fetch dt.davis.problems, from:now() - 7d
 | fields event.start, display_id, event.name, event.category, entity_id
 | sort event.start desc
 ```
+
+Do not filter problems on `dt.smartscape_source.id`. That field is populated on
+`dt.davis.events`, not on `dt.davis.problems` — on problems it is null for every
+record, so the filter returns nothing and reads as "no Kubernetes problems".
 
 ### Simple Problem Listing
 
@@ -447,7 +438,7 @@ fetch dt.davis.problems, from: "2026-05-18T22:50:00Z", to: "2026-05-18T23:35:00Z
 | Wrong field name (`title`, `status`, `severity`) | SQL-like naming | Use `event.name`, `event.status`, `event.category` — see field name table above |
 | `root_cause_entity_id` is null | Not all problems have identified root causes | Add `filter isNotNull(root_cause_entity_id)` when querying root causes |
 | Query scans too much data / times out | Missing time range | Always specify `from:now() - <duration>` on the fetch command |
-| `affected_entity_ids` is empty array | Problem has no mapped affected entities | Check `dt.smartscape.service` or `dt.smartscape_source.id` as alternatives |
+| `affected_entity_ids` is empty array | Problem has no mapped affected entities | Check `dt.smartscape.service` or `smartscape.affected_entities` as alternatives — `dt.smartscape_source.id` is null on problems |
 
 ## When to Load References
 

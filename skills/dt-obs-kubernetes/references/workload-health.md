@@ -134,7 +134,7 @@ smartscapeNodes K8S_HORIZONTALPODAUTOSCALER
     max_replicas = config[`spec`][`maxReplicas`],
     current_replicas = config[`status`][`currentReplicas`]
 | filter current_replicas >= max_replicas
-| fields k8s.cluster.name, k8s.namespace.name, k8s.workload.name,
+| fields k8s.cluster.name, k8s.namespace.name, k8s.horizontalpodautoscaler.name,
     current_replicas, max_replicas
 ```
 

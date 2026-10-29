@@ -20,7 +20,7 @@ Merging decisions are mainly driven by:
 
 2. Source entity is the same
 - Preferred field: `dt.smartscape_source.id` is the same.
-- Backward-compatible/older field: `dt.source_entity` is the same.
+- Deprecated field: `dt.source_entity` is the same. This field is deprecated and will be removed in the future — use `dt.smartscape_source.id` instead.
 
 3. Events are in the same vertical deployment stack
 - Example: a process runs on a host.
@@ -43,7 +43,7 @@ Use these fields when investigating merge behavior:
 - `event.start`
 - `event.end`
 - `dt.smartscape_source.id`
-- `dt.source_entity`
+- `dt.source_entity` (deprecated — use `dt.smartscape_source.id`)
 - `dt.davis.is_merging_allowed`
 
 ## Investigation Tips
@@ -52,7 +52,7 @@ Use these fields when investigating merge behavior:
 - Check if active windows overlap.
 
 2. Compare entity identity next
-- Check both `dt.smartscape_source.id` and `dt.source_entity`.
+- Check `dt.smartscape_source.id` (preferred) and `dt.source_entity` (deprecated; still readable but will be removed).
 
 3. Validate topology relationship
 - If entities differ, check whether they are still part of the same vertical stack (for example process on host).

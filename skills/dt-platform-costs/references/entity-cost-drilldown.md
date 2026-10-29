@@ -123,6 +123,8 @@ fetch dt.system.events, from: -7d
 
 ### Host Monitoring (Full-Stack, Infrastructure, Foundation)
 
+#### All-Hosts Ranking (Unrated / No Rate Card)
+
 ```dql-template
 fetch dt.system.events, from: -7d
 | filter event.kind == "BILLING_USAGE_EVENT"
@@ -138,6 +140,15 @@ fetch dt.system.events, from: -7d
 > Infrastructure and Foundation. See
 > [billing-event-types.md](billing-event-types.md) for the correct billed
 > field per event type.
+
+**Rated path:** When a rate card is available, name the summarize output
+`billable_usage` instead of `total_usage` — the join reads that field, raw and
+unconverted — and keep `event.type` in the group-by, because the join matches on it:
+`| summarize billable_usage = sum(<billed field>), by: {dt.entity.host, event.type}`.
+Then append the rate-card join from
+[cost-estimations.md § Price Source Resolution](cost-estimations.md#price-source-resolution),
+then sort with `isNull(estimated_cost) asc, estimated_cost desc`. For output rules and disclaimer wording, see
+[cost-estimations.md § Output Rules for Rated Path](cost-estimations.md#output-rules-for-rated-path).
 
 ### RUM (Real User Monitoring)
 

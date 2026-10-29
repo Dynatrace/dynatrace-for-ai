@@ -111,7 +111,7 @@
       "affected_entity.type": "PROCESS_GROUP",
       "related_entities.kubernetes_clusters.count": "0",
       "vulnerability.cvss.vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N",
-      "vulnerability.url": "https://demo.dev.dynatracelabs.com/ui/security/problem/6559308239670527127",
+      "vulnerability.url": "https://{your-environment-id}.apps.dynatrace.com/ui/security/problem/6559308239670527127",
       "affected_entity.vulnerable_functions": [],
       "vulnerability.parent.davis_assessment.assessment_mode": "FULL",
       "vulnerability.parent.first_seen": "2023-08-17T14:04:03.198000000Z",
@@ -243,7 +243,7 @@
       "affected_entity.type": "PROCESS_GROUP",
       "related_entities.kubernetes_clusters.count": "0",
       "vulnerability.cvss.vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H",
-      "vulnerability.url": "https://demo.dev.dynatracelabs.com/ui/security/problem/5299986947609318358",
+      "vulnerability.url": "https://{your-environment-id}.apps.dynatrace.com/ui/security/problem/5299986947609318358",
       "affected_entity.vulnerable_functions": [],
       "vulnerability.parent.davis_assessment.assessment_mode": "FULL",
       "vulnerability.parent.first_seen": "2023-06-06T14:41:29.576000000Z",
@@ -353,7 +353,7 @@
       "vulnerability.risk.score": 10,
       "affected_entity.type": "PROCESS_GROUP",
       "related_entities.kubernetes_clusters.count": "0",
-      "vulnerability.url": "https://demo.dev.dynatracelabs.com/ui/security/code-vulnerabilities/11655308857424924884",
+      "vulnerability.url": "https://{your-environment-id}.apps.dynatrace.com/ui/security/code-vulnerabilities/11655308857424924884",
       "affected_entity.vulnerable_functions": [
         "Router.dispatch() (route.js)"
       ],

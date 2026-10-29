@@ -2,14 +2,14 @@
 name: dt-obs-hosts
 description: >-
   Host and process metrics including CPU, memory, disk, network, containers, and process-level
-  telemetry. Use when analyzing infrastructure health, resource utilization, process consumption,
+  telemetry. Use when analyzing infra health, resource util, process consumption,
   or host discovery. Also use when building timeseries queries for host metrics that feed into
   analytical workflows like anomaly detection, forecasting, or seasonality analysis.
   Trigger: "show hosts", "CPU usage", "memory utilization", "disk space", "high CPU",
   "top hosts by CPU", "top processes by memory",
-  "Linux hosts in AWS", "what databases are running", "infrastructure costs by cost center",
-  "hosts running EOL Java", "container monitoring", "listening ports",
-  "process resource consumption", "CPU forecast", "memory anomaly", "host seasonality",
+  "Linux hosts in AWS", "what databases are running", "infra costs by cost center",
+  "process resource consumption", "container monitoring", "listening ports",
+  "CPU forecast", "memory anomaly", "host seasonality",
   "OneAgent mode", "OneAgent version", "GCP hosts".
   Do NOT use for explaining existing queries, product documentation questions,
   Kubernetes pod/workload queries (use dt-obs-kubernetes), AWS cloud resource inventory
@@ -83,7 +83,7 @@ smartscapeNodes "HOST"
 
 **OS Types:** `LINUX`, `WINDOWS`, `AIX`, `SOLARIS`, `ZOS`
 
-→ For cloud-specific attributes, see [references/inventory-discovery.md](#cloud-specific-attributes)
+→ For cloud-specific attributes, see [references/inventory-discovery.md](references/inventory-discovery.md#cloud-attribute-reference)
 
 ### 2. Resource Utilization Monitoring
 
@@ -93,9 +93,9 @@ Monitor CPU, memory, disk, network across hosts.
 timeseries {
   cpu = avg(dt.host.cpu.usage),
   memory = avg(dt.host.memory.usage),
-  disk = avg(dt.host.disk.used.percent)
+  disk_free = avg(dt.host.disk.free)
 }, by: {dt.smartscape.host}
-| fieldsAdd host_name = getNodeName(dt.smartscape.host)
+| fieldsAdd host_name = getNodeName(dt.smartscape.host), disk_used = 100 - disk_free[]
 | filter arrayAvg(cpu) > 80 or arrayAvg(memory) > 80
 | sort arrayAvg(cpu) desc
 ```
@@ -115,10 +115,10 @@ timeseries {
 #### Disk Free Space — Find Hosts with Most/Least Free Disk
 
 ```dql
-timeseries disk_used_pct = avg(dt.host.disk.used.percent), by: {dt.smartscape.host}
+timeseries disk_free_pct = avg(dt.host.disk.free), by: {dt.smartscape.host}
 | fieldsAdd host_name = getNodeName(dt.smartscape.host)
-| fieldsAdd avg_disk_used = arrayAvg(disk_used_pct),
-    free_pct = 100 - arrayAvg(disk_used_pct)
+| fieldsAdd free_pct = arrayAvg(disk_free_pct),
+    avg_disk_used = 100 - arrayAvg(disk_free_pct)
 | sort free_pct desc
 | limit 10
 ```
@@ -164,15 +164,15 @@ Map listening ports to services for security and inventory.
 
 ```dql
 smartscapeNodes "PROCESS"
-| fieldsAdd process.listen_ports, dt.process_group.detected_name
-| filter isNotNull(process.listen_ports) and arraySize(process.listen_ports) > 0
-| expand listen_port = process.listen_ports
+| filter isNotNull(port) and arraySize(port) > 0
+| fieldsAdd port, dt.process_group.detected_name
+| expand listen_port = port
 | summarize process_count = count(), by: {listen_port, dt.process_group.detected_name}
 | sort toLong(listen_port) asc
 | limit 50
 ```
 
-**Well-known ports:** 80 (HTTP), 443 (HTTPS), 22 (SSH), 3306 (MySQL), 5432 (PostgreSQL)
+**Well-known ports** (values are numeric — filter with an unquoted integer, `listen_port == 22`, not `"22"`): 80 (HTTP), 443 (HTTPS), 22 (SSH), 3306 (MySQL), 5432 (PostgreSQL)
 
 → For comprehensive port mapping, see [references/inventory-discovery.md](references/inventory-discovery.md#port-discovery)
 
@@ -234,7 +234,35 @@ timeseries {
 
 → For multi-resource saturation detection, see [references/host-metrics.md](references/host-metrics.md#resource-saturation)
 
-### 9. OneAgent Inventory
+### 9. Disk Monitoring
+
+→ For space, I/O, latency, inode, and fill-prediction queries, see
+[references/disk-monitoring.md](references/disk-monitoring.md).
+
+**Shared disks.** A `DISK-*` Smartscape ID identifies a **logical storage device** —
+several can map to one physical device. Read `disk.remote_disk_id` (a property of the disk, constant across
+its mounts) straight from Smartscape for the Smartscape disk entities the problem fired on — a shared
+non-zero value means one physical disk mounted in several places. Filter smartscape ids with
+`matchesValue` (not `in`, which rejects the smartscape-id type):
+
+```dql-template
+smartscapeNodes "DISK"
+| filter matchesValue(id, array("<DISK-ID-1>", "<DISK-ID-2>"))
+| filter isNotNull(`disk.remote_disk_id`) and `disk.remote_disk_id` != 0
+| summarize mounts = collectDistinct(id), mount_count = countDistinct(id), by: {`disk.remote_disk_id`}
+```
+
+- **One row** → those mounts share **one physical disk** (one root cause); `mount_count` is how many
+  of the queried mounts share it. Other mounts may not have alerted — the Fan-Out query below
+  enumerates the full set.
+- **Multiple rows** → genuinely separate disks. Investigate each independently.
+- A `disk.remote_disk_id` of **0** (filtered out) is a local, non-shared disk.
+
+→ See [references/disk-monitoring.md](references/disk-monitoring.md#shared-disks) for the corrections
+that follow — cross-host attribution, blast radius, and environment-wide
+shared disk discovery.
+
+### 10. OneAgent Inventory
 
 Count and list hosts by OneAgent monitoring mode, version, or cloud region.
 
@@ -242,29 +270,9 @@ Count and list hosts by OneAgent monitoring mode, version, or cloud region.
 
 **Key ONEAGENT fields:**
 - `dt.agent.monitoring_mode` — monitoring coverage level: `FULL_STACK` / `INFRASTRUCTURE` / `DISCOVERY`
-- `dt.agent.module.version` — installed version string, e.g. `1.347.0.20260809-172428`
+- `dt.agent.module.version` — installed version string, formatted `<major>.<minor>.<patch>.<build>`
 
-**Count by monitoring mode:**
-
-```dql
-smartscapeNodes "HOST"
-| traverse edgeTypes: {monitors}, targetTypes: {ONEAGENT}, direction: backward
-| fieldsAdd oa_mode = `dt.agent.monitoring_mode`
-| summarize host_count = count(), by: {oa_mode}
-| sort host_count desc
-```
-
-**Count by agent version:**
-
-```dql
-smartscapeNodes "HOST"
-| traverse edgeTypes: {monitors}, targetTypes: {ONEAGENT}, direction: backward
-| fieldsAdd oa_version = `dt.agent.module.version`
-| summarize host_count = count(), by: {oa_version}
-| sort host_count desc
-```
-
-**Combined: mode + version** (for upgrade planning):
+**Count by mode and version** (for upgrade planning) — drop either field from `by:` for a single-dimension breakdown (mode only, or version only):
 
 ```dql
 smartscapeNodes "HOST"
@@ -408,16 +416,7 @@ timeseries metric = avg(dt.host.<metric>), by: {dt.smartscape.host}
 | filter <thresholds>
 ```
 
-### Pattern 3: Cross-Layer Correlation
-Correlate host and process metrics.
-```dql
-timeseries {
-  host_cpu = avg(dt.host.cpu.usage),
-  process_cpu = avg(dt.process.cpu.usage)
-}, by: {dt.smartscape.host, dt.smartscape.process}
-```
-
-### Pattern 4: Entity Enrichment with Lookup
+### Pattern 3: Entity Enrichment with Lookup
 Enrich data with entity attributes. After `lookup`, reference fields with `lookup.` prefix.
 ```dql
 timeseries cpu = avg(dt.host.cpu.usage), by: {dt.smartscape.host}
@@ -427,52 +426,6 @@ timeseries cpu = avg(dt.host.cpu.usage), by: {dt.smartscape.host}
   ], sourceField:dt.smartscape.host, lookupField:id
 | fieldsAdd cores = lookup.cpuCores, mem_gb = lookup.memoryTotal / 1024 / 1024 / 1024
 ```
-
----
-
-## Tags and Metadata
-
-### Important Notes
-- Generic `tags` field is NOT populated in smartscape queries
-- Use specific tag fields: `tags:azure[*]`, `tags:environment`
-- Use custom metadata: `host.custom.metadata[*]`
-
-### Available Tags
-- **Azure Tags:** `tags:azure[dt_owner_team]`, `tags:azure[dt_cloudcost_capability]`
-- **Environment:** `tags:environment`
-- **Custom Metadata:** `host.custom.metadata[OperatorVersion]`, `host.custom.metadata[Cluster]`
-- **Cost:** `dt.cost.costcenter`, `dt.cost.product`
-
-→ For complete tag reference, see [references/inventory-discovery.md](references/inventory-discovery.md#tags-and-metadata)
-
----
-
-## Cloud-Specific Attributes
-
-### AWS
-- `cloud.provider == "aws"`
-- `aws.region`, `aws.availability_zone`, `aws.account.id`
-- `aws.resource.id`, `aws.resource.name`
-- `aws.state` (running, stopped, terminated)
-
-### Azure
-- `cloud.provider == "azure"`
-- `azure.location`, `azure.subscription`, `azure.resource.group`
-- `azure.status`, `azure.provisioning_state`
-- `azure.resource.sku.name` (VM size)
-
-### GCP
-- `cloud.provider == "gcp"`
-- `gcp.region`, `gcp.zone`, `gcp.location`
-- `gcp.project.id` (note: two dots)
-- `gcp.resource.type` (e.g. `gce_instance`), `gcp.asset.type` (e.g. `compute.googleapis.com/Instance`)
-
-### Kubernetes
-- `k8s.cluster.name`, `k8s.cluster.uid`
-- `k8s.namespace.name`, `k8s.node.name`, `k8s.pod.name`
-- `k8s.workload.name`, `k8s.workload.kind`
-
-→ For multi-cloud analysis, see [references/inventory-discovery.md](references/inventory-discovery.md#multi-cloud-hosts)
 
 ---
 
@@ -487,10 +440,8 @@ timeseries cpu = avg(dt.host.cpu.usage), by: {dt.smartscape.host}
 
 **Time windows:** Real-time: 5-15 min | Trends: 1-7 days | Capacity planning: 30-90 days
 
-### Limitations
-- `dt.host.cpu.iowait` available on Linux only
-- Generic `tags` field NOT populated in smartscape (use specific tag namespaces)
-- Container image names NOT available in smartscape
+Known metric/field limitations (iowait Linux-only, generic `tags` unpopulated, container image
+names absent) are listed with their fixes in the Troubleshooting table below.
 
 ---
 
@@ -516,8 +467,15 @@ This skill uses **progressive disclosure**. Start here for 80% of use cases. Loa
 ### Load host-metrics.md when:
 - Analyzing CPU component breakdown (user, system, iowait, steal)
 - Investigating memory pressure and swap usage
-- Troubleshooting disk I/O latency
 - Diagnosing network packet drops or errors
+- Detecting multi-resource saturation
+
+### Load disk-monitoring.md when:
+- Investigating disk space, I/O throughput, latency, or inode exhaustion
+- Predicting when a disk will fill
+- A Davis Problem involves multiple Smartscape disk entities confirmed to share one `disk.remote_disk_id`
+- Attributing any shared disk metric — space, slowdown, inodes, or a custom alert — across several mounting hosts
+- Assessing which additional mounting hosts are exposed but have not alerted
 
 ### Load process-monitoring.md when:
 - Analyzing process-level I/O patterns
@@ -537,14 +495,5 @@ This skill uses **progressive disclosure**. Start here for 80% of use cases. Loa
 - Validating data quality and metadata completeness
 - Managing multi-cloud infrastructure
 - Listing or filtering hosts by OneAgent mode/version
-
----
-
-## References
-
-- [host-metrics.md](references/host-metrics.md) - Detailed host CPU, memory, disk, and network monitoring
-- [process-monitoring.md](references/process-monitoring.md) - Process-level CPU, memory, I/O, and network analysis
-- [container-monitoring.md](references/container-monitoring.md) - Container inventory, Kubernetes versions, and operator management
-- [inventory-discovery.md](references/inventory-discovery.md) - Host/process discovery, technology inventory, cost attribution, and data quality
 
 ---

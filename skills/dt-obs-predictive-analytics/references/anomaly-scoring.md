@@ -54,7 +54,7 @@ lower value = more alerts (valid range 0.1–10.0; default 4.0).
 
 Use when the acceptable limit is known and stable (e.g., CPU > 90%).
 `threshold` must be in the base unit of the queried metric (response time
-metrics use nanoseconds — set 5 seconds as `5000000000`, not `5000`).
+metrics use microseconds — set 5 seconds as `5000000`, not `5000`).
 
 **Tool**: `static-threshold-analyzer`
 - `timeSeriesData`: `timeseries avg(dt.host.cpu.usage), by:{dt.entity.host}, interval:1m | limit 20`
@@ -114,8 +114,8 @@ Available novelty types: `CHANGE_IN_VALUES`, `CHANGE_IN_VARIABILITY`,
   day/week before escalating
 - Consider seasonality — a spike at Monday 9 AM may be expected
 - Correlate Davis AI findings with DQL scores to prioritize what matters
-- `dt.service.request.response_time` is in nanoseconds — divide by
-  `1000000` for ms before scoring
+- `dt.service.request.response_time` is in microseconds — divide by
+  `1000` for ms before scoring
 - For `static-threshold-analyzer`, always set `threshold` in the metric's
-  base unit (nanoseconds for response time, percent for CPU)
+  base unit (microseconds for response time, percent for CPU)
 - `violatingSamples` must not exceed `slidingWindow`

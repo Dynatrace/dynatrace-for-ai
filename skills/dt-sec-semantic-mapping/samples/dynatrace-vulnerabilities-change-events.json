@@ -117,7 +117,7 @@
       "related_entities.kubernetes_clusters.count": "0",
       "vulnerability.cvss.vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:H/I:H/A:H",
       "event.trigger.type": "DT_PLATFORM",
-      "vulnerability.url": "https://demo.dev.dynatracelabs.com/ui/security/problem/17031388985207430910",
+      "vulnerability.url": "https://{your-environment-id}.apps.dynatrace.com/ui/security/problem/17031388985207430910",
       "affected_entity.vulnerable_functions": [],
       "vulnerability.parent.davis_assessment.assessment_mode": "FULL",
       "vulnerability.parent.first_seen": "2023-08-17T14:04:03.198000000Z",
@@ -216,7 +216,7 @@
       "affected_entity.type": "PROCESS_GROUP",
       "related_entities.kubernetes_clusters.count": "0",
       "vulnerability.cvss.vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
-      "vulnerability.url": "https://demo.dev.dynatracelabs.com/ui/security/problem/11526069578220465414",
+      "vulnerability.url": "https://{your-environment-id}.apps.dynatrace.com/ui/security/problem/11526069578220465414",
       "vulnerability.parent.first_seen": "2024-07-19T16:42:55.723000000Z",
       "vulnerability.parent.resolution.status": "OPEN",
       "vulnerability.references.cve": [

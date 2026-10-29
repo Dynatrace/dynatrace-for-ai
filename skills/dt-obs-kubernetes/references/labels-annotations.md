@@ -444,8 +444,8 @@ smartscapeNodes K8S_POD
    slashes in backticks
 
    ```dql
-   tags[``app.kubernetes.io/name``]
-   tags[``prometheus.io/scrape``]
+   tags[`app.kubernetes.io/name`]
+   tags[`prometheus.io/scrape`]
    ```
 
 2. **Check for Null**: Use `isNotNull()` before accessing label values to

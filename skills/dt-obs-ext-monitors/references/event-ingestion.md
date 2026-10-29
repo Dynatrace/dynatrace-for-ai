@@ -156,6 +156,9 @@ event payload** — sending them has no effect since the pipeline overwrites the
 | Field | Written by | Value |
 |-------|-----------|-------|
 | `dt.smartscape.ext_test` | `smartscapeNode` processor on runs pipeline; `fieldsAdd` stitching processor on steps pipeline | Smartscape node ID derived from `test.id`. Used for topology correlation — keep `test.id` stable across runs to accumulate history. |
+| `dt.smartscape_source.id` | Smartscape enrichment after ingest | Set to the `EXT_TEST` Smartscape node ID (same value as `dt.smartscape.ext_test`). Davis uses this to link the event to the named entity. |
+| `dt.smartscape_source.type` | Smartscape enrichment after ingest | Set to `"EXT_TEST"`. Companion to `dt.smartscape_source.id` — Davis requires both fields to resolve the entity. |
+| `dt.source_entity` | Smartscape enrichment after ingest | **Deprecated alias for `dt.smartscape_source.id`.** This field is deprecated and will be removed in the future — use `dt.smartscape_source.id` instead. |
 | `result.status.category` | `fieldsAdd` processor on steps pipeline | `SUCCESS` / `SKIPPED` / `FAIL` — normalized from `test.step.status`. Run events do **not** get this field. |
 
 ---
@@ -227,7 +230,7 @@ use clear all-caps names that distinguish them from system-level codes:
 ### Minimal — single run event
 
 ```text
-curl -X POST "https://xdc84620.dev.apps.dynatracelabs.com/platform/ingest/custom/events/external.tests" \
+curl -X POST "https://{your-environment-id}.apps.dynatrace.com/platform/ingest/custom/events/external.tests" \
   -H "Authorization: Api-Token {token}" \
   -H "Content-Type: application/json" \
   -d '[{

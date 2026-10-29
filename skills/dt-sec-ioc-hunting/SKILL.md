@@ -113,8 +113,8 @@ have returned a result or an explicit no-match. Execute them in order:
 1. **Logs** — load `hunt-logs.md`, run the canonical `matchesPhrase` template (summarize-first).
 2. **Spans** — load `hunt-spans.md`, run the combined inbound+outbound template (summarize-first).
 3. **Detections** — load `hunt-security-events.md` § Detection hunt rollup:
-   - IPs → `in(ip(actor.ips), array(...))` filter
-   - Domains/URLs → `lower(url.*)` filter (clause owned by **dt-sec-insights** `detections.md`)
+   - IPs → `in(iCollectArray(ip(actor.ips[])), array(...))` filter
+   - Domains/URLs → case-insensitive `matchesValue` / `contains(…, caseSensitive:false)` filter on `url.*` (no `lower()`; clause owned by **dt-sec-insights** `detections.md`)
 
    Default window: `from:now()-2h`; widen to `from:now()-24h` only if zero rows returned.
 

@@ -16,7 +16,7 @@ Impact analysis helps answer critical questions:
 | Field | Description | Type | Usage |
 |-------|-------------|------|-------|
 | `dt.davis.affected_users_count` | Estimated users impacted | integer | Prioritization metric |
-| `dt.davis.impact_level` | System layer (Application, Services, Infrastructure) | string | Determines user visibility |
+| `dt.davis.impact_level` | System layers (Application, Services, Infrastructure, Environment, Synthetic) | array of string | Determines user visibility. A problem can carry more than one level, so compare with `in(<value>, dt.davis.impact_level)`, not `==` |
 | `smartscape.affected_entities` | Record array of directly impacted entities, each with `id`, `type`, and `name` | record[] | Blast radius via `arraySize()`; project members with `[][id]` / `[][type]` |
 | `dt.smartscape.service` | Affected service IDs | array | Business criticality |
 | `event.category` | Problem type (AVAILABILITY, ERROR, etc.) | string | Severity indicator |
@@ -246,7 +246,7 @@ Focus on user-facing issues:
 ```dql
 fetch dt.davis.problems, from:now() - 24h
 | filter not(dt.davis.is_duplicate) and event.status == "ACTIVE"
-| filter dt.davis.impact_level == "Application"
+| filter in("Application", dt.davis.impact_level)
 | fields
     display_id,
     event.name,

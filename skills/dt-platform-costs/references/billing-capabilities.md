@@ -8,12 +8,7 @@ fields and metering intervals.
 > exclusively to the Dynatrace Platform Subscription (DPS) license model — not
 > to classic license models.
 
-> **Reminder:** Billing events can be refreshed — always use
-> `| dedup {event.id, event.type}` before aggregating to prevent double-counting.
-> `event.id` is not unique across event types — using `| dedup event.id` alone
-> silently drops rows in multi-type queries. Single-type queries (filtered to one
-> `event.type`) are safe with plain `| dedup event.id`.
-> See [Billing Event Deduplication](#billing-event-deduplication).
+> **Dedup required** — see [Billing Event Deduplication](#billing-event-deduplication).
 
 ## Contents
 
@@ -115,11 +110,16 @@ level in the Account Management Portal.
 | 3 | [Metrics Ingest — Billable Volume](#metrics-ingest--billable-volume) | Metrics - Ingest & Process | Requires included volume deduction from host monitoring baseline |
 | 4 | [Traces Ingest — Billable Volume](#traces-ingest--billable-volume) | Traces - Ingest & Process | Requires included volume deduction from Full-Stack monitoring baseline |
 
-Apply the [Unit Conversion Lookup](cost-estimations.md#unit-conversion-lookup)
-to convert raw values to capability units (GiB, GiB-days, etc.) for
-**usage-only** reporting. For **cost ranking**, use the
+For **usage only** (no cost), the Combined Query output is complete — `billable_usage` is
+the raw billed field. Divide by the `unitDivisor` for the type's billed field in the
+[Unit Conversion Table](#unit-conversion-table) above to convert to native units. Stop here;
+do not append any cost lookup.
+
+For **cost ranking** (unrated), append the
 [Full Inline Lookup for Cost Rankings](cost-estimations.md#full-inline-lookup-for-cost-rankings)
-instead — it computes both `capability_usage` and `cost_weight` in DQL.
+— it computes both `capability_usage` and `cost_weight` in DQL. For the **rated path**
+(rate card present), append the
+[Rate Card Join Snippet](cost-estimations.md#rate-card-join-snippet) instead.
 
 Replace `<START>` / `<END>` with explicit UTC midnight boundaries (see
 [Billing Timeframe Boundaries](#billing-timeframe-boundaries)).
@@ -135,7 +135,8 @@ use individual queries for per-source detail (e.g., `monitoring_source`
 breakdown for Metrics/Traces).
 
 > **14-day limit** — Metrics Ingest and Traces Ingest sub-queries use
-> `timeseries` for included volume metrics.
+> `timeseries` for included volume metrics. For any window over 14 days, run the
+> [multi-window pattern](#longer-timeframes-multi-window-pattern) instead of one long window.
 
 > **Per-sub-query timeframes.** Each sub-query has its own `to:` boundary —
 > see the individual query sections below and
@@ -147,19 +148,21 @@ breakdown for Metrics/Traces).
 | summarize billable_usage = sum(usage), by: {event.type}
 
 // Query 2 — Workflow + SPM (uses <END>, NOT <END_PLUS_5H>)
-// billable_usage = distinct workflow/node per hour, NOT execution count
+// billable_usage = distinct workflow.id per hour (Automation Workflow) or dt.entity.kubernetes_node per hour (SPM), NOT execution count
 | append [
   <Workflow + SPM>
   | summarize billable_usage = toDouble(count()), by: {event.type}
 ]
 
 // Query 3 — Metrics Ingest — Billable Volume (uses <END_PLUS_5H> + usage.start filter)
+// ⛔ <START>→<END> must be ≤ 14 days. Longer timeframe: run the whole query once per ≤ 14-day window and sum (multi-window pattern)
 | append [
   <Metrics Ingest — Billable Volume>
   | summarize billable_usage = sum(billable), by: {event.type}
 ]
 
 // Query 4 — Traces Ingest — Billable Volume (uses <END>)
+// ⛔ same ≤ 14-day limit — one 31-day window inflated billable Traces Ingest 2.7×
 | append [
   <Traces Ingest — Billable Volume>
   | fields billable_usage = fullstack + otlp + serverless, event.type
@@ -344,7 +347,7 @@ fetch dt.system.events, from: "<START>", to: "<END>"
 > ```
 >
 > For correct week-over-week or month-over-month cost comparison, use the
-> [Period Comparison pattern](cost-estimations.md#period-comparison-wow--mom)
+> [Period Comparison pattern](cost-estimations.md#period-comparison-wow--mom-unrated)
 > in `cost-estimations.md`. It compares `capability_usage` (in capability units)
 > across two explicit UTC midnight windows.
 
@@ -361,7 +364,7 @@ deductions. This section documents how the deduction works.
 
 ### 14-Day Limitation
 
-> **Included volume queries are only correct for windows ≤ 15 days.** The
+> **Always use ≤ 14-day windows per sub-query.** The
 > `timeseries` command has a maximum bucket count of **1440**. At `interval:
 > 15m`, this allows 15 days (15 × 96 = 1440). Windows exceeding this threshold
 > trigger **silent auto-coarsening** — the interval doubles to 30 minutes
@@ -370,10 +373,11 @@ deductions. This section documents how the deduction works.
 > The deduction queries in this skill hardcode multipliers that assume
 > 15-minute intervals (e.g., `license_limit[] * 15`, `4 * 900`). When the
 > interval is coarsened to 30 minutes, these multipliers are wrong — included
-> volume is halved, and billable volume is inflated by 1–5%.
+> volume is halved and billable volume is inflated — several-fold for Traces
+> Ingest (one 31-day window measured 2.7× the split result). Never run a
+> deduction query over a window longer than 14 days.
 >
-> **Always use ≤ 14-day windows** (conservative margin). For longer periods,
-> use the [multi-window pattern](#longer-timeframes-multi-window-pattern). For
+> For longer periods, use the [multi-window pattern](#longer-timeframes-multi-window-pattern). For
 > authoritative values, use Account Management (**Subscription** > **Overview**
 > > **Cost and usage details**).
 
@@ -384,8 +388,8 @@ billed against the Metrics Ingest capability:
 
 | Monitoring Mode | Included Data Points per GiB-hour |
 |-----------------|----------------------------------|
-| Full-Stack Monitoring | 3,600 (= `4 * 900` per 15-min interval) |
-| Infrastructure Monitoring | 6,000 (= `4 * 1500` per 15-min interval) |
+| Full-Stack Monitoring | 3,600 data points/GiB-hour (query uses `4 * 900` per 15-min timeseries slot) |
+| Infrastructure Monitoring | 6,000 data points/GiB-hour (query uses `4 * 1500` per 15-min timeseries slot) |
 
 The `monitoring_source` field on Metrics Ingest billing events identifies the
 source: `fullstack`, `infrastructure`, `discovery`, or `other`. Only `fullstack`
@@ -452,6 +456,12 @@ midnight boundaries** — not rolling `from: -Nd`:
 
 This ensures billing totals are comparable with **Account Management >
 Subscription > Overview > Cost and usage details**.
+
+**Tell the user why.** When the request is for totals to compare against the
+portal, add one sentence to the answer stating the window is complete UTC days
+and that a rolling "last N days" window starts mid-day, so its partial first
+day would not match the portal. This is the one explanatory sentence allowed
+beyond the prescribed disclaimers.
 
 > **`to:` is exclusive.** The `to:` boundary is not included in the results.
 > `from: "2026-04-06T00:00:00Z", to: "2026-04-13T00:00:00Z"` covers Apr 6–12

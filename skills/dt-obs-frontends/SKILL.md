@@ -146,7 +146,7 @@ Use this skill for real-user web and mobile frontend telemetry — Core Web Vita
 
 Use a different skill for:
 
-- Synthetic monitors / availability checks → `dt-obs-synthetic`
+- Ingesting third-party or CI test results → `dt-obs-ext-monitors` (no skill covers Dynatrace-native Synthetic Monitoring)
 - Backend services, traces, spans → `dt-obs-services`, `dt-obs-tracing`
 - Infrastructure, hosts → `dt-obs-hosts`
 - Logs → `dt-obs-logs`

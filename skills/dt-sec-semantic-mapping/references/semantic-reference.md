@@ -42,8 +42,8 @@ The SD is queryable in Grail as two tables:
 
 | Table | What it gives you |
 |---|---|
-| `dt.semantic_dictionary.fields` | Per-field: `name`, `type`, `stability` (`stable` / `experimental` / `deprecated`), `description`, `tags`, `unit`, `supported_values`, `examples` |
-| `dt.semantic_dictionary.models` | Per data model: `name`, `description`, `data_object`, `fields[]`, `relationships[]`, `smartscape_node_name` |
+| `dt.semantic_dictionary.fields` | Per-field: `name`, `type`, `stability` (`stable` / `experimental` / `deprecated`), `description`, `tags`, `unit`, `supported_values`, `examples`, `model_id` (null for global fields), `is_resource` |
+| `dt.semantic_dictionary.models` | Per data model: `name`, `display_name`, `description`, `data_object`, `fields[]`, `relationships[]`, `smartscape_node_name`, `smartscape_node_type`, `smartscape_id_inputs[]`, `classic_models[]` |
 
 These queries are read-only — always safe.
 

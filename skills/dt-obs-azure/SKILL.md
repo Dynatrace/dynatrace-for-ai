@@ -96,7 +96,7 @@ All Azure entities include:
 - `azure.provisioning_state` — Provisioning state (e.g., `Succeeded`)
 - `azure.object` — Full ARM resource JSON (see [Configuration Parsing](#configuration-parsing-with-azureobject))
 - `cloud.provider` — Always `azure`
-- `tags` — Resource tags (use `` tags[`key`] ``)
+- `` `tags:azure` `` — Azure resource tags (use `` `tags:azure`[`key`] ``)
 
 Some entity types also have:
 - `azure.resourceId` — Full ARM resource ID (VMs and some others)
@@ -215,10 +215,11 @@ Access patterns:
 - SKU: `azjson[configuration][sku][name]`
 - Kind: `azjson[configuration][kind]`
 - Zones: `azjson[configuration][zones]`
+- Tags: read `` `tags:azure`[`key`] `` directly instead of parsing `azure.object`. It holds both top-level `tags` and AKS-managed `configuration.tags`
 
 Common configuration fields by service:
 - **VM:** `properties.hardwareProfile.vmSize`, `properties.storageProfile.imageReference.offer`, `properties.storageProfile.osDisk.osType`, `properties.extended.instanceView.powerState.displayStatus`
-- **VMSS:** `sku.name` (VM size), `sku.capacity` (instance count), `tags.aks-managed-poolName`
+- **VMSS:** `sku.name` (VM size), `sku.capacity` (instance count), AKS system tags such as `` `tags:azure`[`aks-managed-poolName`] ``
 - **NSG:** `properties.securityRules[]` (custom rules array), `properties.securityRules[].properties.direction`, `properties.securityRules[].properties.access`, `properties.securityRules[].properties.sourceAddressPrefix`
 - **Storage Account:** `kind` (e.g., StorageV2), `sku.name`, `properties.accessTier`, `properties.supportsHttpsTrafficOnly`, `properties.allowBlobPublicAccess`, `properties.encryption.keySource`
 - **SQL Server:** `properties.fullyQualifiedDomainName`, `properties.publicNetworkAccess`, `properties.minimalTlsVersion`
@@ -232,7 +233,7 @@ Common configuration fields by service:
 - **Key Vault:** `properties.enableRbacAuthorization`, `properties.enableSoftDelete`, `properties.publicNetworkAccess`
 - **Redis:** `properties.sku.name`, `properties.hostName`, `properties.redisVersion`, `properties.enableNonSslPort`
 - **Cosmos DB:** `kind` (e.g., GlobalDocumentDB), `properties.EnabledApiTypes`, `properties.consistencyPolicy.defaultConsistencyLevel`
-- **Load Balancer:** `sku.name`, `tags.aks-managed-cluster-name`
+- **Load Balancer:** `sku.name`, `` `tags:azure`[`aks-managed-cluster-name`] ``
 - **App Gateway:** `properties.sku.name`, `properties.sku.tier`, `properties.operationalState`, `properties.webApplicationFirewallConfiguration.enabled`, `properties.webApplicationFirewallConfiguration.firewallMode` (Detection/Prevention), `properties.webApplicationFirewallConfiguration.ruleSetType`, `properties.webApplicationFirewallConfiguration.ruleSetVersion`, `properties.webApplicationFirewallConfiguration.disabledRuleGroups[]`, `properties.webApplicationFirewallConfiguration.exclusions[]`, `properties.firewallPolicy.id`
 
 ---
@@ -252,7 +253,7 @@ smartscapeNodes "AZURE_*"
 | sort count desc
 ```
 
-To list a specific type, replace `"AZURE_*"` with the entity type (e.g., `"AZURE_MICROSOFT_COMPUTE_VIRTUALMACHINES"`). Add `| fields name, azure.subscription, azure.resource.group, azure.location, ...` to select specific columns. Use `` tags[`TagName`] `` for tag-based filtering.
+To list a specific type, replace `"AZURE_*"` with the entity type (e.g., `"AZURE_MICROSOFT_COMPUTE_VIRTUALMACHINES"`). Add `| fields name, azure.subscription, azure.resource.group, azure.location, ...` to select specific columns. Use `` `tags:azure`[`TagName`] `` for tag-based filtering.
 
 ### Pattern 2: Configuration Parsing
 
@@ -293,14 +294,14 @@ Group resources by any tag for ownership/chargeback:
 
 ```dql-template
 smartscapeNodes "AZURE_*"
-| filter isNotNull(tags[`<TAG_NAME>`])
-| summarize resource_count = count(), by: {tags[`<TAG_NAME>`], type}
+| filter isNotNull(`tags:azure`[`<TAG_NAME>`])
+| summarize resource_count = count(), by: {`tags:azure`[`<TAG_NAME>`], type}
 | sort resource_count desc
 ```
 
-Common Azure tags: `` tags[`ACE:CREATED-BY`] ``, `` tags[`dt_owner_email`] ``, `` tags[`dt_owner_team`] ``, `` tags[`project`] ``, `` tags[`managed-by`] ``. Replace `"AZURE_*"` with a specific type to scope to one service.
+Common Azure tags: `` `tags:azure`[`ACE:CREATED-BY`] ``, `` `tags:azure`[`dt_owner_email`] ``, `` `tags:azure`[`dt_owner_team`] ``, `` `tags:azure`[`project`] ``, `` `tags:azure`[`managed-by`] ``. Replace `"AZURE_*"` with a specific type to scope to one service.
 
-Find untagged resources: `| filter arraySize(tags) == 0`
+Find untagged resources: `` | filter isNull(`tags:azure`) or toString(`tags:azure`) == "{}" ``
 
 ---
 
@@ -348,8 +349,8 @@ Load reference files for detailed queries when the core patterns above need serv
 4. Use `summarize ... by: {azure.subscription, azure.resource.group}` for organizational breakdowns
 
 ### Tagging Strategy
-1. Use `` tags[`key`] `` for filtering (backtick-quoted key names)
-2. Check `arraySize(tags)` for untagged resources
+1. Use `` `tags:azure`[`key`] `` for filtering (backtick-quoted key names)
+2. Filter `` isNull(`tags:azure`) or toString(`tags:azure`) == "{}" `` for untagged resources
 3. Track tag coverage with summarize operations
 4. Common ownership tags: `dt_owner_email`, `dt_owner_team`, `ACE:CREATED-BY`
 
