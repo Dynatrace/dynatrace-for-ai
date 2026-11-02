@@ -4,14 +4,23 @@ Log and span hunt queries default to a 30-minute window, matching the Dynatrace
 UI default view. This reference defines when and how to retry on timeout and
 when to widen on empty results.
 
+## Contents
+
+- [Default Windows](#default-windows)
+- [Event-Anchored Hunts](#event-anchored-hunts)
+  - [Optional Scope Pre-Filtering for Logs](#optional-scope-pre-filtering-for-logs)
+- [Interactive Mode (standalone agent use)](#interactive-mode-standalone-agent-use)
+- [Autonomous Mode (sub-agent invocation)](#autonomous-mode-sub-agent-invocation)
+- [Scan Cost Reference](#scan-cost-reference)
+
 ## Default Windows
 
 | Data source | Default window | Rationale |
 |---|---|---|
 | `fetch logs` | `from:now()-30m` | Matches DT UI default. Use `matchesPhrase(content, "<ioc>")` as the unscoped prefilter; raw `contains(content, ...)` across all logs may hit Grail's 10-second limit. |
 | `fetch spans` | `from:now()-30m` | Matches DT UI default. High volume; root-span fan-out. Even 1h can exceed read limits. |
-| `security.events` detections | `from:now()-2h` | Hunt leg 3 via `hunt-security-events.md`; field semantics and drill-down owned by `dt-sec-insights` (widen to 24h on empty) |
-| `security.events` RVA vulnerabilities | `from:now()-30m` | Snapshot window; widening has no effect |
+| `security.events` detections | `from:now()-2h` | Hunt leg 3 via `hunt-security-events.md`; field semantics and drill-down owned by `dt-sec-insights` (zero rows: widen automatically to 24h, no approval; beyond 24h needs approval) |
+| `security.events` RVA vulnerabilities | `from:now()-30m` | Snapshot window; never widen it. Zero rows is a valid no-exposure result for Dynatrace RVA findings |
 
 ## Event-Anchored Hunts
 
@@ -47,12 +56,29 @@ Rules:
    INCONCLUSIVE and prefer entity scoping or smaller per-event windows before
    widening.
 
-Example:
+Example (a minimal IP-only body to show the anchored window; run the full template from
+`hunt-logs.md` or `hunt-spans.md` with only the first line changed):
+
+**Placeholders** (substitute before running; the query is executable afterwards):
+
+- `<window_start>`: `event_time - 30m`, an ISO 8601 UTC timestamp from the source event, for example
+  `2026-10-15T11:23:27Z` for an event at `11:53:27Z`. The event time comes from the `ioc-intake.md`
+  output (the timestamped detection, log, or event the IoCs were derived from).
+- `<window_end>`: `event_time + 30m`, for example `2026-10-15T12:23:27Z`; never later than now (use
+  `to:now()` or omit `to:` instead, rule 2).
+- `<ip1>`: a normalized IP from `ioc-intake.md`, for example `192.0.2.11`. Add one
+  `matchesPhrase(content, "<ipN>")` clause per further IP, within the clause budget in `hunt-logs-large-sets.md`.
 
 ```dql-template
-fetch spans, from:toTimestamp("2026-07-16T11:53:27Z"), to:toTimestamp("2026-07-16T12:23:27Z")
-| filter request.is_root_span == true
-...
+fetch logs, from:toTimestamp("<window_start>"), to:toTimestamp("<window_end>")
+| filter matchesPhrase(content, "<ip1>")
+| summarize by:{log.source}, {
+    log_count = count(),
+    minTime   = takeMin(timestamp),
+    maxTime   = takeMax(timestamp)
+  }
+| sort log_count desc
+| limit 25
 ```
 
 ### Optional Scope Pre-Filtering for Logs
@@ -131,7 +157,7 @@ loop), the approval gate is bypassed:
 "No matches found in the last 30 minutes (searched window: now()-30m).
 Expansion to 1h, 24h, or 7d would require user approval."
 
-3. Surface the empty result so the user can decide whether to widen later.
+4. Surface the empty result so the user can decide whether to widen later.
 
 Default mode is autonomous unless set otherwise by the orchestrator.
 

@@ -1,6 +1,6 @@
 ---
 name: dt-platform-costs
-description: "Query and analyze a Dynatrace tenant's ACTUAL billing and usage data with DQL against dt.system.events — DPS consumption breakdown, cost-normalized spend ranking, included volume deduction, chargeback/showback, cost drivers, spending trends, cost investigation, log import cost, metrics ingest optimization, drop/remove a metric or dimension from ingestion, metric usage, query cost attribution, workflow total cost, entity cost drill-down (RUM, hosts, synthetic, K8s), and AI/LLM cost (AI Units, AI Function Standard Calls, AI-generated query consumption). Directs licensing/entitlement questions to docs (not via DQL). USE ONLY to query/analyze the tenant's actual consumption. Do NOT use for conceptual 'explain' questions about how DPS billing/pricing works or what units/weights/the rate card mean — see Dynatrace docs. Do NOT use for tuning DQL queries to be faster or cheaper to run (query optimization, reducing scanned data/consumption per run, filter-early best practices) — that belongs to dt-dql-essentials."
+description: "Query and analyze a Dynatrace tenant's ACTUAL billing and usage data with DQL on dt.system.events — DPS consumption breakdown, cost-normalized spend ranking, included volume deduction, chargeback/showback, cost drivers, spending trends, cost investigation, log import cost, metrics ingest optimization, drop/remove a metric or dimension from ingestion, reduce metric cardinality, metric usage, query cost attribution, workflow total cost, entity cost drill-down (RUM, hosts, synthetic, K8s), AI/LLM cost (AI Units, AI Function Standard Calls). Directs licensing/entitlement questions (am I entitled to use X?) to docs (not via DQL). USE ONLY for the tenant's actual consumption. Do NOT use for conceptual 'explain' questions about how DPS billing/pricing works or what units/weights/the rate card mean — see Dynatrace docs. Do NOT use for tuning DQL queries to be faster or cheaper to run (query optimization, reducing scanned data/consumption per run, filter-early best practices) — that belongs to dt-dql-essentials."
 license: Apache-2.0
 ---
 
@@ -71,7 +71,7 @@ beyond the single one shown:
 
 - **Usage Overview** — DPS consumption breakdown by capability, unit conversion, cross-capability comparison
 - **Cost Estimation** — Cost-normalized usage comparison and relative spend ranking, daily cost trends, spending spikes
-- **Cost Investigation** — Step-by-step drill-down into cost drivers, query scan cost attribution, workflow total cost (4 signals)
+- **Cost Investigation** — Step-by-step drill-down into cost drivers, query cost attribution, workflow total cost (4 signals)
 - **Chargeback / Showback** — Cost center and product attribution, team-level billing
 - **Included Volume** — Metrics/Traces Ingest baseline deduction, billed vs. total usage
 
@@ -89,36 +89,36 @@ beyond the single one shown:
 | "save money", "reduce costs", "billed costs", "actual bill" | Usage with included volume deduction, then cost estimation | billing-capabilities.md -> Cross-Capability Usage (4 Queries), then cost-estimations.md |
 | "cost by team", "chargeback", "showback" | Cost per cost center — resolve price source (Cost Ranking Rules step 0), then run chargeback query. | cost-allocation.md |
 | "metrics ingest by cost center", "metrics chargeback", "billable data points per team" | Metrics Ingest billable volume per cost center (with included volume deduction) | cost-allocation.md -> Metrics Ingest — Billable Volume per Cost Center |
-| "how much log ingest", "trace volume" (single category) | Single-category usage query | billing-event-types.md, billing-capabilities.md |
+| "how much log ingest", "trace volume" (single category, not metrics) | Single-category usage query | billing-event-types.md, billing-capabilities.md |
 | "log import cost", "imported logs cost", "log migration billing", "live vs imported log cost", "cost center for import job" | Imported logs use the log ingest `event.type` — identify them with `isNotNull(dt.job.id)`. Also worth ruling out for an otherwise unexplained log-ingest spike | billing-event-types.md -> Log Ingest Sources, cost-allocation.md -> Log Import — Cost Center Attribution |
-| "cost trend", "spending spike", "budget forecast" | Daily cost trend | cost-estimations.md -> Daily Cost Trend |
-| "compare this week to last", "week over week", "WoW", "MoM", "month over month", "how did costs change", "cost change vs last week", "cost change vs last month", "period comparison", "what grew", "what shrank", "usage trend", "notable changes in usage" | Period Comparison — two equal-length UTC windows, resolve price source (Cost Ranking Rules step 0), ssort by largest absolute cost delta. | cost-estimations.md -> Period Comparison (WoW / MoM) |
+| "cost trend", "spending spike", "budget forecast" | Daily Cost Trend, then drill into the capability that moved without asking | cost-estimations.md -> Daily Cost Trend, query-cost-attribution.md -> Spike Investigation, entity-cost-drilldown.md |
+| "compare this week to last", "week over week", "WoW", "MoM", "month over month", "how did costs change", "cost change vs last week", "cost change vs last month", "period comparison", "what grew", "what shrank", "usage trend", "notable changes in usage" | Period Comparison — two equal-length UTC windows, resolve price source (Cost Ranking Rules step 0), sort by largest absolute cost delta. | cost-estimations.md -> Period Comparison (WoW / MoM) |
 | "detector costs", "anomaly detector query cost", "ALERTING pool costs" | Cross-reference detector -> query cost | query-cost-attribution.md |
 | "workflow cost", "what does this workflow cost", "workflow spending" | Composite workflow cost (4 signals) | workflow-total-cost.md |
 | "which workflow", "workflow name", "workflow owner", "how often does this workflow run", "workflow frequency" | Resolve workflow name/owner and run frequency | workflow-total-cost.md → Cross-Event Field Reference + Owner Identification + How Often Did the Workflow Run |
-| "what's driving costs", "cost investigation", "cost spike" | Step-by-step cost investigation | query-cost-attribution.md, workflow-total-cost.md, entity-cost-drilldown.md |
+| "what's driving costs", "cost investigation", "cost spike", "anomaly for capability", "observed vs predicted", "detected on <date>" | Step-by-step cost investigation; a Query-type anomaly goes to Spike Investigation | query-cost-attribution.md -> Spike Investigation, workflow-total-cost.md, entity-cost-drilldown.md |
 | "which app", "which host", "which monitor", "drill down", "break down by application/host/cluster" | Entity-based cost drill-down — resolve price source (Cost Ranking Rules step 0), sample first, then run drill-down query. | entity-cost-drilldown.md |
 | "what's driving RUM/Full-Stack/Synthetic/K8s cost" | Entity drill-down for specific capability | entity-cost-drilldown.md |
-| "optimize metrics ingest", "reduce data points", "which metrics cost most", "metric usage", "biggest contributor to metrics ingest" | Data-point ingest analysis (also filtered by source, cost center, product, or metric key) — present data and optimization levers, then wait for the user to choose — NEVER recommend specific metrics to drop/reduce | metrics-ingest-optimization.md |
+| "optimize metrics ingest", "reduce data points", "which metrics cost most", "metric usage", "biggest contributor to metrics ingest", "metrics ingest for <source>", "OpenTelemetry metrics", "Prometheus metrics", "extension metrics", "show my metrics ingest" | Data-point ingest analysis (also filtered by source, cost center, product, or metric key) — present data and optimization levers, then wait for the user to choose — NEVER recommend specific metrics to drop/reduce | metrics-ingest-optimization.md |
 | "drop metric", "remove metric from ingestion", "stop ingesting metric" | Drop metric strategy; skips Steps 1–2 when the metric key is named directly | metrics-ingest-optimization.md -> Direct Optimization Request |
 | "reduce cardinality", "remove dimension", "drop dimension from metric" | Reduce cardinality strategy; skips Steps 1–2 when the metric key is named directly | metrics-ingest-optimization.md -> Direct Optimization Request |
-| "change ingest interval", "reduce collection frequency", "scrape interval" | Change ingest interval strategy; skips Steps 1–2 when the metric key is named directly | metrics-ingest-optimization.md -> Direct Optimization Request |
-| "AI costs", "cost of AI agents", "what does AI cost", "AI spending", "AI agent costs", "direct and indirect AI cost", "how much is AI costing", "AI Units cost" | Direct AI costs (AI Units / AI Function Standard Call BUEs) + indirect AI costs (Query BUEs with `ai_generated == true`) | billing-event-types.md -> Agentic AppEngine, query-cost-attribution.md -> Step 2a |
-| "query cost by source", "who is scanning most", "cost attribution by app" | BUE query cost by source | query-cost-attribution.md -> Step 1 |
-| "expensive dashboards", "dashboard cost ranking", "top dashboards by cost" | Dashboard query cost ranking | query-cost-attribution.md -> Step 1b + Step 2 |
+| "change ingest interval", "reduce collection frequency", "scrape interval" | Change ingest interval strategy; skips Steps 1–2 when the metric key is named directly. Not available for network-device extensions (fixed 1-min interval). | metrics-ingest-optimization.md -> Direct Optimization Request |
+| "AI costs", "cost of AI agents", "what does AI cost", "AI spending", "AI agent costs", "direct and indirect AI cost", "how much is AI costing", "AI Units cost" | Direct AI costs (`AI Units` = LLM work; `AI Function Standard Call` = non-LLM tool calls triggered by AI) + indirect AI costs (Query BUEs with `ai_generated == true`) | billing-event-types.md -> Agentic AppEngine, query-cost-attribution.md -> AI and Agent Queries |
+| "query cost by source", "who is scanning most", "cost attribution by app" | BUE query cost by source | query-cost-attribution.md -> Attribution Ranking |
+| "expensive dashboards", "dashboard cost ranking", "top dashboards by cost" | Dashboard query cost ranking | query-cost-attribution.md -> Source Interpretation and Dashboard Ranking |
 | "included volume", "billed vs total", "baseline usage" | Included volume analysis | billing-capabilities.md -> Included Volume |
 | "hourly billing", "daily billing after deductions", "time-granular billed usage" | Time-bucketed usage with included volume subtracted | billing-capabilities.md -> Query 3 (Metrics Ingest — Billable Volume) / Query 4 (Traces Ingest — Billable Volume) |
 
 ### Usage vs Cost Distinction
 
-| Term                              | Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "Usage"                           | Usage in native units only — no cost step. Run the Combined Query; divide `billable_usage` by the `unitDivisor` for the type's billed field in [billing-capabilities.md § Unit Conversion Table](references/billing-capabilities.md#unit-conversion-table) to convert to native units. Do not append the Full Inline Lookup or the Rate Card Join Snippet.                                                                                                                                                                                                    |
-| "Cost" (unrated, no rate card)    | Unit conversion + compute `cost_weight` in DQL (via the Full Inline Lookup) for internal ordering/aggregation only. **Never display `cost_weight` as a dollar amount.** Omit from rankings for types not in the normalization table.                                                                                                                                                                                                                                                         |
-| "Cost" (rated, rate card present) | `estimated_cost` in contracted currency + native units; label as "estimated cost (from BUE) [<currency_code>]".                                                                                                                                                                                                                                                                                                                                                                              |
-| "Cost drivers"                    | **Rated:** sort by `isNull(estimated_cost) asc, estimated_cost desc` (unpriced types last); **Unrated:** sort by `cost_weight desc`. Output columns: rank, capability name, usage in native units (and estimated cost on rated path). Drop `cost_weight` before presenting — it never appears in any column, label, or sentence.                                                                                                                                                                                                               |
-| "Cost share / percentage"         | **Rated:** share of the total `estimated_cost` across **all** priced capabilities in the result — not only the ones the user named — computed in DQL (e.g. `summarize` the total, then `estimated_cost / total * 100`); unpriced types are excluded from the denominator. **Unrated:** share of total `cost_weight` from the Full Inline Lookup, computed in DQL. Present as a percentage table. Use the applicable ℹ️ disclaimer from Cost Ranking Rules step 3 (rated or unrated variant) — do not add any additional caveat or note.                                                                                                                                                                                                                                                       |
-| "User-provided rate"              | If the user supplies a contracted rate (e.g. "$0.15/GiB for Log Ingest"), use that rate for that capability and display actual USD for it. All other capabilities show usage-only (no cost). Disclaimer: ⚠️ Calculated using your provided rate of $X/unit. For all capabilities without a provided rate, only usage is shown. For authoritative totals, refer to Account Management > Subscription. **Never infer or assume rates** — only accept them when the user explicitly states them. Precedence: rate card > user-provided rate > normalization weights (see [Cost Ranking Rules step 0](#cost-ranking-rules)). |
+| Term | Behavior |
+| --- | --- |
+| "Usage" | Usage in native units only — no cost step. Run the Combined Query; divide `billable_usage` by the `unitDivisor` for the type's billed field in [billing-capabilities.md § Unit Conversion Table](references/billing-capabilities.md#unit-conversion-table) to convert to native units. Do not append the Full Inline Lookup or the Rate Card Join Snippet. Keep DQL row order. |
+| "Cost" (unrated, no rate card) | Unit conversion + compute `cost_weight` in DQL (via the Full Inline Lookup) for internal ordering/aggregation only. **Never display `cost_weight` as a dollar amount.** Omit from rankings for types not in the normalization table. |
+| "Cost" (rated, rate card present) | `estimated_cost` in contracted currency + native units; label as "estimated cost (from BUE) [<currency_code>]". |
+| "Cost drivers" | **Rated:** sort by `isNull(estimated_cost) asc, estimated_cost desc` (unpriced types last); **Unrated:** sort by `cost_weight desc`. Output columns: rank, capability name, usage in native units (and estimated cost on rated path). Drop `cost_weight` before presenting — it never appears in any column, label, or sentence. |
+| "Cost share / percentage" | **Rated:** share of the total `estimated_cost` across **all** priced capabilities in the result — not only the ones the user named — computed in DQL with the [Share and Grand Total snippet](references/cost-estimations.md#share-and-grand-total-rated) (rows are kept; never hand-compute totals or shares); unpriced types are excluded from the denominator. **Unrated:** share of total `cost_weight` from the Full Inline Lookup, computed in DQL (unrated variant of the same snippet). Present as a percentage table. Use the applicable ℹ️ disclaimer from Cost Ranking Rules step 3 (rated or unrated variant) — do not add any additional caveat or note. |
+| "User-provided rate" | If the user supplies a contracted rate (e.g. "$0.15/GiB for Log Ingest"), use that rate for that capability and show the cost in the currency the user gave; never convert currencies. If the rate has no currency, show the amount without a currency label. It wins over the rate card; skip the pre-flight for that capability. Answer only for the capabilities the user asked about; any other requested capability shows usage only (no cost). Disclaimer: ⚠️ Calculated using your provided rate of <rate as given, with its currency>/<unit>. For all capabilities without a provided rate, only usage is shown. For authoritative totals, refer to Account Management > Subscription. **Never infer or assume rates** — only accept them when the user explicitly states them. Precedence: user-provided rate (for that capability) > rate card > normalization weights (see [Cost Ranking Rules step 0](#cost-ranking-rules)). |
 
 Only add cost information when the user explicitly asks for it. Units are incomparable across categories — cost normalization is the only way to rank or sum them.
 
@@ -133,7 +133,7 @@ drivers, cost trend, workflow cost, query cost attribution, cost investigation, 
 
 0. **Resolve price source** — run the pre-flight from
    [cost-estimations.md § Pre-flight Detection](references/cost-estimations.md#pre-flight-detection).
-   Precedence: **rate card > user-provided rate > normalization weights**.
+   Precedence: **user-provided rate (for that capability) > rate card > normalization weights**.
    - Rate card readable → **rated path**: append the
      [Rate Card Join Snippet](references/cost-estimations.md#rate-card-join-snippet) after
      the `| summarize billable_usage` step; sort by `isNull(estimated_cost) asc, estimated_cost desc`
@@ -144,17 +144,14 @@ drivers, cost trend, workflow cost, query cost attribution, cost investigation, 
      [Full Inline Lookup for Cost Rankings](references/cost-estimations.md#full-inline-lookup-for-cost-rankings);
      sort by `cost_weight desc`. **NEVER multiply normalization weights mentally** — values
      span orders of magnitude where silent arithmetic errors are undetectable.
-     *Exception — query cost attribution:* all Query types share one normalization weight,
-     so skip the Full Inline Lookup and do not compute `cost_weight`; rank by GiB scanned
-     (`capability_usage desc`) as in
-     [cost-estimations.md § Estimated Query Cost by Source](references/cost-estimations.md#estimated-query-cost-by-source).
-     The ranking still gets the unrated ℹ️ disclaimer from step 3.
+     *Exception — query cost attribution:* rank by `billable_usage`, no `cost_weight` ([why](references/cost-estimations.md#estimated-query-cost-by-source)); the unrated ℹ️ disclaimer still applies.
      *Exception — single capability:* when the question covers exactly one capability, there
      is nothing to rank. Skip the Full Inline Lookup and do not compute `cost_weight`.
      Convert to native units in DQL as in the Usage row of
-     [Usage vs Cost Distinction](#usage-vs-cost-distinction). Any breakdown below capability
-     level (by host, app, cost center) that ranks several rows still uses the lookup.
-   The check is transparent to the user — the skill does not mention running it.
+     [Usage vs Cost Distinction](#usage-vs-cost-distinction). Within a single event.type,
+     unrated rankings sort by the billed field in DQL (the weight is constant); the rated
+     path appends the rate-card join for currency.
+   How to mention the check: [Pre-flight Detection](references/cost-estimations.md#pre-flight-detection).
 
 1. **Compute cost measure in DQL** — rated path: `estimated_cost` in contracted currency
    (from the rate-card join). Unrated path: `cost_weight` (from the Full Inline Lookup, an
@@ -173,14 +170,17 @@ drivers, cost trend, workflow cost, query cost attribution, cost investigation, 
    For percentage questions, output a share-of-total table (see Cost share / percentage above).
 
 3. **Disclaimer FIRST** — applies to multi-capability results only (2+ capabilities,
-   rankings, or percentage table). Make the disclaimer the **first line of the answer**. Copy the applicable text **verbatim**:
+   or any ranking or percentage table, including hosts/apps/cost centers within one capability).
+   Make the disclaimer the **first line of the answer** — no lead-in. The final message starts with the
+   `> ℹ️` line itself: no status sentence ("I have all the data…", "Here are the results"), heading or
+   `---` before it, and no second note about the price source after it. Copy the applicable text **verbatim**:
    - *Rated:* > ℹ️ Estimated costs from BUE. For authoritative figures, see **Account Management > Subscription > Overview > Cost and usage details**.
-   - *Unrated:* > ℹ️ Rankings show relative spend — for actual dollar figures, see **Account Management > Subscription > Overview > Cost and usage details**.
+   - *Unrated:* > ℹ️ Rankings show relative spend — for actual cost figures, see **Account Management > Subscription > Overview > Cost and usage details**.
 
    For **single-capability** results: **omit the disclaimer entirely** — except in
    user-provided rate mode, where the required warning applies even for single-capability
-   results. A single-capability answer is the usage table only: add no sentence about rate
-   cards, dollar amounts, or why a cost figure is unavailable.
+   results. A single-capability answer is the usage table only: add no ℹ️ line and no sentence about rate
+   cards, their validity, dollar amounts, or why a cost figure is unavailable.
 
    For **zero-rated** results: determine disclaimer based on current path (rated/unrated).
 
@@ -229,7 +229,7 @@ Which of these matches what you're trying to do?
 | 2   | [billing-capabilities.md](references/billing-capabilities.md)               | BUE-to-capability mapping, unit conversion, cross-category usage queries, included volume deduction                |
 | 3   | [cost-estimations.md](references/cost-estimations.md)                       | Cost normalization weights, price source resolution (pre-flight, rate-card join, validity rule, output rules), cost estimation queries, full inline lookup |
 | 4   | [cost-allocation.md](references/cost-allocation.md)                         | Cost center/product attribution, chargeback queries                                                                |
-| 5   | [query-cost-attribution.md](references/query-cost-attribution.md)           | Query scan cost attribution — BUE by source, per-detector breakdown (ALERTING pool), QEE drill-down                |
+| 5   | [query-cost-attribution.md](references/query-cost-attribution.md)           | Query cost attribution — BUE-first ranking by source, dashboard, detector and AI agent; QEE only for named fallbacks |
 | 6   | [workflow-total-cost.md](references/workflow-total-cost.md)                 | Workflow total cost — four billing signals (query scan, AppEngine, workflow-hours, AI invocations)                 |
 | 7   | [entity-cost-drilldown.md](references/entity-cost-drilldown.md)             | Entity-based cost drill-down — RUM/Host/Synthetic/K8s/Security/Automation by entity                                |
 | 8   | [metrics-ingest-optimization.md](references/metrics-ingest-optimization.md) | Per-metric-key ingest drill-down — data-point ranking, dimension cardinality measurement, optimization target identification |
@@ -251,7 +251,7 @@ fetch dt.system.events, from: -7d
    longer windows (one 31-day window inflated billable Traces Ingest 2.7×). For a month or
    longer, split into ≤ 14-day windows and sum — see
    [billing-capabilities.md § Longer Timeframes](references/billing-capabilities.md#longer-timeframes-multi-window-pattern).
-3. **Use explicit UTC midnight boundaries** for billing totals, and tell the user in one sentence why (a rolling window's partial first day won't match the portal) — see [billing-capabilities.md § Billing Timeframe Boundaries](references/billing-capabilities.md#billing-timeframe-boundaries).
+3. **Use explicit UTC midnight boundaries** for billing totals, and, only for portal reconciliation or exact-totals requests, tell the user in one sentence why (a rolling window's partial first day won't match the portal) — see [billing-capabilities.md § Billing Timeframe Boundaries](references/billing-capabilities.md#billing-timeframe-boundaries).
 4. **Never use `~` for approximation** — use `≈` or "approximately" (bare `~` creates Markdown strikethrough).
 5. **Empty results?** — Run the discovery query above to verify available event types.
 6. **`count()` fans out — confirm one-row-per-thing before counting** — both
@@ -262,7 +262,7 @@ fetch dt.system.events, from: -7d
    `countDistinct(dt.automation_engine.workflow_execution.id)` on
    `WORKFLOW_EXECUTION` — never bare `count()`. Never write "ran N times" or
    compute a per-second/per-minute rate from any raw `count()`. See
-   [query-cost-attribution.md § Step 3](references/query-cost-attribution.md#step-3--drill-into-qee-for-details)
+   [query-cost-attribution.md § Single-Query Details](references/query-cost-attribution.md#single-query-details)
    and [workflow-total-cost.md § How Often Did the Workflow Run](references/workflow-total-cost.md#how-often-did-the-workflow-run).
 7. **Never use entity-model functions** — `entityName()` (and any function that
    takes a `dt.entity.*` field to resolve entity metadata) is deprecated.
@@ -278,6 +278,6 @@ fetch dt.system.events, from: -7d
 - **Included volume** — Metrics/Traces Ingest include a host baseline (≈14 days max). See [billing-capabilities.md § Included Volume](references/billing-capabilities.md#included-volume).
 - **Cost attribution is optional** — only populated when configured; Retention events often lack entity references.
 - **Log Import bills at import time** — imported historical logs share the log ingest `event.type` and are billed in the window the import job ran, not the period the records came from. Uncommon, but worth ruling out (`isNotNull(dt.job.id)`) for an unexplained log-ingest jump. See [billing-event-types.md § Log Ingest Sources](references/billing-event-types.md#log-ingest-sources).
-- **Zero-rated queries** — Certain queries may be zero-rated based on execution context (user, apps, queried data). These produce QEE records but no corresponding BUE. A gap between QEE `scanned_bytes` and BUE `billed_bytes` totals indicates zero-rated usage, not a pipeline issue. See [query-cost-attribution.md § Investigating QEE↔BUE Mismatches](references/query-cost-attribution.md#investigating-qeebue-mismatches).
+- **Zero-rated queries** — Certain queries may be zero-rated based on execution context (user, apps, queried data). These produce QEE records but no corresponding BUE. A gap between QEE `scanned_bytes` and BUE `billed_bytes` totals indicates zero-rated usage, not a pipeline issue. See [query-cost-attribution.md § QEE Exceeds BUE](references/query-cost-attribution.md#qee-exceeds-bue).
 - **Rate card is optional** — costs shown as estimated amounts in the contracted currency only when a rate card is present and readable. Without one, all cost outputs are relative rankings (native units or cost-weight).
 - **Rate card scope** — not all BUE types may have a rate card entry. Types without a price show native units only.

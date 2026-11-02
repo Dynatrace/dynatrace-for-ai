@@ -126,6 +126,7 @@ The MCP server is remote — Dynatrace hosts it, so there is nothing to install.
 | [dt-alerting](skills/dt-alerting/SKILL.md) | End-to-end alerting lifecycle: anomaly detector setup, alert events in Grail, problem grouping, and workflow notification routing. |
 | [dt-obs-analytics](skills/dt-obs-analytics/SKILL.md) | Analyze Dynatrace dashboards and notebooks with Davis analyzers: anomaly detection, novelty scoring, and metric correlation. |
 | [dt-obs-ext-monitors](skills/dt-obs-ext-monitors/SKILL.md) | Ingest third-party test and monitor results into Dynatrace Grail via the platform events ingest API. |
+| [dt-obs-extensions](skills/dt-obs-extensions/SKILL.md) | Check Dynatrace extension status and troubleshoot extension errors: monitoring configuration status, error diagnosis, and error code interpretation. |
 | [dt-obs-genai](skills/dt-obs-genai/SKILL.md) | Analyze observability signals from GenAI applications: golden signals, LLM cost/token analytics, agent tool-call behavior, and evaluation results. |
 | [dt-obs-log-semantic-mapping](skills/dt-obs-log-semantic-mapping/SKILL.md) | Suggest and validate semantic dictionary mappings for audit log integrations, using vendor log payloads or live ingested events. |
 | [dt-obs-network-devices](skills/dt-obs-network-devices/SKILL.md) | Analyze SNMP-monitored network devices (switches, routers, firewalls, load balancers): topology, interface metrics, and SNMP trap/syslog events. |
@@ -150,6 +151,8 @@ The MCP server is remote — Dynatrace hosts it, so there is nothing to install.
 | [dt-setup-flutter](skills/dt-setup-flutter/SKILL.md) | Integrate the Dynatrace Flutter Plugin: dependency setup, config, SDK bootstrap, navigation tracking, and verification. |
 | [dt-setup-ios](skills/dt-setup-ios/SKILL.md) | Set up the Dynatrace iOS SDK via Swift Package Manager: SPM dependency, Dynatrace.plist config, privacy opt-in, and Xcode build verification. |
 | [dt-setup-react-native](skills/dt-setup-react-native/SKILL.md) | Integrate the Dynatrace React Native Plugin for bare React Native and Expo: dependency setup, dynatrace.config.js, Babel registration, navigation tracking, and verification. |
+| [dt-setup-genai](skills/dt-setup-genai/SKILL.md) | Instrument a GenAI/LLM app (Python or TypeScript, any provider or agent SDK) to emit OpenTelemetry `gen_ai.*` spans queryable in Dynatrace: detect, instrument, enrich, validate. |
+| [dt-setup-openinference-migration](skills/dt-setup-openinference-migration/SKILL.md) | Migrate a GenAI/LLM app from Traceloop/OpenLLMetry to OpenInference with `gen_ai.*` semantic conventions enabled, including ingestion shape and cardinality trade-offs. |
 
 ### Platform
 
@@ -165,6 +168,7 @@ The MCP server is remote — Dynatrace hosts it, so there is nothing to install.
 | Skill | Description |
 |-------|-------------|
 | [dt-migration](skills/dt-migration/SKILL.md) | Migrate classic entity-based DQL and topology navigation to Smartscape equivalents. |
+| [dt-upgrade](skills/dt-upgrade/SKILL.md) | Guide an upgrade from classic/2nd-gen to 3rd-gen Dynatrace: tenant readiness, migration actions per feature area, and AWS/Azure/GCP cloud integration cutover to Smartscape on Grail. |
 
 ## Prompts
 

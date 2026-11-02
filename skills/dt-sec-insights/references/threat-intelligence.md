@@ -7,7 +7,7 @@ report identity + provenance (`threat.report.*`), adversary context (`threat.act
 `threat.target.*`, `threat.malware.*`, `threat.attack.*`), and extracted indicators of compromise
 (`threat.observables.*`).
 
-> **Cross-references:** field reference → [data-model.md § Threat Intelligence Fields](data-model.md#threat-intelligence-fields-threat_report) · provider-scoping idiom → [all-security-events.md § Scoping to a Specific Provider](all-security-events.md#scoping-to-a-specific-provider-any-finding-type) · dashboard/tile recipes → [coverage-and-dashboards.md § Dashboard Query Patterns](coverage-and-dashboards.md#dashboard-query-patterns).
+> **Cross-references:** field reference → [data-model.md § Threat Intelligence Fields](data-model.md#threat-intelligence-fields-threat_report) · provider-scoping idiom → [all-security-events.md § Scoping to a Specific Provider](all-security-events.md#scoping-to-a-specific-provider-any-finding-type) · dashboard/tile recipes → [dashboard-patterns.md](dashboard-patterns.md).
 
 > **THREAT_REPORT is NOT a finding.** These events describe threats **in the wild** — external
 > campaigns, adversary reports, IOC feeds — **not** findings on your monitored entities. They carry
@@ -15,10 +15,11 @@ report identity + provenance (`threat.report.*`), adversary context (`threat.act
 > scan cycle**. Do **not**:
 > - put THREAT_REPORT in the cross-provider four-key `summarize` (`{event.provider, product.name, event.type, dt.security.risk.level}`) — the risk field is always null here;
 > - include it in the DT-inclusive posture/overview 3-stream decomposition or the double-counting guard;
-> - scope it by entity (`dt.smartscape*` / `dt.entity*` / `object.*` are all absent).
+> - scope it by entity (`dt.smartscape*` / `object.*` are all absent).
 >
 > Threat intelligence answers a **separate class of question** ("what threats/IOCs/campaigns are
-> being reported?", "am I exposed to the IOCs in report X?") — route here only for those intents.
+> being reported?") — route here only for that intent. "Am I exposed to the IOCs in report X?" is
+> IoC hunting: `dt-sec-ioc-hunting`.
 
 > **MITRE here vs. in detections.** `threat.attack.*` on a THREAT_REPORT describes the ATT&CK
 > techniques of an **external campaign reported by a TI vendor** — it is NOT evidence the technique
@@ -51,11 +52,7 @@ report identity + provenance (`threat.report.*`), adversary context (`threat.act
   - [By targeted country / industry](#by-targeted-country--industry)
   - [By TLP (AlienVault) / report type (CrowdStrike)](#by-tlp-alienvault--report-type-crowdstrike)
   - [Free-text search (title / tags)](#free-text-search-title--tags)
-- [Threat-Exposure Correlation (IOC → environment)](#threat-exposure-correlation-ioc--environment)
-  - [CVEs → vulnerabilities](#cves--vulnerabilities)
-  - [Attacker IPs → detections](#attacker-ips--detections)
-  - [MITRE techniques → detections](#mitre-techniques--detections)
-  - [IOCs → logs and spans](#iocs--logs-and-spans)
+- [Threat-Exposure Correlation (IOC → environment)](#threat-exposure-correlation-ioc--environment) (moved to `dt-sec-ioc-hunting`)
 - [Field Nuances & Vendor Extensions](#field-nuances--vendor-extensions)
 - [Best Practices](#best-practices)
 
@@ -274,111 +271,12 @@ use `contains(field, "…", caseSensitive:false)` for case-insensitive substring
 
 ## Threat-Exposure Correlation (IOC → environment)
 
-The high-value use case: take the IOCs/CVEs/techniques from threat reports and check whether they
-appear in **your** monitored environment. Because the two sides live in different event families (or
-different datasets), correlate with **`join` on a shared key**, not `in(x, [subquery])` (an
-execution block is not a valid `in()` argument). Dashboards pre-compute the IOC list into a variable
-and use `in(field, $Var)`; a self-contained query uses `join`.
-
-> **Reverse direction (IoC → report attribution) lives elsewhere.** The queries here go report →
-> environment. For the inverse — you already matched an IoC and want *"which report(s) mention it,
-> attributed to which actor/malware/campaign?"* — use
-> `dt-sec-contextualization/references/ioc-enrichment.md`.
-
-### CVEs → vulnerabilities
-
-"Am I running anything with a CVE named in recent threat intel?" — join report CVEs to
-`VULNERABILITY_FINDING` (external scanners) on the CVE:
-
-```dql
-fetch security.events, from:now()-7d
-| filter event.type == "VULNERABILITY_FINDING"
-| filter isNotNull(vulnerability.references.cve)
-| expand cve = vulnerability.references.cve
-| join [
-    fetch security.events, from:now()-7d
-    | filter event.type == "THREAT_REPORT"
-    | filterOut isNull(threat.report.id)
-    | expand cve = threat.observables.cves
-    | filterOut isNull(cve)
-    | summarize reports = countDistinctExact(threat.report.id), reportNames = collectDistinct(threat.report.name), by: {cve}
-  ], on: {cve}, kind: inner, prefix: "tr."
-| summarize {
-    findings = count(),
-    affectedObjects = countDistinctExact(object.id)
-  }, by: {cve, event.provider}
-| sort findings desc
-```
-
-For **Dynatrace RVA** matches, run the canonical RVA 30m snapshot pipeline (see
-[vulnerabilities-dynatrace.md](vulnerabilities-dynatrace.md)) and `filter in(vulnerability.references.cve, <cveList>)`,
-or join the RVA stream on `vulnerability.references.cve` the same way.
-
-> **CISA KEV vs `THREAT_REPORT` — they answer different questions.** The Dynatrace Library
-> Vulnerability Feed carries a CISA KEV flag per vulnerability. KEV is **binary**: it tells you
-> *that* exploitation is known, and nothing more. Threat reports carry the **evidence and detail** —
-> which campaign, which actor, which IOCs, what was observed.
->
-> - *"Is CVE-X known to be exploited?"* / *"which of my vulnerabilities are actively exploited?"* — a
->   KEV hit is a sufficient answer on its own. Use
->   [vulnerability-feed.md § KEV in your environment](vulnerability-feed.md#kev-in-your-environment)
->   (RVA snapshot + `lookup` of the feed's KEV entries); no `THREAT_REPORT` needed.
-> - **No KEV flag, or the user wants the concrete threat** — who is exploiting it, in what campaign,
->   with which indicators — fall back to `THREAT_REPORT` as described in this reference. Absence of a
->   KEV flag is not evidence that nothing is exploiting it; it only means CISA has not catalogued it.
->
-> Report which source the answer came from, and never present a KEV flag as campaign detail.
-
-### Attacker IPs → detections
-
-"Have any IPs flagged in threat intel shown up as attackers?" — join report IPs to
-`DETECTION_FINDING` `actor.ips` on a shared string key:
-
-```dql
-fetch security.events, from:now()-7d
-| filter event.type == "DETECTION_FINDING"
-| filter isNotNull(actor.ips)
-| expand ioc = actor.ips
-| fieldsAdd ioc = toString(ioc)
-| join [
-    fetch security.events, from:now()-7d
-    | filter event.type == "THREAT_REPORT"
-    | expand ioc = threat.observables.ips
-    | filterOut isNull(ioc)
-    | fieldsAdd ioc = toString(ioc)
-    | summarize reportNames = collectDistinct(threat.report.name), by: {ioc}
-  ], on: {ioc}, kind: inner, prefix: "tr."
-| summarize matchedDetections = count(), matchedIPs = countDistinctExact(ioc),
-            reports = collectDistinct(tr.reportNames)
-| fieldsRemove reports  // drop if you want the report names projected
-```
-
-Zero matches is a valid, meaningful answer ("none of the reported IPs have attacked us in this
-window") — report it truthfully with the window used.
-
-### MITRE techniques → detections
-
-Same join shape, keyed on the technique ID: expand `threat.attack.technique.ids` on the report side
-and `threat.attack.technique.ids` on the Automated-Detections side (`event.provider == "Dynatrace
-Automated Detections"`), join `on:{technique}`.
-
-### IOCs → logs and spans
-
-Report IOCs can also be searched in **logs** and **spans** — these are different datasets
-with their own validated hunt templates. Route to **`dt-sec-ioc-hunting`** for IoC-specific
-hunting across both sources.
-
-- **Logs** — literal `matchesPhrase(content, "<ioc>")` OR-chain prefilter (one clause per IoC), then per-class matched-observable derivation using `contains` after that prefilter. Supports IPs, Domains, URLs, Emails, and Hashes.
-  See `dt-sec-ioc-hunting/references/hunt-logs.md`.
-- **Spans (inbound + outbound)** — single combined pass over `span.kind in {client,server}`;
-  matches IPs on `client.ip`/`server.resolved_ips`/`request_attribute.SourceIP` and
-  Domains/URLs on `http.host`/`url.full`. See `dt-sec-ioc-hunting/references/hunt-spans.md`.
-
-Keep the log/span window tight (default `from:now()-15m`, unless the user explicitly asks for a wider window) and pre-filter the IOC list. The
-`dt-sec-ioc-hunting` skill owns the expand-on-approval protocol for widening.
-
-For **generic** log or trace queries not tied to an IoC hunt, route to `dt-obs-logs` /
-`dt-obs-tracing` instead.
+Checking whether the IOCs, CVEs and techniques in these reports appear in **your** environment
+(report → vulnerabilities, detections, logs, spans) is IoC hunting and lives in
+**dt-sec-ioc-hunting**: `hunt-security-events.md` § Report-driven correlation for the self-contained join form over
+ingested reports, `ioc-intake.md` + the `hunt-*.md` references when the user supplies the IoCs.
+The reverse direction (a matched IoC → which reports mention it) is in `dt-sec-contextualization`
+`ioc-enrichment.md`. This reference only reads the reports.
 
 ---
 
@@ -405,12 +303,11 @@ For **generic** log or trace queries not tied to an IoC hunt, route to `dt-obs-l
 2. **Apply the SD-compliance guard** (`filterOut isNull(event.provider) OR isNull(product.name) OR
    isNull(threat.report.id) OR isNull(threat.report.name)`) so partial/non-conformant rows don't skew results.
 3. **Never use finding/entity/risk fields** — `finding.*`, `object.*`, `dt.security.risk.level`,
-   `dt.smartscape*`/`dt.entity*` are all null on THREAT_REPORT. Do not add them to filters, `by:`, or projections.
+   `dt.smartscape*` are all null on THREAT_REPORT. Do not add them to filters, `by:`, or projections.
 4. **Keep threat intel out of the posture/overview streams** — it is a separate intent; a broad
    "what security data do we have?" must not fold in THREAT_REPORT (see the top-of-file callout).
 5. **Parent + sub-techniques require an OR** across `threat.attack.technique.ids` and `threat.attack.subtechnique.ids` — they are separate arrays.
 6. **Count distinct reports after `expand`** — `countDistinctExact(threat.report.id)`, not `count()`.
 7. **No snapshot window** — use `24h` for recent, `7d`+ for overviews; honor explicit windows. Threat intel accumulates; widening looks back further (unlike RVA/KSPM).
-8. **Correlate with `join` on a shared IOC/CVE/technique key** — not `in(x, [subquery])`. Cross-dataset IoC hunts in logs/spans route to `dt-sec-ioc-hunting`; generic log/trace exploration routes to `dt-obs-logs` / `dt-obs-tracing`.
+8. **Do not correlate reports with the environment here** — report → vulnerabilities / detections / logs / spans is IoC hunting: `dt-sec-ioc-hunting` (`hunt-security-events.md` § Report-driven correlation). Generic log/trace exploration routes to `dt-obs-logs` / `dt-obs-tracing`.
 9. **Vendor extensions (`alienvault.pulse.*`, `crowdstrike.report.*`) are valid additive context** — use them for TLP / report-type filters; they have no SD counterpart.
-10. **Report empty correlation results truthfully** — "none of the reported IOCs appear in your environment in the last X" is a real, useful answer; never fabricate matches.

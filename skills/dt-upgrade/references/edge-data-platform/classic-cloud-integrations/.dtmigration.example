@@ -1,0 +1,14 @@
+# .dtmigration — local credentials for cloud migration assessment
+#
+# Copy this file to .dtmigration in your working directory.
+# .dtmigration is git-ignored and never committed.
+#
+# Required: a Dynatrace platform token (dt0s16.*) with the following scopes:
+#   - document:documents:read    (list/read dashboards)
+#   - document:documents:admin   (read all dashboards, not just your own)
+#   - settings:objects:read      (read anomaly detection settings)
+#
+# Generate a token in Dynatrace: Settings > Access Tokens > Generate new token
+# Ensure the active dtctl context points to the same environment.
+
+export DT_PLATFORM_TOKEN="dt0s16.XXXXXXXXXXXXXXXXXXXX.YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY"

@@ -76,8 +76,7 @@ into estimated costs in the customer's contracted currency.
 
 ### Pre-flight Detection
 
-Before producing any cost-amount answer, the skill runs a silent pre-flight check to determine
-whether the rate card is present and accessible.
+Before producing any cost-amount answer, check whether the rate card is present and readable.
 
 ```dql
 fetch dt.system.files
@@ -92,8 +91,7 @@ fetch dt.system.files
 - 0 rows returned OR `records == 0` → **unrated path**: fall back to native units + cost-weight
   ranking (existing behavior), unchanged.
 
-The skill runs this check silently before every cost-related request. It does not inform the
-user that a pre-flight was run; it uses the result to pick a path automatically.
+Run this check before every cost-related request and pick the path from the result. If you narrate progress, describe it in plain words (for example "Checking for a contracted rate card…"). In the answer, the SKILL.md Cost Ranking Rules step 3 disclaimer is the only price-source statement; keep skill internals (section names, file paths, path labels) out.
 
 ### Rate Card Join Snippet
 
@@ -131,6 +129,8 @@ BUE types absent from the rate card (`lookup.*` null under `leftOuter`) keep the
 > (`valid_from` / `valid_to`). Estimated costs may not reflect the correct price for those
 > periods.
 >
+> Inside the validity window, add no validity note; the ⚠️ warning above is the only one.
+>
 > Still proceed with the rated join and present results. Do **not** fall back to the unrated
 > path because of a validity window mismatch. Only an absent or unreadable rate card
 > (pre-flight failure) triggers a fallback to the unrated path — a ⚠️ warning is sufficient
@@ -144,11 +144,12 @@ BUE types absent from the rate card (`lookup.*` null under `leftOuter`) keep the
 2. **Show native units alongside the estimated cost** — include a capability-units column
    next to the cost column for transparency. Do not replace native units with cost amounts.
 3. **Two decimal places** for all cost amounts (`round(..., decimals: 2)`).
-4. **No authoritative billing claim** — always direct to
-   **Account Management > Subscription > Overview > Cost and usage details** for
-   actual invoice reconciliation. Never state that estimated costs are authoritative billing
-   figures.
-5. **No `cost_weight` in rated path** — the rated path uses `estimated_cost` in the
+4. **No authoritative billing claim** — never call estimates authoritative. The Account
+   Management pointer lives only inside the ℹ️ disclaimer, so single-capability answers
+   carry none.
+5. **Totals, subtotals, shares and ratios MUST come from DQL** — if not computed in DQL, omit them. See
+   [Share and Grand Total (rated)](#share-and-grand-total-rated).
+6. **No `cost_weight` in rated path** — the rated path uses `estimated_cost` in the
    contracted currency. Do not also compute or display `cost_weight` or normalization weights
    when the rate card is present.
 
@@ -179,6 +180,34 @@ Present as a ranked table: rank, capability name, native units (`capability_usag
 label), estimated cost labeled "estimated cost (from BUE) [<currency_code>]". Show the ℹ️
 rated disclaimer before results. Apply ⚠️ validity warning if timeframe extends outside
 `valid_from`/`valid_to`.
+
+### Share and Grand Total (rated)
+
+For share, percentage, or grand-total requests, append this after the
+[Rate Card Join Snippet](#rate-card-join-snippet) instead of the final `sort … | fields`. It adds a
+grand total and `share_pct` per row without collapsing rows. Unpriced types keep their row
+(`share_pct` null) and stay out of the denominator.
+
+```dql-snippet
+| summarize rows = collectArray(record(event.type, capability_usage, estimated_cost, currency_code)), total_cost = sum(estimated_cost)
+| expand rows
+| fieldsAdd event.type = rows[event.type], capability_usage = rows[capability_usage], estimated_cost = rows[estimated_cost],
+    currency_code = rows[currency_code], share_pct = round(rows[estimated_cost] / total_cost * 100, decimals: 1)
+| sort isNull(estimated_cost) asc, estimated_cost desc
+| fields event.type, capability_usage, estimated_cost, currency_code, share_pct, total_cost
+```
+
+Unrated variant (after the [Full Inline Lookup](#full-inline-lookup-for-cost-rankings) and `| filter isNotNull(cost_weight)`);
+drop `cost_weight` and `total_weight` before presenting:
+
+```dql-snippet
+| summarize rows = collectArray(record(event.type, capability_usage, cost_weight)), total_weight = sum(cost_weight)
+| expand rows
+| fieldsAdd event.type = rows[event.type], capability_usage = rows[capability_usage], cost_weight = rows[cost_weight],
+    share_pct = round(rows[cost_weight] / total_weight * 100, decimals: 1)
+| sort cost_weight desc
+| fields event.type, capability_usage, share_pct
+```
 
 ### Daily Cost Trend (rated)
 
@@ -272,6 +301,8 @@ capabilities by relative cost. **Never display these values as dollar estimates*
 > - Preview types (`Digital Experience Monitoring - Query/Retain`)
 >   have no weight — omit from **unrated** cost rankings. On the rated path they
 >   stay in the result in native units with an empty cost column.
+> - `AI Function Standard Call` is the BUE event type for non-LLM tool calls triggered by AI. It shares the
+>   Standard Function Calls rate-card item with `AppEngine Functions - Small`; LLM work is billed as `AI Units`.
 > - `AI Units` uses `usage.quantity.billable` (double) as its billed field,
 >   not `billed_invocations`.
 
@@ -354,38 +385,7 @@ weight is involved.
 
 ### Estimated Query Cost by Source
 
-Attribute query scan costs to originating source. Uses `coalesce()` across all
-`client.*` attribution fields — see
-[query-cost-attribution.md → BUE Query Attribution Fields](query-cost-attribution.md#bue-query-attribution-fields).
-
-All Query types use `unitDivisor = 1073741824` (bytes → GiB scanned), so a
-simplified single-value conversion is used instead of the full lookup:
-
-```dql-template
-fetch dt.system.events, from: "<START>", to: "<END>"
-| filter event.kind == "BILLING_USAGE_EVENT"
-| filter in(event.type,
-    "Log Management & Analytics - Query",
-    "Events - Query",
-    "Traces - Query",
-    "Files - Query")
-| dedup {event.id, event.type}
-| fieldsAdd attribution = coalesce(client.source, client.application_context, client.internal_service_context, client.workflow_context, client.function_context, client.client_context, "unknown")
-| summarize total_bytes = sum(billed_bytes), by: {attribution, event.type}
-| fieldsAdd capability_usage = toDouble(total_bytes) / 1073741824
-| fields attribution, event.type, capability_usage
-| sort capability_usage desc
-| limit 30
-```
-
-All Query types included above share the same normalization weight (`0.0035`),
-so the inline lookup is not required — `capability_usage` already reflects
-relative cost within this result set. Sort by `capability_usage desc`.
-
-> The `attribution` values mix source types (dashboard, detector, workflow, app).
-> To interpret them and drill down per source — per-detector, per-workflow, and
-> the full investigation workflow — see
-> [query-cost-attribution.md](query-cost-attribution.md).
+On the unrated path, all weighted Query types have the same [normalization weight](#cost-normalization-weights), so rank by `billable_usage` and skip `cost_weight`. The rated path ranks by `estimated_cost` because contract prices differ per type. Preview types: [query-cost-attribution.md § BUE Attribution Fields](query-cost-attribution.md#bue-attribution-fields). Query: [Attribution Ranking](query-cost-attribution.md#attribution-ranking).
 
 ### Daily Cost Trend (unrated)
 
@@ -423,7 +423,7 @@ Finish with `| filter isNotNull(cost_weight) | sort day asc, cost_weight desc | 
 DQL returns rows with `capability_usage` in native units, pre-sorted by cost
 weight within each day. Output the daily-bucketed table in native units only
 (GiB, GiB-hours, workflow-hours, etc.), with direction markers (↑ elevated,
-🔴 spike, ~ normal) derived from relative `cost_weight` within the day. See
+🔴 spike, → normal) derived from relative `cost_weight` within the day. See
 SKILL.md § Cost Ranking Rules step 2 for output formatting — drop `cost_weight`
 and present native units only.
 

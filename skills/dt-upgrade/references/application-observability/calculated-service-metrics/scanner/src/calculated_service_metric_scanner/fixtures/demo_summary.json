@@ -1,0 +1,422 @@
+{
+  "tool": "calculated-service-metric-scanner",
+  "version": "0.1.0a0",
+  "generated_at": "2026-09-01T10:00:00+00:00",
+  "tenant": {
+    "label": "demo tenant",
+    "transport": "fixture",
+    "dtctl_context": null,
+    "ui_url": "https://example.apps.dynatrace.com",
+    "classic_url": "",
+    "platform_url": ""
+  },
+  "verdict": "affected",
+  "verdict_note": "Configurations reference calculated service metrics.",
+  "sources": [
+    {
+      "name": "grail_metric_inventory",
+      "state": "complete",
+      "reason": "Configuration API metricsOnGrail",
+      "items_checked": 2,
+      "items_unread": 0
+    },
+    {
+      "name": "dashboards",
+      "state": "complete",
+      "reason": "",
+      "items_checked": 214,
+      "items_unread": 0
+    },
+    {
+      "name": "notebooks",
+      "state": "complete",
+      "reason": "",
+      "items_checked": 37,
+      "items_unread": 0
+    },
+    {
+      "name": "slos",
+      "state": "complete",
+      "reason": "",
+      "items_checked": 12,
+      "items_unread": 0
+    },
+    {
+      "name": "classic_slos",
+      "state": "complete",
+      "reason": "",
+      "items_checked": 190,
+      "items_unread": 0
+    },
+    {
+      "name": "metric_events",
+      "state": "complete",
+      "reason": "",
+      "items_checked": 531,
+      "items_unread": 0
+    },
+    {
+      "name": "davis_anomaly_detectors",
+      "state": "complete",
+      "reason": "",
+      "items_checked": 1242,
+      "items_unread": 0
+    },
+    {
+      "name": "srgs",
+      "state": "partial",
+      "reason": "3/4 guardian content fetches failed",
+      "items_checked": 4,
+      "items_unread": 1
+    }
+  ],
+  "incomplete_sources": [
+    "srgs"
+  ],
+  "totals": {
+    "metrics_available_in_grail": 3,
+    "metrics_referenced": 3,
+    "metrics_referenced_outside_grail_inventory": 2,
+    "artifacts_affected": 3,
+    "references": 4,
+    "metrics_defined": 4,
+    "metrics_migratable": 3,
+    "metrics_not_migratable": 1,
+    "metrics_without_data": 1,
+    "metrics_referenced_platform": 1,
+    "metrics_referenced_classic_only": 2,
+    "artifacts_classic": 2
+  },
+  "report_scope": "read-only usage assessment",
+  "cache": {
+    "format": 1,
+    "purpose": "Reusable calculated-service-metric usage scan data",
+    "contains": "affected metric identities, matching values, and affected configuration bodies"
+  },
+  "metrics": [
+    {
+      "metric_key": "service.checkout.request_count_by_tier",
+      "classic_metric_key": "calc:service.checkout.request_count_by_tier",
+      "name": "Checkout requests by tier",
+      "in_grail_inventory": true,
+      "artifact_count": 2,
+      "reference_count": 2,
+      "key_forms": [
+        "classic",
+        "grail"
+      ],
+      "artifacts": [
+        {
+          "source": "dashboards",
+          "kind": "DASHBOARD",
+          "id": "dashboard-demo",
+          "name": "Checkout overview",
+          "link": "https://example.apps.dynatrace.com/ui/intent/dynatrace.dashboards/view-dashboard#%7B%22dt.document.id%22%3A%22dashboard-demo%22%7D",
+          "field_path": "content.tiles.tile-1.query",
+          "dql": "timeseries requests = sum(service.checkout.request_count_by_tier)",
+          "scope": null,
+          "key_form": "grail",
+          "category": "Dashboard",
+          "generation": "platform"
+        },
+        {
+          "source": "metric_events",
+          "kind": "SETTINGS/builtin:anomaly-detection.metric-events",
+          "id": "vu9U3hXa3q0AAAABACdidWlsdGluOmFub21hbHktZGV0ZWN0aW9uLm1ldHJpYy1ldmVudHM",
+          "name": "Checkout tier request drop",
+          "link": "https://example.apps.dynatrace.com/ui/intent/dynatrace.classic.settings/settings-open-settings-by-id#%7B%22dt.settings.object_id%22%3A%22vu9U3hXa3q0AAAABACdidWlsdGluOmFub21hbHktZGV0ZWN0aW9uLm1ldHJpYy1ldmVudHM%22%7D",
+          "field_path": "value.queryDefinition.metricSelector",
+          "dql": "calc:service.checkout.request_count_by_tier:splitBy(\"dt.entity.service\"):avg",
+          "scope": "environment",
+          "key_form": "classic",
+          "category": "Metric event",
+          "generation": "classic"
+        }
+      ],
+      "generations": [
+        "classic",
+        "platform"
+      ],
+      "review_only": false,
+      "link": "https://example.live.dynatrace.com/#settings/serviceMetrics/serviceMetricsEdit;serviceTSM=calc:service.checkout.request_count_by_tier",
+      "referenced": true,
+      "migration": {
+        "classic_metric_key": "calc:service.checkout.request_count_by_tier",
+        "metric_key": "service.checkout.request_count_by_tier",
+        "name": "Checkout requests by tier",
+        "enabled": true,
+        "description": [
+          "measures **REQUEST_COUNT**",
+          "where **REQUEST_NAME** EQUALS `/api/checkout`",
+          "split by **{RequestAttribute:Customer Tier}**"
+        ],
+        "notes": [
+          "Classic kept only the top 10 values (AVERAGE, DESCENDING). The extracted metric keeps every value; ranking moves to the query."
+        ],
+        "inexact": [],
+        "blockers": [],
+        "traffic": "recent",
+        "traffic_window": "10d",
+        "verdict": "migratable",
+        "target_metric_key": "migrated.service.checkout.request_count_by_tier",
+        "processor_file": "processors/migrated.service.checkout.request_count_by_tier.json",
+        "processor": {
+          "id": "migrated.service.checkout.request_count_by_tier",
+          "type": "samplingAwareCounterMetric",
+          "enabled": true,
+          "description": "Migrated from calc:service.checkout.request_count_by_tier (Checkout requests by tier)",
+          "matcher": "subtrace.is_root_span == true and matchesValue(endpoint.name, \"/api/checkout\")",
+          "samplingAwareCounterMetric": {
+            "metricKey": "migrated.service.checkout.request_count_by_tier",
+            "dimensions": [
+              {
+                "strategy": "equals",
+                "extractionType": "field",
+                "sourceFieldName": "`request_attribute.Customer Tier`",
+                "destinationFieldName": "Dimension"
+              }
+            ],
+            "sampling": "enabled",
+            "aggregation": "enabled"
+          }
+        },
+        "top_n_dropped": true
+      }
+    },
+    {
+      "metric_key": "service.legacy_batch_duration",
+      "classic_metric_key": "calc:service.legacy_batch_duration",
+      "name": "Legacy batch duration",
+      "in_grail_inventory": true,
+      "referenced": false,
+      "artifacts": [],
+      "artifact_count": 0,
+      "reference_count": 0,
+      "key_forms": [],
+      "generations": [],
+      "review_only": false,
+      "link": "https://demo.live.dynatrace.com/#settings/serviceMetrics/serviceMetricsEdit;serviceTSM=calc:service.legacy_batch_duration",
+      "migration": {
+        "classic_metric_key": "calc:service.legacy_batch_duration",
+        "metric_key": "service.legacy_batch_duration",
+        "name": "Legacy batch duration",
+        "enabled": true,
+        "description": [
+          "measures **RESPONSE_TIME**",
+          "where **REQUEST_NAME** BEGINS_WITH `BatchJob`",
+          "split by **{Request:Name}**"
+        ],
+        "notes": [
+          "Classic kept only the top 10 values of this split. The migrated metric keeps every value, so sorting and limiting move into the query that reads it."
+        ],
+        "inexact": [],
+        "blockers": [],
+        "traffic": "none",
+        "traffic_window": "10d",
+        "in_grail_inventory": true,
+        "traffic_note": "No datapoint in the last 10d, so there is nothing for a replacement metric to measure today. Check whether this metric is still wanted before spending any effort on it — a metric that only reports monthly can look dormant in this window.",
+        "verdict": "migratable",
+        "target_metric_key": "migrated.service.legacy_batch_duration",
+        "processor_file": "processors/migrated.service.legacy_batch_duration.json",
+        "processor": {
+          "id": "migrated.service.legacy_batch_duration",
+          "type": "samplingAwareValueMetric",
+          "enabled": true,
+          "description": "Migrated from calc:service.legacy_batch_duration (Legacy batch duration)",
+          "matcher": "subtrace.is_root_span == true and matchesValue(endpoint.name, \"BatchJob*\")",
+          "samplingAwareValueMetric": {
+            "metricKey": "migrated.service.legacy_batch_duration",
+            "dimensions": [
+              {
+                "strategy": "equals",
+                "extractionType": "field",
+                "sourceFieldName": "endpoint.name",
+                "destinationFieldName": "Request"
+              }
+            ],
+            "sampling": "enabled",
+            "aggregation": "enabled",
+            "measurement": "duration"
+          }
+        },
+        "top_n_dropped": true
+      }
+    },
+    {
+      "metric_key": "service.mapf_slostatus_400",
+      "classic_metric_key": "calc:service.mapf_slostatus_400",
+      "name": "",
+      "in_grail_inventory": false,
+      "artifact_count": 1,
+      "reference_count": 1,
+      "key_forms": [
+        "classic"
+      ],
+      "artifacts": [
+        {
+          "source": "classic_slos",
+          "kind": "SETTINGS/builtin:monitoring.slo",
+          "id": "vu9U3hXa3q0AAAABABhidWlsdGluOm1vbml0b3Jpbmcuc2xv",
+          "name": "HTTP 400 rate",
+          "link": "https://example.apps.dynatrace.com/ui/intent/dynatrace.classic.settings/settings-open-settings-by-id#%7B%22dt.settings.object_id%22%3A%22vu9U3hXa3q0AAAABABhidWlsdGluOm1vbml0b3Jpbmcuc2xv%22%7D",
+          "field_path": "value.metricExpression",
+          "dql": "(100)*((calc:service.mapf_slostatus_400:splitBy())/(calc:service.slototal:splitBy()))",
+          "scope": "environment",
+          "key_form": "classic",
+          "category": "Classic SLO",
+          "generation": "classic"
+        }
+      ],
+      "generations": [
+        "classic"
+      ],
+      "review_only": true,
+      "link": "https://example.live.dynatrace.com/#settings/serviceMetrics/serviceMetricsEdit;serviceTSM=calc:service.mapf_slostatus_400",
+      "referenced": true,
+      "migration": {
+        "classic_metric_key": "calc:service.mapf_slostatus_400",
+        "metric_key": "service.mapf_slostatus_400",
+        "name": "MAPF SLO status 400s",
+        "enabled": true,
+        "description": [
+          "measures **HTTP_4XX_ERROR_COUNT**",
+          "where **WEBREQUEST_URL_PATH** CONTAINS `/mapf/`",
+          "where **SERVICE_TYPE** EQUALS `WEB_SERVICE`",
+          "split by **{Request:Name}**"
+        ],
+        "notes": [
+          "Classic counted requests whose combined HTTP status is 4xx, preferring the server-side status; the matcher tests the entry span's `http.response.status_code` directly. A span without that field — a non-HTTP service call — is not counted by either side.",
+          "Classic kept only the top 10 values (AVERAGE, DESCENDING). The extracted metric keeps every value; ranking moves to the query."
+        ],
+        "inexact": [
+          "The classic metric required the service type to be `WEB_SERVICE`. Spans carry no service-type field, so that condition is not in the matcher and the extracted metric also counts service calls of another type — but only among the records this metric's other conditions already admit."
+        ],
+        "blockers": [],
+        "traffic": "recent",
+        "traffic_window": "10d",
+        "verdict": "migratable_inexact",
+        "target_metric_key": "migrated.service.mapf_slostatus_400",
+        "processor_file": "processors/migrated.service.mapf_slostatus_400.json",
+        "processor": {
+          "id": "migrated.service.mapf_slostatus_400",
+          "type": "samplingAwareCounterMetric",
+          "enabled": true,
+          "description": "Migrated from calc:service.mapf_slostatus_400 (MAPF SLO status 400s)",
+          "matcher": "subtrace.is_root_span == true and http.response.status_code >= 400 and http.response.status_code <= 499 and matchesValue(url.path, \"*/mapf/*\")",
+          "samplingAwareCounterMetric": {
+            "metricKey": "migrated.service.mapf_slostatus_400",
+            "dimensions": [
+              {
+                "strategy": "equals",
+                "extractionType": "field",
+                "sourceFieldName": "endpoint.name",
+                "destinationFieldName": "Dimension"
+              }
+            ],
+            "sampling": "enabled",
+            "aggregation": "enabled"
+          }
+        },
+        "top_n_dropped": true
+      }
+    },
+    {
+      "metric_key": "service.slototal",
+      "classic_metric_key": "calc:service.slototal",
+      "name": "",
+      "in_grail_inventory": false,
+      "artifact_count": 1,
+      "reference_count": 1,
+      "key_forms": [
+        "classic"
+      ],
+      "artifacts": [
+        {
+          "source": "classic_slos",
+          "kind": "SETTINGS/builtin:monitoring.slo",
+          "id": "vu9U3hXa3q0AAAABABhidWlsdGluOm1vbml0b3Jpbmcuc2xv",
+          "name": "HTTP 400 rate",
+          "link": "https://example.apps.dynatrace.com/ui/intent/dynatrace.classic.settings/settings-open-settings-by-id#%7B%22dt.settings.object_id%22%3A%22vu9U3hXa3q0AAAABABhidWlsdGluOm1vbml0b3Jpbmcuc2xv%22%7D",
+          "field_path": "value.metricExpression",
+          "dql": "(100)*((calc:service.mapf_slostatus_400:splitBy())/(calc:service.slototal:splitBy()))",
+          "scope": "environment",
+          "key_form": "classic",
+          "category": "Classic SLO",
+          "generation": "classic"
+        }
+      ],
+      "generations": [
+        "classic"
+      ],
+      "review_only": true,
+      "link": "https://example.live.dynatrace.com/#settings/serviceMetrics/serviceMetricsEdit;serviceTSM=calc:service.slototal",
+      "referenced": true,
+      "migration": {
+        "classic_metric_key": "calc:service.slototal",
+        "metric_key": "service.slototal",
+        "name": "SLO total requests",
+        "enabled": true,
+        "description": [
+          "measures **REQUEST_COUNT**",
+          "where **SERVICE_TAG** TAG_KEY_EQUALS `slo-tier`",
+          "split by **All requests**"
+        ],
+        "notes": [],
+        "inexact": [],
+        "blockers": [
+          {
+            "kind": "condition",
+            "element": "SERVICE_TAG",
+            "status": "SEMANTIC_CHANGE",
+            "why": "Classic service tags are unsupported in Phase 3.",
+            "family": "Entity tags"
+          },
+          {
+            "kind": "comparison",
+            "element": "TAG_KEY_EQUALS",
+            "status": "UNSUPPORTED",
+            "why": "Classic matches an arbitrary tag *key* on the entity.",
+            "family": "Entity tags"
+          }
+        ],
+        "traffic": "recent",
+        "traffic_window": "10d",
+        "verdict": "not_migratable"
+      }
+    }
+  ],
+  "migration": {
+    "assessed": 4,
+    "totals": {
+      "migratable": 2,
+      "migratable_inexact": 1,
+      "not_migratable": 1,
+      "unknown": 0,
+      "assessed": 4,
+      "migratable_total": 3,
+      "no_traffic": 1,
+      "migratable_with_data": 2
+    },
+    "traffic_window": "10d",
+    "processor_dir": "processors",
+    "reasons": [
+      {
+        "family": "Entity tags",
+        "elements": [
+          "SERVICE_TAG",
+          "TAG_KEY_EQUALS"
+        ],
+        "metrics": 1,
+        "why": "Tags on services, process groups and hosts are not available on spans, so a condition on them cannot be checked."
+      }
+    ],
+    "decisions": [
+      "**The metric gets a new name.** The old key is still in use by the classic metric, so a migrated metric cannot reuse it: `service.foo` becomes `migrated.service.foo`. Every dashboard, notebook, SLO, guardian and alert listed above has to be pointed at the new name.",
+      "**The \"top N values\" limit is gone** on 3 metric(s). Classic kept only the top few values of a split; a migrated metric keeps them all, so sorting and limiting move into the query that reads it. Where a split takes many different values, check how many that produces first.",
+      "**1 metric(s) are not migrated exactly.** Their classic definition is limited to a kind of service, which a span does not record, so the migrated metric counts a bit more: the same conditions, without that limit. Each one says so in its own entry.",
+      "**The unit and the display name are not carried over.** They live on the classic definition, so a migrated metric starts without them and a tile that showed milliseconds shows a bare number instead. Set them on the new metric key with `builtin:metric.metadata`.",
+      "**Where to put the processors is your decision.** Each one below is a single metric extraction processor, and nothing more: it is not attached to a pipeline, a pipeline group or a routing rule. Which pipeline a given service's spans go through depends on how this environment is set up, so add each processor where those spans are handled."
+    ],
+    "complete": true
+  }
+}

@@ -52,6 +52,7 @@ Observability:
 - dt-alerting: Alerting lifecycle — anomaly detectors, alert events in Grail, problem grouping, workflow notifications.
 - dt-obs-analytics: Analyze dashboards/notebooks with Davis analyzers — anomaly detection, novelty scoring, metric correlation.
 - dt-obs-ext-monitors: Ingest third-party test and monitor results into Grail via the platform events ingest API.
+- dt-obs-extensions: Extension status checks and troubleshooting — monitoring configuration status, error diagnosis, error codes.
 - dt-obs-genai: GenAI application observability — golden signals, LLM cost/token analytics, agent tool-call behavior, evaluation results.
 - dt-obs-log-semantic-mapping: Suggest and validate semantic dictionary mappings for audit log integrations.
 - dt-obs-network-devices: SNMP-monitored network devices — topology, interface metrics, trap/syslog events.
@@ -70,6 +71,8 @@ Instrumentation Setup:
 - dt-setup-flutter: Integrate the Dynatrace Flutter Plugin — dependency setup, SDK bootstrap, navigation tracking.
 - dt-setup-ios: Set up the Dynatrace iOS SDK via Swift Package Manager — Dynatrace.plist, privacy opt-in, Xcode verification.
 - dt-setup-react-native: Integrate the Dynatrace React Native Plugin for bare RN and Expo — dynatrace.config.js, Babel registration, navigation tracking.
+- dt-setup-genai: Instrument GenAI/LLM apps (Python/TypeScript, any SDK) to emit OTel gen_ai.* spans — detect, instrument, enrich, validate.
+- dt-setup-openinference-migration: Migrate GenAI apps from Traceloop/OpenLLMetry to OpenInference with gen_ai.* semconv enabled.
 
 Dynatrace Apps:
 - dt-app-dashboards: Dashboard JSON, tiles, layouts, DQL queries, variables.
@@ -79,6 +82,7 @@ Dynatrace Apps:
 
 Migration:
 - dt-migration: Migrate classic entities to Smartscape.
+- dt-upgrade: Upgrade from classic/2nd-gen to 3rd-gen — tenant readiness, per-area migration actions, AWS/Azure/GCP cloud integration cutover.
 
 ## Available prompts
 

@@ -1,5 +1,9 @@
 # Verification & Troubleshooting
 
+- [Verification Checklist](#verification-checklist)
+- [Sessions Appear but Session Replay Is Missing](#sessions-appear-but-session-replay-is-missing)
+- [No Data After 5 Minutes](#no-data-after-5-minutes)
+
 ## Verification Checklist
 
 Run through these steps after completing setup:
@@ -10,6 +14,21 @@ Run through these steps after completing setup:
 1. Open Dynatrace console → Experience Vitals → select your mobile app
 1. A user session should appear within 1–2 minutes
 1. Confirm route changes appear as views in the session timeline (if navigation tracking is enabled)
+1. If Session Replay was enabled, confirm a replay is playable for the session (may take a few minutes after the session closes)
+
+## Sessions Appear but Session Replay Is Missing
+
+Check in order:
+
+1. The console capability is enabled (Experience Vitals → [Your App] → Settings → Enablement and Cost Control)
+1. The Grail flags (`startupWithGrailEnabled` / `DTXStartupWithGrailEnabled`) are present in `dynatrace.config.js`
+1. Android: `sessionReplay.enabled true` is in `dynatrace.config.js` and `npx instrumentDynatrace` was re-run. Without it the build succeeds and `configure(...)` throws nothing, but Session Replay stays off and `SessionReplay.isEnabled()` returns `false`
+1. Android: `userOptIn true` is set — the build fails with `Property 'userOptIn' must be enabled when Session Replay is used` otherwise
+1. `@dynatrace/react-native-plugin` is 2.349.1 or newer (`npm ls @dynatrace/react-native-plugin`), and `pod install` was re-run on iOS after adding the replay package
+1. `SessionReplay.configure({ enabled: true })` is actually reached (with manual startup, after `Dynatrace.start`); `SessionReplay.isEnabled()` should return `true`
+1. With `userOptIn: true`, the privacy call uses `DataCollectionLevel.UserBehavior` and `screenRecordOptedIn` set to `true`
+1. Set `react: { debug: true }` in `dynatrace.config.js` and check the logs — a `Session Replay React Native <version> enabled` line confirms the package started
+1. The Metro cache was reset and both native apps were rebuilt
 
 ## No Data After 5 Minutes
 
@@ -37,7 +56,7 @@ Download the authoritative config from the Dynatrace console and compare or repl
 
 > Experience Vitals → [Your App] → Instrumentation → Cross Platform → React Native → Download dynatrace.config.js
 
-Either replace `dynatrace.config.js` at the project root with the downloaded file, or open both and confirm `applicationId` and `beaconUrl` match. A trailing slash or wrong environment ID in the beacon URL will silently drop all data.
+Either replace `dynatrace.config.js` at the project root with the downloaded file, or open both and confirm `applicationId` and `beaconUrl` match (with manual startup these are passed to `ConfigurationBuilder` instead — check them there). A trailing slash or wrong environment ID in the beacon URL will silently drop all data.
 
 **4. Check opt-in gate (if `userOptIn: true`)**
 
@@ -45,11 +64,11 @@ If `userOptIn: true` is set, the SDK sends no data until `applyUserPrivacyOption
 
 **5. Check Android native config**
 
-Open `android/app/build.gradle` and confirm the Dynatrace `dynatrace {}` block is present with correct `applicationId` and `beaconUrl`. If it is missing, re-run `npx instrumentDynatrace`.
+Open `android/app/build.gradle` and confirm the Dynatrace `dynatrace {}` block is present with correct `applicationId` and `beaconUrl` (with manual startup it contains only `autoStart.enabled false`). If it is missing, re-run `npx instrumentDynatrace`.
 
 **6. Check iOS plist**
 
-Open `ios/<AppName>/Info.plist` and confirm `DTXApplicationID` and `DTXBeaconURL` are present with correct values. If missing, re-run `npx instrumentDynatrace`.
+Open `ios/<AppName>/Info.plist` and confirm `DTXApplicationID` and `DTXBeaconURL` are present with correct values (with manual startup only `DTXAutoStart` = `false` is expected). If missing, re-run `npx instrumentDynatrace`.
 
 **7. Check network connectivity**
 

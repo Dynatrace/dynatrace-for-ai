@@ -8,8 +8,9 @@ For shared building blocks (risk-level mapping, status aggregation, sem-dict
 filter, time-window rules), see [common-patterns.md](common-patterns.md). For
 field reference, see [data-model.md](data-model.md).
 
-> **No `dt.system.bucket` filter.** Security event data may live in any bucket;
-> bucket scoping risks hiding tile data.
+> **No default `dt.system.bucket` filter.** Security events land in the default bucket
+> `default_security` (the name varies per tenant), but users can route them to any custom bucket, so bucket
+> scoping is irrelevant and can hide tile data. Add a bucket filter only when the user explicitly names a bucket to search.
 
 > **Load this reference only for dashboard / chart / KPI requests.** For plain
 > investigation, triage, or drill-down, the per-domain references are sufficient.
@@ -29,14 +30,12 @@ field reference, see [data-model.md](data-model.md).
   - [Top 10 Repositories by Critical+High Findings](#top-10-repositories-by-criticalhigh-findings)
   - [Top 10 Vulnerable Components](#top-10-vulnerable-components)
   - [Findings Distribution by Object Type (HIGH+CRITICAL only)](#findings-distribution-by-object-type-highcritical-only)
-  - [Top 10 Affected Hosts (entity-enriched)](#top-10-affected-hosts-entity-enriched)
+  - [Top 10 Affected Hosts](#top-10-affected-hosts)
 - [Trend Charts (timeseries)](#trend-charts-timeseries)
   - [Vulnerability Counts Over Time, Stacked by Risk Level](#vulnerability-counts-over-time-stacked-by-risk-level)
 - [Provider / Product Coverage Summary](#provider--product-coverage-summary)
   - [Findings vs. Scans Split per Product](#findings-vs-scans-split-per-product)
-- [Coverage Donut Variants (smartscapeNodes-driven)](#coverage-donut-variants-smartscapenodes-driven)
-  - [Host Coverage by Any External Product (donut)](#host-coverage-by-any-external-product-donut)
-  - [Entity-Centric Coverage via `fetch dt.entity.host`](#entity-centric-coverage-via-fetch-dtentityhost)
+- [Coverage Donuts](#coverage-donuts)
 - [Multi-Type Combined Views](#multi-type-combined-views)
   - [One-Row-Per-Entity Risk Summary (DT RVA + external)](#one-row-per-entity-risk-summary-dt-rva--external)
 
@@ -182,26 +181,15 @@ fetch security.events
 | sort Findings desc
 ```
 
-### Top 10 Affected Hosts (entity-enriched)
+### Top 10 Affected Hosts
 
-Joins findings to HOST smartscapeNodes for runtime context. For full 3-way
-enrichment (container image digest / id paths), see
-[dt-sec-contextualization/references/entity-enrichment.md](../../dt-sec-contextualization/references/entity-enrichment.md).
-
-```dql
-fetch security.events, from:now()-30m
-| filter event.provider=="Dynatrace"
-| filter in(event.type,{"VULNERABILITY_STATE_REPORT_EVENT","VULNERABILITY_STATUS_CHANGE_EVENT","VULNERABILITY_TRACKING_LINK_CHANGE_EVENT"})
-     AND event.level=="ENTITY"
-| dedup {vulnerability.display_id, affected_entity.id}, sort:{timestamp desc}
-| summarize {
-    Vulnerabilities=count(),
-    Critical=countIf(vulnerability.risk.score >= 9)
-  }, by:{affected_entity.id, affected_entity.name}
-| join [smartscapeNodes HOST], on:{right[id]==left[affected_entity.id]}
-| sort Vulnerabilities desc
-| limit 10
-```
+Not a dashboard-local pattern. The canonical RVA host ranking (affected-host merge, grouped on
+the in-event classic id alone) is
+[vulnerabilities-rankings.md § Most vulnerable hosts — DT RVA](vulnerabilities-rankings.md#most-vulnerable-hosts--dt-rva);
+reuse that query as the tile. Event-time host names can be generic, so for readable tile labels
+append the host tail from **dt-sec-contextualization** `rva-entity-resolution.md` § Resolving a
+ranking result. For external findings mapped to hosts, load **dt-sec-contextualization** →
+`entity-enrichment.md`.
 
 ---
 
@@ -227,7 +215,7 @@ fetch security.events
 ```
 
 For DT RVA equivalents (open vulnerability counts over 7d in 3h buckets), see
-[vulnerabilities-dynatrace.md § Time-Series Trends](vulnerabilities-dynatrace.md#dt-rva-time-series-trends-7-days-3h-buckets).
+[vulnerabilities-lifecycle.md § Time-Series Trends](vulnerabilities-lifecycle.md#dt-rva-time-series-trends-7-days-3h-buckets).
 
 ---
 
@@ -248,37 +236,11 @@ and scan-coverage events per source.
 
 ---
 
-## Coverage Donut Variants (smartscapeNodes-driven)
+## Coverage Donuts
 
-### Host Coverage by Any External Product (donut)
-
-```dql
-smartscapeNodes HOST
-| dedup id
-| join [
-    fetch security.events
-    | filterOut event.provider=="Dynatrace" or product.vendor=="Dynatrace"
-    | filter exists(host.ip)
-  ], on:{host.ip}, kind:leftOuter
-| summarize count(), by:{covered=if(isNotNull(event.provider), "Covered", else:"Not covered")}
-```
-
-### Entity-Centric Coverage via `fetch dt.entity.host`
-
-Alternative to `smartscapeNodes`-based coverage; uses the entity stream directly:
-
-```dql
-fetch dt.entity.host
-| lookup [
-    fetch security.events
-    | filter event.type == "VULNERABILITY_SCAN"
-    | dedup dt.entity.host
-  ], sourceField:id, lookupField:dt.entity.host
-| summarize count(), by:{coverage=if(isNotNull(lookup.dt.entity.host), "covered", else: "not covered")}
-```
-
-For full coverage analysis broken down by provider/product (and the 3-way
-K8s/host match), see [coverage.md](coverage.md).
+Covered / not-covered donuts (hosts by external product, hosts by Dynatrace scan events)
+start from `smartscapeNodes`, so they live with the coverage queries:
+**dt-sec-contextualization** → `runtime-coverage.md` § Coverage Donut Variants.
 
 ---
 
@@ -342,7 +304,7 @@ sample dashboards live in `evals/skills/dt-sec-insights/sources/sample-dashboard
   correlate against the environment (RVA + external vulnerabilities by CVE, detections by actor IP /
   MITRE technique, logs by `contains(content, …)`, traces by IP/domain/URL). Uses dashboard
   **variables** to carry the IOC lists and `in(field, $Var)` filters (the self-contained-query
-  equivalent uses `join` — see [threat-intelligence.md § Threat-Exposure Correlation](threat-intelligence.md#threat-exposure-correlation-ioc--environment)).
+  equivalent uses `join` — see `dt-sec-ioc-hunting` `hunt-security-events.md` § Report-driven correlation).
 
 > **Tile field nuances:** use `threat.target.industries` (plural) and
 > `threat.target.countries.iso_codes` for the map; `coalesce(toTimestamp(threat.report.time.created), timestamp)`

@@ -1,382 +1,427 @@
 # Query Cost Attribution
 
-Step-by-step workflow for investigating what is driving DQL query scan costs.
-Covers BUE billable totals, per-source attribution, per-detector breakdown
-(ALERTING pool), and QEE drill-down.
+Investigate what drives DQL query billable volume. Answer from BUE (billing usage events); use QEE
+(query execution events) only for the [QEE Fallbacks](#qee-fallbacks).
 
 ## Contents
 
-- [Common Principles](#common-principles)
-- [Overview](#overview)
-- [BUE Query Attribution Fields](#bue-query-attribution-fields)
-- [Step 1 — Top Sources by Billable Scan (BUE)](#step-1--top-sources-by-billable-scan-bue)
-  - [Step 1a — Coverage Check](#step-1a--coverage-check)
-  - [Step 1b — Combined Attribution](#step-1b--combined-attribution)
-- [Step 2 — Identify Source Type](#step-2--identify-source-type)
-  - [Step 2a — AI-Generated Queries](#step-2a--ai-generated-queries)
-  - [Step 2b — Drill Down by Bucket](#step-2b--drill-down-by-bucket)
-- [Step 3 — Drill Into QEE for Details](#step-3--drill-into-qee-for-details)
-  - [Step 3b — Cross-Validate Execution Count](#step-3b--cross-validate-execution-count)
-- [Step 4 — Per-Detector Scan & Name Resolution (ALERTING pool)](#step-4--per-detector-scan--name-resolution-alerting-pool)
-- [Step 5 — Rank by Cost Weight](#step-5--rank-by-cost-weight--estimated-cost)
-- [Investigating QEE↔BUE Mismatches](#investigating-qeebue-mismatches)
+- [Rules](#rules)
+- [Decision Path](#decision-path)
+- [Spike Investigation](#spike-investigation)
+- [BUE Attribution Fields](#bue-attribution-fields)
+- [Coverage Check](#coverage-check)
+- [Attribution Ranking](#attribution-ranking)
+- [Source Interpretation and Dashboard Ranking](#source-interpretation-and-dashboard-ranking)
+- [Detector Ranking](#detector-ranking)
+- [AI and Agent Queries](#ai-and-agent-queries)
+- [Bucket Drill-Down](#bucket-drill-down)
+- [Run Counts](#run-counts)
+- [QEE Fallbacks](#qee-fallbacks): Bucket Scan, Single-Query Details, QEE Exceeds BUE
 
-## Common Principles
+## Rules
 
-1. **BUE is billable truth, QEE is diagnostic** — BUE Query events reflect
-   actual billed scan volumes; QEE provides per-query execution details
-   (`client.client_context`, query text, duration). Always start cost
-   investigations with BUE, then drill into QEE for attribution detail.
+- Select Query BUEs with `endsWith(event.type, " - Query")`. NEVER hard-code an `event.type` list; tenants differ and new Query types appear.
+- Dedup with `dedup {event.id, event.type}` ([why](billing-capabilities.md#billing-event-deduplication)). Filter before the dedup; duplicates share every field.
+- Count queries with `countDistinct(query_id)`, NEVER `count()` (inflates 2-3x). `countDistinct(query_id)` is approximate (about 1%); say so when quoting exact counts.
+- Sum raw `billed_bytes` as `billable_usage`. Unrated: add `billable_gib = billable_usage / 1073741824` for display. Rated: append the [Rate Card Join Snippet](cost-estimations.md#rate-card-join-snippet) instead (it divides by `unit_divisor`; summing GiB divides twice and every cost rounds to `0.00`).
+- **Rated variant** (ranking queries below; Spike Q1 and Detector Ranking have their own rated lines): keep `event.type` in `by`; replace the `billable_gib` `fieldsAdd`, `sort` and `limit` with the [Rate Card Join Snippet](cost-estimations.md#rate-card-join-snippet), `| sort isNull(estimated_cost) asc, estimated_cost desc`, `| limit 20`; add `estimated_cost, currency_code` to any `fields` line.
+- Timeframe: `-7d` default, `-14d` max ([SKILL.md Best Practice 2](../SKILL.md#best-practices)). Billing totals that must match the portal use [UTC midnight boundaries](billing-capabilities.md#billing-timeframe-boundaries).
+- NEVER join BUE with QEE in bulk. For one query's detail, take `query_id` from BUE and filter QEE by it ([Single-Query Details](#single-query-details)).
+- Unrated path: rank by `billable_usage`, NEVER compute `cost_weight` ([why](cost-estimations.md#estimated-query-cost-by-source)). Rated path: rank by `estimated_cost`.
+- `user.email` is the caller, not the owner or the last editor. Infer no team or fix that the data does not show.
+- Asked for a team or product area, say billing data can't attribute it; give `user.email` or the detector `task_id`/name instead.
+- Label BUE volume "billable GiB" in headings, columns and prose, even when the user asks about "scan volume". "Scanned" is QEE wording.
 
-2. **Sample first** — Before building any attribution query, run
-   `| limit 3` (without `| fields`) on the target event type to discover
-   available fields. `client.source`, `client.function_context`, and
-   `client.workflow_context` vary by pool; confirm they are populated.
+## Decision Path
 
-3. **Dedup billing events** — Use `| dedup {event.id, event.type}` for
-   multi-type queries. See
-   [Billing Event Deduplication](billing-capabilities.md#billing-event-deduplication).
+Questions that name no source type (for example "what drives our query cost?"): run the [Coverage Check](#coverage-check), then the [Attribution Ranking](#attribution-ranking). Others: route by the table.
 
-4. **Always verify coverage before attributing** — Run the
-   [Step 1a coverage check](#step-1a--coverage-check) before filtering on any
-   `client.*` field.
+| Question | Section |
+|----------|---------|
+| Spike or anomaly on one Query type around a date (observed vs predicted)? | [Spike Investigation](#spike-investigation) |
+| Which sources are billed most? | [Attribution Ranking](#attribution-ranking), [Source Interpretation](#source-interpretation-and-dashboard-ranking) |
+| Which dashboards? | [Dashboard Ranking](#dashboard-ranking) |
+| Which detectors? | [Detector Ranking](#detector-ranking) |
+| AI cost? | Coverage Check `ai_generated` split; if `ai_generated == true` has volume, [AI and Agent Queries](#ai-and-agent-queries) |
+| Which buckets? | [Bucket Drill-Down](#bucket-drill-down); Logs, Traces, Files: [Bucket Scan](#bucket-scan) (QEE) |
+| What did one query do? | [Single-Query Details](#single-query-details) (QEE) |
+| How often did X run? | [Run Counts](#run-counts) |
+| QEE far above BUE? | [QEE Exceeds BUE](#qee-exceeds-bue) (QEE) |
 
-5. **Rolling windows are acceptable here** — Investigation queries use
-   `from: -7d` or `from: -30d` for diagnostic analysis. For billing totals
-   that must match the Account Management Portal, use explicit UTC midnight
-   boundaries per [billing-capabilities.md § Billing Timeframe Boundaries](billing-capabilities.md#billing-timeframe-boundaries).
+## Spike Investigation
 
-## Overview
+Anomaly on one Query type around date D (observed vs predicted). Resolve the price source first ([Cost Ranking Rules step 0](../SKILL.md#cost-ranking-rules)). Two BUE queries answer who, when and how much. Use BUE only, with no QEE or `query_string` step; single-query questions go to [Single-Query Details](#single-query-details).
 
-Query cost attribution requires **all 5 steps**. BUE (Step 1) shows billable
-totals but lacks per-detector breakdown. Steps 2-4 resolve that using QEE
-and `ANALYZER_EXECUTION_EVENT`. Stopping at Step 1 leaves most costs
-unattributed.
+**Q1 trend.** Window D-13 00:00Z to D+1 00:00Z (14 days, the cap). Fill in the one `event.type` and the dates.
 
-**BUE vs QEE:** BUE Query events are billable truth. QEE's `scanned_bytes` is diagnostic,
-not billable. Start with BUE for totals, drill into QEE for breakdown.
-
-## BUE Query Attribution Fields
-
-Coverage of all `client.*` attribution fields depends on your tenant's query pool
-distribution, not on BUE event type. Always run the coverage check in Step 1a
-before building attribution queries.
-
-| Field | Description | Populated on |
-|-------|-------------|--------------|
-| `client.source` | Named source (dashboard URL, detector ID) | ALERTING, DASHBOARDS, APPLICATION, OPERATIONAL, BILLING; variable on INTERNAL_APPLICATION |
-| `client.application_context` | App ID (e.g., `dynatrace.automations`) | AUTOMATION, DASHBOARDS, APPLICATION, INTERNAL_APPLICATION |
-| `client.function_context` | Function within the app — drill down after attributing | AUTOMATION reliably; partial on INTERNAL_APPLICATION |
-| `client.client_context` | Structured JSON with app, function, and version details | ALERTING and AUTOMATION reliably; variable on API and APPLICATION |
-| `client.internal_service_context` | Internal Dynatrace service name | ALERTING, OPERATIONAL, BILLING |
-| `client.workflow_context` | Workflow ID | AUTOMATION only |
-| `user.id` / `user.email` | User or service account | Most pools |
-| `ai_generated` | `true` when the query was issued by an AI agent (Davis Copilot, MCP assistant) | All Query BUE types |
-
-Use `coalesce(client.source, client.application_context, client.internal_service_context, client.workflow_context, client.function_context, client.client_context, "unknown")` for
-attribution. For app-level results, drill into `client.function_context`.
-
-## Step 1 — Top Sources by Billable Scan (BUE)
-
-Start with BUE — billable truth. First run a **coverage check** to see which
-attribution field to use, then run the attribution query.
-
-> **Rated path:** When a rate card is available (pre-flight passes), use the
-> rated variant of [Step 1b](#step-1b--combined-attribution) — it sums raw
-> `billed_bytes` so the rate-card join converts to GiB exactly once.
-
-### Step 1a — Coverage Check
-
-Verify which attribution fields are populated before building the attribution
-query:
-
-```dql
-fetch dt.system.events, from: -7d
-| filter event.kind == "BILLING_USAGE_EVENT"
-| filter in(event.type,
-    "Log Management & Analytics - Query",
-    "Events - Query",
-    "Traces - Query",
-    "Files - Query")
+```dql-template
+fetch dt.system.events, from: toTimestamp("<D-13>T00:00:00Z"), to: toTimestamp("<D+1>T00:00:00Z")
+| filter event.kind == "BILLING_USAGE_EVENT" and event.type == "<event.type>"
 | dedup {event.id, event.type}
-| fieldsAdd has_source = isNotNull(client.source)
-| fieldsAdd has_app_ctx = isNotNull(client.application_context)
-| summarize
-    total_gib = sum(toDouble(billed_bytes) / 1073741824),
-    with_source_gib = sum(if(has_source, toDouble(billed_bytes) / 1073741824, else: 0)),
-    with_app_ctx_gib = sum(if(has_app_ctx, toDouble(billed_bytes) / 1073741824, else: 0)),
-    by: {event.type}
-| fieldsAdd source_coverage_pct = round(with_source_gib / total_gib * 100, decimals: 1)
-| fieldsAdd app_ctx_coverage_pct = round(with_app_ctx_gib / total_gib * 100, decimals: 1)
-| sort event.type asc
+| fieldsAdd attribution = coalesce(client.application_context, client.internal_service_context, client.source, client.workflow_context, client.function_context, client.client_context, "unknown")
+| summarize billable_usage = sum(billed_bytes),
+    attributed_usage = sum(if(attribution != "unknown", billed_bytes, else: 0)),
+    queries = countDistinct(query_id), callers = countDistinct(user.email),
+    by: {day = bin(timestamp, 24h)}
+| fieldsAdd billable_gib = billable_usage / 1073741824,
+    attributed_pct = round(toDouble(attributed_usage) / billable_usage * 100, decimals: 1)
+| summarize {baseline_gib = arrayMedian(collectArray(billable_gib)),
+    days = collectArray(record(day, billable_gib, attributed_pct, queries, callers))}
+| expand d = days
+| fields day = d[day], billable_gib = d[billable_gib], baseline_gib,
+    spike = d[billable_gib] > 1.2 * baseline_gib,
+    attributed_pct = d[attributed_pct], queries = d[queries], callers = d[callers]
+| sort day asc
 ```
 
-### Step 1b — Combined Attribution
+- Rated (the pre-flight found a rate card, so this is the Q1 to run): add `event.type` to the daily `by` (one row per day, single type), insert the [Rate Card Join Snippet](cost-estimations.md#rate-card-join-snippet) right after that `summarize`, add `estimated_cost, currency_code` to the `record(...)` and `estimated_cost = d[estimated_cost], currency_code = d[currency_code]` to the final `fields`; compare daily `estimated_cost` with the anomaly's currency values.
+- Baseline: `baseline_gib`, the median daily `billable_gib` across the Q1 window, computed in DQL by the query's tail. `spike` is true for days above 1.2 × `baseline_gib`. The median is not pulled up by the spike itself.
+- If Q1 shows no day above baseline, say so, skip Q2, and name no cause.
+- The spike window is the run of days above baseline; D need not be in it.
 
-Use `coalesce()` across all six `client.*` attribution fields to capture the first
-non-null value regardless of which query pool generated the event:
+**Q2 spike attribution.** Spike window only. One query replaces the Coverage Check, Attribution Ranking, [Time-Split](#time-split) and [Unknown-by-User Drill-Down](#unknown-by-user-drill-down) on this path.
 
-```dql
-fetch dt.system.events, from: -30d
-| filter event.kind == "BILLING_USAGE_EVENT"
-| filter in(event.type,
-    "Log Management & Analytics - Query",
-    "Events - Query",
-    "Traces - Query",
-    "Files - Query")
+```dql-template
+fetch dt.system.events, from: toTimestamp("<spike start>T00:00:00Z"), to: toTimestamp("<spike end+1>T00:00:00Z")
+| filter event.kind == "BILLING_USAGE_EVENT" and event.type == "<event.type>"
 | dedup {event.id, event.type}
-| fieldsAdd attribution = coalesce(client.source, client.application_context, client.internal_service_context, client.workflow_context, client.function_context, client.client_context, "unknown")
-| summarize total_billed_gib = sum(toDouble(billed_bytes) / 1073741824),
-    by: {attribution, event.type}
-| sort total_billed_gib desc
+| fieldsAdd attribution = coalesce(client.application_context, client.internal_service_context, client.source, client.workflow_context, client.function_context, client.client_context, "unknown")
+| summarize {billable_usage = sum(billed_bytes),
+    queries = countDistinct(query_id)},
+    by: {attribution, user.email}
+| fieldsAdd billable_gib = billable_usage / 1073741824
+| sort billable_usage desc
 | limit 20
 ```
 
-**Rated path:** When a rate card is available, replace the `summarize` above with one
-that keeps **raw bytes** — the join divides by `lookup.unit_divisor` (`1073741824` for
-all Query BUE types), so summing values already in GiB divides twice and rounds every
-cost to `0.00`:
+Rated: [rated variant](#rules).
 
-```dql-snippet
-| summarize billable_usage = sum(billed_bytes), by: {attribution, event.type}
-```
+| Top `attribution` | Next |
+|-------------------|------|
+| Detector source | [Detector Ranking](#detector-ranking) on the spike window; `user.email` is only the run-as user. State impact only from billable GiB per run or totals, never from query text |
+| `unknown` | The `user.email` rows are the answer; report callers only |
+| Other | [Source Interpretation](#source-interpretation-and-dashboard-ranking) |
 
-Then append the [Rate Card Join Snippet](cost-estimations.md#rate-card-join-snippet) —
-it yields `capability_usage` in GiB scanned and `estimated_cost` — and sort with
-`isNull(estimated_cost) asc, estimated_cost desc`. For output rules and disclaimer wording, see
-[cost-estimations.md § Output Rules for Rated Path](cost-estimations.md#output-rules-for-rated-path).
+Rules:
 
-## Step 2 — Identify Source Type
+- Baseline days near zero before the spike: say it is a resumption of an earlier level, not a new workload (D-7 windows hide it).
+- Claim a billing gap or zero-rating only through [QEE Exceeds BUE](#qee-exceeds-bue), not on this path.
+- Explain the baseline only from Q1 data; label it an inference. Say what was not verified.
+- Report what the data shows, not why: give no tuning or remediation advice (time ranges, filters, bucket scoping, config changes) and name no cause or owner the BUE fields don't show.
+- Unrated path with a currency anomaly: say the currency figures can't be reconciled from BUE and report billable GiB; give no rate and no forecast method.
 
-The meaning of `attribution` depends on which query pool generated the cost.
+## BUE Attribution Fields
 
-| `attribution` pattern | Source type | Next step |
-|------------------------|-------------|-----------|
-| `https://.../document/...` | Dashboard (DASHBOARDS pool) | Filter Step 1b by `matchesPhrase(client.source, "/ui/dashboard/")` to rank dashboards |
-| Encoded settings UID / opaque ID | Detector settings `objectId` (ALERTING pool) | Step 4 — resolved in combined query |
-| `builtin:davis.anomaly-detectors/...` | Detector type name (ALERTING pool) | Step 4 — parse `client.client_context` |
-| `dynatrace.automations:...` | Automation function (AUTOMATION pool) | Resolve via [workflow-total-cost.md § Cross-Event Field Reference](workflow-total-cost.md#cross-event-field-reference) |
-| `dynatrace.<appname>` | Platform app (from `client.application_context`) | Drill into `client.function_context` |
-| `dt.*` service name | Internal platform service | Review with platform team |
-| `ai_generated == true` | AI agent (Davis Copilot / MCP) | Step 2a — attribute by `session_id`; `client.source` has the MCP tool name |
+Population depends on the query pool, not on the BUE type.
 
-### Step 2a — AI-Generated Queries
+| Field | Meaning | Notes |
+|-------|---------|-------|
+| `client.application_context` | App id (`dynatrace.automations`) | Clean for URL sources |
+| `client.internal_service_context` | Internal service | Detectors arrive as `dt.davis.anomaly-detector` |
+| `client.source` | Dashboard URL, detector id, MCP tool | |
+| `client.workflow_context` | Workflow id | Automation only |
+| `client.function_context` | Function within an app | Drill-down |
+| `client.client_context` | JSON or plain string | JSON shapes: external client (`agent`, for example dtctl), detector (`dt.task.id`, `dt.task.group`, `dt.analyzer.execution_id`), backend (`app`), app sub-source (`source`) |
+| `query_id` | Query identity | Always set; the grain for query counts |
+| `user.email` | Caller | Always set. For detectors it is the run-as user, shared by several detectors: never use it for per-detector attribution, use `dt.task.id` |
+| `usage.bucket` | Grail bucket | Events and Digital Experience Monitoring only |
+| `session_id` | AI session | `ai_generated` rows only |
+| `ai_generated` | Platform AI tool query (CoPilot/Assist, Dynatrace MCP) | Indirect AI cost signal, see [AI and Agent Queries](#ai-and-agent-queries) |
 
-Queries with `ai_generated == true` on BUE Query events represent **indirect** AI costs — the DQL scan volume triggered by an AI agent on top of the direct charges billed as `AI Units` / `AI Function Standard Call` BUEs. For direct AI invocation costs, see [billing-event-types.md § Agentic AppEngine](billing-event-types.md#agentic-appengine).
+Preview types (for example Digital Experience Monitoring) have real `billed_bytes` but no public weight or rate card price. Keep their rows in the ranking and mark them preview/unpriced; on the rated path `estimated_cost` stays null and they sort last.
 
-Filter on `ai_generated == true` to isolate the indirect scan cost:
+## Coverage Check
 
-```dql
-fetch dt.system.events, from: -7d
-| filter event.kind == "BILLING_USAGE_EVENT"
-| filter in(event.type, "Log Management & Analytics - Query", "Events - Query", "Traces - Query", "Files - Query")
-| filter ai_generated == true
-| dedup {event.id, event.type}
-| summarize total_gib = sum(toDouble(billed_bytes) / 1073741824),
-    event_count = count(),
-    by: {event.type}
-```
+One pass per `event.type` and `ai_generated`. Report `attributed_pct` (coalesce is not `unknown`), `bucket_pct` and the `ai_generated` split. Skip types under 1% of total `billable_gib`. State the overall unattributed share in one line of the answer, then branch on `attributed_pct`:
 
-To see which AI sessions drove the most scan volume, group by `session_id`. The `session_id`
-on these Query BUEs matches the `session_id` on the `AI Units` / `AI Function Standard
-Call` BUEs that initiated them, enabling cross-BUE attribution:
+| `attributed_pct` | Next |
+|------------------|------|
+| `<10%` | Skip the Attribution Ranking and [Time-Split](#time-split); run the [Unknown-by-User Drill-Down](#unknown-by-user-drill-down) |
+| `10% to <90%` | Continue as routed, plus the [Unknown-by-User Drill-Down](#unknown-by-user-drill-down) |
+| `≥90%` | Continue as routed |
 
-```dql
-fetch dt.system.events, from: -7d
-| filter event.kind == "BILLING_USAGE_EVENT"
-| filter in(event.type, "Log Management & Analytics - Query", "Events - Query", "Traces - Query", "Files - Query")
-| filter ai_generated == true
-| filter isNotNull(session_id) and session_id != ""
-| dedup {event.id, event.type}
-| summarize total_gib = sum(toDouble(billed_bytes) / 1073741824),
-    event_count = count(),
-    by: {session_id, event.type}
-| sort total_gib desc
-| limit 20
-```
-
-> `client.source` on these BUEs typically contains the MCP tool name (e.g.,
-> `dynatrace-mcp.get-problem-by-id`, `dynatrace-mcp.execute-dql`), useful for seeing which
-> AI tools are driving the most scan volume. `conversation_id` may be an empty string on
-> Query BUEs even when present on the AI Units / AI Function Standard Call BUEs in the same
-> session — use `session_id` as the reliable join key.
-
-### Step 2b — Drill Down by Bucket
-
-Identify which Grail buckets drive scan volume — high scan on one bucket often
-means missing time filters, over-broad aggregations, or detectors on
-large-retention data.
-
-> **BUE `usage.bucket` coverage varies by BUE `event.type`** (verified:
-> emitted by `Events - Query` and `Digital Experience Monitoring - Query`;
-> not by `Log Management & Analytics - Query`, `Traces - Query`,
-> `Files - Query`) and can change as Dynatrace adds groupers. For **reliable
-> per-bucket attribution across all BUE Query types, use QEE** — carries
-> `table` and `bucket` with 100% coverage.
+If `unknown` is in the top 3 of the [Attribution Ranking](#attribution-ranking), run the [Time-Split](#time-split) against the top named source. If `unknown` stops when a named source starts, at the same volume and callers, it is one workload: merge the two and say so.
 
 ```dql
 fetch dt.system.events, from: -7d
-| filter event.kind == "BILLING_USAGE_EVENT"
-| filter in(event.type,
-    "Events - Query",
-    "Digital Experience Monitoring - Query")
+| filter event.kind == "BILLING_USAGE_EVENT" and endsWith(event.type, " - Query")
 | dedup {event.id, event.type}
-| summarize total_gib = sum(toDouble(billed_bytes) / 1073741824),
-    bue_rows = count(),
-    by: {usage.bucket, event.type}
-| sort total_gib desc
-| limit 20
+| fieldsAdd attribution = coalesce(client.application_context, client.internal_service_context, client.source, client.workflow_context, client.function_context, client.client_context, "unknown")
+| summarize billable_usage = sum(billed_bytes),
+    attributed_usage = sum(if(attribution != "unknown", billed_bytes, else: 0)),
+    bucket_usage = sum(if(isNotNull(usage.bucket), billed_bytes, else: 0)),
+    queries = countDistinct(query_id),
+    by: {event.type, ai_generated}
+| fieldsAdd billable_gib = billable_usage / 1073741824,
+    attributed_pct = round(toDouble(attributed_usage) / billable_usage * 100, decimals: 1),
+    bucket_pct = round(toDouble(bucket_usage) / billable_usage * 100, decimals: 1)
+| fields event.type, ai_generated, billable_gib, attributed_pct, bucket_pct, queries
+| sort billable_gib desc
 ```
 
-> ### ⛔ Cardinality rules for BUE + QEE joins
->
-> Both BUE and QEE can fan out to multiple rows per `query_id`, and grouper
-> dimensions may change over time. Apply universally:
->
-> | Wrong | Right |
-> |-------|-------|
-> | `count()` on BUE/QEE for query count | `countDistinct(query_id)` |
-> | `sum(billed_bytes)` grouped by `query_id` on BUE+QEE join | `sum(billed_bytes)` grouped by `event.id` |
->
-> **`event.id` = safe grain for billed volume; `query_id` = safe grain for
-> query counts.** Never mix them.
+### Time-Split
 
-Join BUE with QEE for per-query details (group by `event.id` when summing
-`billed_bytes`, use `countDistinct(query_id)` for query counts):
-
-```dql
-fetch dt.system.events, from: -7d
-| filter event.kind == "BILLING_USAGE_EVENT"
-| filter in(event.type,
-    "Log Management & Analytics - Query",
-    "Events - Query",
-    "Traces - Query",
-    "Files - Query")
-| dedup {event.id, event.type}
-| lookup [
-    fetch dt.system.events, from: -7d
-    | filter event.kind == "QUERY_EXECUTION_EVENT"
-    | fields query_id, query_string, execution_duration_ms, user.email, table
-  ], sourceField: query_id, lookupField: query_id,
-     fields: {query_string, execution_duration_ms, query_user = user.email, table}
-```
-
-## Step 3 — Drill Into QEE for Details
-
-QEE provides per-query execution details not available on BUE: `query_string`,
-`scanned_bytes`, and `execution_duration_ms`.
-
-> **Sample a BUE Query event with `| limit 1` before joining to QEE** to
-> confirm available fields — notably `query_id`, the correct join key.
-
-> **Filter must match the attribution field from Step 1b.** If the top
-> `attribution` value came from `client.source`, filter on `client.source`.
-> If it came from `client.application_context`, filter on that instead. Use
-> `coalesce` to cover both:
-
-> ### ⛔ What QEE `count()` actually counts — do NOT mislabel it
->
-> A `QUERY_EXECUTION_EVENT` is emitted **once per bucket touched per DQL
-> statement** — NOT once per DQL statement, and NOT once per workflow/detector
-> run. A single `fetch logs` that scans 3 buckets produces **3 QEE records**
-> (all sharing one `query_id`). Therefore:
->
-> | Quantity | How to count it | What it means |
-> |----------|-----------------|---------------|
-> | `qee_events = count()` | raw QEE row count | bucket-touches — **diagnostic only** |
-> | `dql_statements = countDistinct(query_id)` | distinct `query_id` | actual DQL queries executed |
-> | workflow / detector **runs** | a **separate** `WORKFLOW_EVENT` / `ANALYZER_EXECUTION_EVENT` query — see [Step 3b](#step-3b--cross-validate-execution-count) | how many times something actually ran |
->
-> Never alias the QEE row count as `queries` or phrase it as "ran N times" — the
-> gap between `count()` and `countDistinct(query_id)` is unpredictable (a few× to
-> 50×+), so a raw count is never a safe proxy for query volume or run frequency.
-> Use `countDistinct(query_id)` for query volume, and cross-validate run counts
-> with the source event ([Step 3b](#step-3b--cross-validate-execution-count))
-> before reporting any "how often did this run" conclusion.
+6-hour bins; fill in the top named source:
 
 ```dql-template
 fetch dt.system.events, from: -7d
-| filter event.kind == "QUERY_EXECUTION_EVENT"
-| filter coalesce(client.source, client.application_context, client.internal_service_context, client.workflow_context, client.function_context, client.client_context) == "<top attribution from step 1b>"
-| summarize qee_events = count(),
-    dql_statements = countDistinct(query_id),
-    total_scanned_gib = sum(scanned_bytes) / 1073741824,
-    avg_duration_ms = avg(execution_duration_ms),
-    by: {table, status}
-| sort total_scanned_gib desc
+| filter event.kind == "BILLING_USAGE_EVENT" and endsWith(event.type, " - Query")
+| dedup {event.id, event.type}
+| fieldsAdd attribution = coalesce(client.application_context, client.internal_service_context, client.source, client.workflow_context, client.function_context, client.client_context, "unknown")
+| filter in(attribution, array("unknown", "<top named source>"))
+| summarize {billable_usage = sum(billed_bytes),
+    queries = countDistinct(query_id), callers = countDistinct(user.email)},
+    by: {time = bin(timestamp, 6h), attribution}
+| fieldsAdd billable_gib = round(billable_usage / 1073741824, decimals: 0)
+| sort time asc
 ```
 
-### Step 3b — Cross-Validate Execution Count
+### Unknown-by-User Drill-Down
 
-**Required whenever you report how often a source ran** (e.g. "this workflow
-runs N times/day", "this detector fires every X"). QEE counts can never answer
-this — QEE `count()` is bucket-touches (see the ⛔ block in Step 3), and the
-real run count lives on the source's **originating** event, which differs by
-pool. Each event has its own fan-out shape — use the exact count expression
-from the table:
+The [Attribution Ranking](#attribution-ranking) query with `| filter attribution == "unknown"` inserted after its `fieldsAdd attribution` line and its `by` replaced with `by: {user.email, event.type}`.
 
-| Attribution pool | Originating event | Filter on | Count runs with |
-|------------------|-------------------|-----------|-----------------|
-| `dynatrace.automations` (AUTOMATION) | `WORKFLOW_EVENT` (`event.type == "WORKFLOW_EXECUTION"`) | `dt.automation_engine.workflow.id` | `countDistinct(dt.automation_engine.workflow_execution.id)` — fans out ≈2× per run (a `RUNNING` row + a terminal `SUCCESS`/`ERROR`/`CANCELLED` row share one execution id). See [workflow-total-cost.md § How Often Did the Workflow Run](workflow-total-cost.md#how-often-did-the-workflow-run) for the full query. |
-| ALERTING (detectors) | `ANALYZER_EXECUTION_EVENT` | `dt.task.id` | `countDistinct(dt.analyzer.execution.start)` grouped by `dt.task.id` — runs are keyed by `(dt.task.id, dt.analyzer.execution.start)` (no dedicated execution-id field is emitted). `countDistinct` on the start timestamp is safe if the event ever fans out; sample first (`\| limit 3`) to confirm shape. |
+## Attribution Ranking
 
-## Step 4 — Per-Detector Scan & Name Resolution (ALERTING pool)
+The only canonical ranking query.
 
-For ALERTING sources, parse `client.client_context` from QEE to get per-detector
-scan volume, then resolve detector names from `ANALYZER_EXECUTION_EVENT` via
-`join`.
-
-
-**`dt.task.id` is the full encoded settings UID** (base64-encoded, e.g.,
-`vu9U3hXa3q0AAAAB...vu9U3hXa3q0`) — not a plain UUID. This same encoded UID
-appears in QEE `client.client_context` → `dt.task.id`, AEE `dt.task.id`, and
-partially in QEE `client.source`.
+- **Unrated:** run as shown. Open the answer with the unrated ℹ️ disclaimer ([SKILL.md Cost Ranking Rules step 3](../SKILL.md#cost-ranking-rules)).
+- **Rated:** [rated variant](#rules). Output rules: [cost-estimations.md](cost-estimations.md#output-rules-for-rated-path).
+- **Dashboards in the top sources:** if `dynatrace.dashboards` or a `/ui/dashboard/` URL is among them, run [Dashboard Ranking](#dashboard-ranking) before answering and show its top dashboards.
 
 ```dql
 fetch dt.system.events, from: -7d
-| filter event.kind == "QUERY_EXECUTION_EVENT"
-| filter query_pool == "ALERTING"
+| filter event.kind == "BILLING_USAGE_EVENT" and endsWith(event.type, " - Query")
+| dedup {event.id, event.type}
+| fieldsAdd attribution = coalesce(client.application_context, client.internal_service_context, client.source, client.workflow_context, client.function_context, client.client_context, "unknown")
+| summarize {billable_usage = sum(billed_bytes),
+    queries = countDistinct(query_id)},
+    by: {attribution, event.type}
+| fieldsAdd billable_gib = billable_usage / 1073741824
+| sort billable_usage desc
+| limit 20
+```
+
+## Source Interpretation and Dashboard Ranking
+
+| `attribution` pattern | Source | Next |
+|-----------------------|--------|------|
+| URL with `/ui/dashboard/<id>` (only when no app context is set; rare) | Dashboard | [Dashboard Ranking](#dashboard-ranking) |
+| Other app URL (only when no app context is set; rare) | App page | Group by `client.application_context` |
+| `dt.statistics.anomaly_detection.*`, `dt.davis.anomaly-detector` | Anomaly detector | [Detector Ranking](#detector-ranking) |
+| Other `dt.statistics.*`, `dt.rca.*`, `dt.security.assessments.*` | Davis or security analyzer, not a detector | Report as analyzer; no per-detector breakdown |
+| `dynatrace.automations` | Workflow | [workflow-total-cost.md](workflow-total-cost.md#cross-event-field-reference) |
+| `dynatrace.dashboards` | Dashboard | [Dashboard Ranking](#dashboard-ranking) |
+| `dynatrace.<app>` | Platform app | Drill into `client.function_context` |
+| `dynatrace-mcp*.<tool>` | Dynatrace MCP tool | [AI and Agent Queries](#ai-and-agent-queries) |
+| JSON with `agent` | External client (dtctl or another CLI) | Group by `agent`; not AI cost |
+| JSON with `app` or `source` | Backend service or app sub-source | Group by `app` or `source` |
+| Other `dt.*` | Dynatrace internal service | Report as internal service |
+| `unknown` | Unattributed: API-pool or service calls without client context | Run the Coverage Check [Time-Split](#time-split), then group by `user.email`; state the unattributed share |
+
+### Dashboard Ranking
+
+Filter on the URL path, which carries the dashboard id, not on the app id. Rated: [rated variant](#rules).
+
+```dql
+fetch dt.system.events, from: -7d
+| filter event.kind == "BILLING_USAGE_EVENT" and endsWith(event.type, " - Query")
+    and contains(client.source, "/ui/dashboard/")
+| dedup {event.id, event.type}
+| parse client.source, "LD '/ui/dashboard/' LD:dashboard_id ('?' | '/' | '#' | EOS)"
+| summarize {billable_usage = sum(billed_bytes),
+    queries = countDistinct(query_id),
+    users = countDistinct(user.email)},
+    by: {dashboard_id}
+| fieldsAdd billable_gib = billable_usage / 1073741824
+| sort billable_usage desc
+| limit 20
+```
+
+## Detector Ranking
+
+Attribute by `task_id` only. Filter on the `client.source` prefix and require `dt.task.id`: detector BUEs span several Query types by tenant, and notebook previews carry `dt.statistics.anomaly_detection.*` sources without a task id. Detector names are not unique: the answer table MUST show `task_id` next to the full, unshortened `detector_name`.
+
+```dql
+fetch dt.system.events, from: -7d
+| filter event.kind == "BILLING_USAGE_EVENT" and endsWith(event.type, " - Query")
+    and startsWith(client.source, "dt.statistics.anomaly_detection")
+| dedup {event.id, event.type}
 | parse client.client_context, "JSON:ctx"
-| summarize qee_events = count(),
-    dql_statements = countDistinct(query_id),
-    total_scanned_gib = sum(scanned_bytes) / 1073741824,
-    by: {task_id = ctx[`dt.task.id`], task_group = ctx[`dt.task.group`]}
-| sort total_scanned_gib desc
+| filter isNotNull(ctx[`dt.task.id`])
+| summarize {billable_usage = sum(billed_bytes),
+    runs = countDistinctExact(ctx[`dt.analyzer.execution_id`])},
+    by: {task_id = toString(ctx[`dt.task.id`])}
+| sort billable_usage desc
 | limit 20
 | join [
     fetch dt.system.events, from: -7d
     | filter event.kind == "ANALYZER_EXECUTION_EVENT"
-    | fieldsAdd task_id = dt.task.id, detector_name = dt.task.name
-    | summarize detector_name = takeFirst(detector_name), by: {task_id}
+    | summarize detector_name = takeFirst(dt.task.name), by: {task_id = toString(dt.task.id)}
   ], on: {task_id}, fields: {detector_name}, kind: leftOuter
+| fieldsAdd billable_gib = billable_usage / 1073741824
+| fields task_id, detector_name, billable_gib, runs
 ```
 
-> **Dotted JSON keys:** `ctx[\`dt.task.id\`]` — without backticks, DQL
-> interprets dots as nested field access and fails silently.
->
-> **`user.id` is NOT detector-specific.** All anomaly detectors share a service
-> account. Use `dt.task.id` / `client.client_context` instead.
+- Wrap `ctx[...]` keys in backticks; unquoted dots read as nested fields and fail silently.
+- `toString` on both join keys is required.
 
-## Step 5 — Rank by Cost Weight / Estimated Cost
+Rated: re-aggregate per `task_id` after the rate-card join so `limit 20` counts detectors:
 
-**Unrated path:** Apply normalization weights from [cost-estimations.md](cost-estimations.md) →
-[Cost Normalization Weights](cost-estimations.md#cost-normalization-weights).
+```dql-snippet
+fetch dt.system.events, from: -7d
+| filter event.kind == "BILLING_USAGE_EVENT" and endsWith(event.type, " - Query")
+    and startsWith(client.source, "dt.statistics.anomaly_detection")
+| dedup {event.id, event.type}
+| parse client.client_context, "JSON:ctx"
+| filter isNotNull(ctx[`dt.task.id`])
+| summarize billable_usage = sum(billed_bytes),
+    by: {task_id = toString(ctx[`dt.task.id`]), event.type}
+// Rate Card Join Snippet (cost-estimations.md#rate-card-join-snippet) goes here
+| summarize {billable_usage = sum(billable_usage), estimated_cost = sum(estimated_cost),
+    currency_code = takeFirst(currency_code), valid_from = max(valid_from), valid_to = min(valid_to)},
+    by: {task_id}
+| sort isNull(estimated_cost) asc, estimated_cost desc
+| limit 20
+| join [
+    fetch dt.system.events, from: -7d
+    | filter event.kind == "BILLING_USAGE_EVENT" and endsWith(event.type, " - Query")
+        and startsWith(client.source, "dt.statistics.anomaly_detection")
+    | dedup {event.id, event.type}
+    | parse client.client_context, "JSON:ctx"
+    | filter isNotNull(ctx[`dt.task.id`])
+    | summarize runs = countDistinctExact(ctx[`dt.analyzer.execution_id`]), by: {task_id = toString(ctx[`dt.task.id`])}
+  ], on: {task_id}, fields: {runs}, kind: leftOuter
+| join [
+    fetch dt.system.events, from: -7d
+    | filter event.kind == "ANALYZER_EXECUTION_EVENT"
+    | summarize detector_name = takeFirst(dt.task.name), by: {task_id = toString(dt.task.id)}
+  ], on: {task_id}, fields: {detector_name}, kind: leftOuter
+| fieldsAdd billable_gib = billable_usage / 1073741824
+| fields task_id, detector_name, billable_gib, runs, estimated_cost, currency_code, valid_from, valid_to
+```
 
-**Rated path:** When a rate card is available, use `estimated_cost` from the rate-card join
-(Steps 1b Rated / Dashboard Ranking Rated above) as the ranking key. No weight multiplication
-is needed — the join already converts scan volume to the contracted currency. Sort with
-`isNull(estimated_cost) asc, estimated_cost desc`.
+## AI and Agent Queries
 
-The detector table is a ranking, so it opens with the unrated ℹ️ disclaimer from [SKILL.md Cost Ranking Rules step 3](../SKILL.md#cost-ranking-rules).
+Indirect AI cost is Query BUEs with `ai_generated == true` only: queries issued by Platform AI tools (CoPilot/Assist, Dynatrace MCP). External clients such as dtctl set `agent` in `client_context`; they are normal API queries, not AI cost, even when an AI coding agent drives them. These are indirect AI costs on top of the direct `AI Units` / `AI Function Standard Call` BUEs ([billing-event-types.md](billing-event-types.md#agentic-appengine)).
 
-## Investigating QEE↔BUE Mismatches
+Sessions (only `ai_generated` rows carry `session_id`; it matches the session on the AI Units BUEs; `conversation_id` can be empty on Query BUEs):
 
-When QEE `scanned_bytes` significantly exceeds BUE `billed_bytes` for the same
-source:
+```dql
+fetch dt.system.events, from: -7d
+| filter event.kind == "BILLING_USAGE_EVENT" and endsWith(event.type, " - Query")
+| filter ai_generated == true and isNotNull(session_id) and session_id != ""
+| dedup {event.id, event.type}
+| summarize {billable_usage = sum(billed_bytes),
+    queries = countDistinct(query_id)},
+    by: {session_id}
+| fieldsAdd billable_gib = billable_usage / 1073741824
+| sort billable_usage desc
+| limit 20
+```
 
-1. **Join on `query_id`** to identify which QEE records have no matching BUE
-2. **Check for zero-rating** — certain queries may be zero-rated based on
-   execution context (user, apps, queried data). These produce QEE
-   records but no corresponding BUE. The gap is zero-rated usage, not a
-   pipeline issue.
-3. Only after ruling out zero-rating, investigate attribution coverage gaps
+## Bucket Drill-Down
+
+BUE `usage.bucket` exists on Events and Digital Experience Monitoring only (0% on Logs, Traces, Files):
+
+```dql
+fetch dt.system.events, from: -7d
+| filter event.kind == "BILLING_USAGE_EVENT" and endsWith(event.type, " - Query")
+| filter isNotNull(usage.bucket)
+| dedup {event.id, event.type}
+| summarize {billable_usage = sum(billed_bytes),
+    queries = countDistinct(query_id)},
+    by: {usage.bucket, event.type}
+| fieldsAdd billable_gib = billable_usage / 1073741824
+| sort billable_usage desc
+| limit 20
+```
+
+Logs, Traces, Files: [Bucket Scan](#bucket-scan) (QEE).
+
+## Run Counts
+
+Required whenever you say how often something ran. Count on the originating event:
+
+| Source | Event | Count with |
+|--------|-------|------------|
+| Workflow | `WORKFLOW_EVENT` `WORKFLOW_EXECUTION` | `countDistinct(dt.automation_engine.workflow_execution.id)`, about 2 rows per run. See [workflow-total-cost.md](workflow-total-cost.md#how-often-did-the-workflow-run) |
+| Detector (from BUE) | Query BUE | `countDistinctExact` of `dt.analyzer.execution_id` in `client_context` ([Detector Ranking](#detector-ranking)) |
+| Detector (from AEE) | `ANALYZER_EXECUTION_EVENT` | `countDistinct(dt.analyzer.execution.start)` by `dt.task.id` |
+
+## QEE Fallbacks
+
+Use QEE (`QUERY_EXECUTION_EVENT`) only for the cases below, and state the case's reason in every answer. These rules apply to all of them:
+
+- QEE `scanned_bytes` is diagnostic scan, NEVER cost. NEVER present a QEE total (including the ALERTING pool) as cost; rankings come from BUE.
+- `scanned_bytes` = `scanned_bytes.included` + `scanned_bytes.on_demand`. Only `on_demand` is billable query volume; neither is cost on the rated path without a BUE. Report the included/on-demand split for every source you discuss; a source's QEE total alone never shows it is free or unscanned.
+- One QEE row per bucket touched (count rule: [Rules](#rules)). QEE has no `event.id`; do not dedup it.
+- `query_string` literals may be masked as `"*"`. A `"*"` is never a wildcard.
+- Zero-rated queries (by user, app or queried data) and included volume (for example Logs on `Retain with Included Queries`, where QEE scan can be 100x the billed bytes) produce QEE rows but no BUE.
+
+### Bucket Scan
+
+Reason: BUE has no `usage.bucket` on Logs, Traces and Files. For Logs, first check for `Retain with Included Queries` BUEs; a high `included_gib` confirms it. A row with null `table` and `bucket` can have `scanned_gib` but no split: report it as unsplit, not as on-demand. Optional, one capability only: add `| filter table == "<table>"` after the `event.kind` filter.
+
+```dql
+fetch dt.system.events, from: -7d
+| filter event.kind == "QUERY_EXECUTION_EVENT"
+| summarize {scanned_gib = sum(scanned_bytes) / 1073741824,
+    included_gib = sum(coalesce(toDouble(scanned_bytes.included), 0.0)) / 1073741824,
+    on_demand_gib = sum(coalesce(toDouble(scanned_bytes.on_demand), 0.0)) / 1073741824,
+    queries = countDistinct(query_id)},
+    by: {table, bucket}
+| sort scanned_gib desc
+| limit 20
+```
+
+### Single-Query Details
+
+Reason: query text, duration and tables are not BUE fields. Step 1: top `query_id`s from BUE. Tied top `billable_gib` means a repeated workload: report how many rows tie and their callers instead of sampling ids from the tie (raise `limit` if all 5 tie).
+
+```dql
+fetch dt.system.events, from: -7d
+| filter event.kind == "BILLING_USAGE_EVENT" and endsWith(event.type, " - Query")
+| dedup {event.id, event.type}
+| summarize billable_usage = sum(billed_bytes), by: {query_id, user.email}
+| fieldsAdd billable_gib = billable_usage / 1073741824
+| sort billable_usage desc
+| limit 5
+```
+
+Step 2: filter QEE by those ids, aggregated per `query_id`.
+
+```dql-template
+fetch dt.system.events, from: -7d
+| filter event.kind == "QUERY_EXECUTION_EVENT"
+| filter in(query_id, array("<query_id_1>", "<query_id_2>"))
+| summarize {scanned_gib = sum(scanned_bytes) / 1073741824,
+    max_duration_ms = max(execution_duration_ms),
+    tables = collectDistinct(table),
+    query_string = takeFirst(query_string)},
+    by: {query_id}
+```
+
+### QEE Exceeds BUE
+
+Reason: zero-rated and included-volume queries produce no BUE. Compare QEE totals per source joined with deduped BUE totals per source (one row per source, not a bulk join). A high `included_gib` means included volume; a high `on_demand_gib` with no BUE means zero-rated.
+
+```dql
+fetch dt.system.events, from: -7d
+| filter event.kind == "QUERY_EXECUTION_EVENT"
+| fieldsAdd attribution = coalesce(client.application_context, client.internal_service_context, client.source, client.workflow_context, client.function_context, client.client_context, "unknown")
+| summarize {scanned_gib = sum(scanned_bytes) / 1073741824,
+    included_gib = sum(coalesce(toDouble(scanned_bytes.included), 0.0)) / 1073741824,
+    on_demand_gib = sum(coalesce(toDouble(scanned_bytes.on_demand), 0.0)) / 1073741824},
+    by: {attribution}
+| join [
+    fetch dt.system.events, from: -7d
+    | filter event.kind == "BILLING_USAGE_EVENT" and endsWith(event.type, " - Query")
+    | dedup {event.id, event.type}
+    | fieldsAdd attribution = coalesce(client.application_context, client.internal_service_context, client.source, client.workflow_context, client.function_context, client.client_context, "unknown")
+    | summarize billable_gib = sum(toDouble(billed_bytes)) / 1073741824, by: {attribution}
+  ], on: {attribution}, fields: {billable_gib}, kind: leftOuter
+| fieldsAdd billable_gib = coalesce(billable_gib, 0.0)
+| fieldsAdd gap_gib = scanned_gib - billable_gib
+| sort gap_gib desc
+| limit 20
+```

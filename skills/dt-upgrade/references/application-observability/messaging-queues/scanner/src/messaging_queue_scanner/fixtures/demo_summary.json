@@ -1,0 +1,196 @@
+{
+  "tool": "messaging-queue-scanner",
+  "version": "0.1.0a0",
+  "generated_at": "2026-08-11T00:00:00+00:00",
+  "tenant": {
+    "label": "https://demo.apps.dynatrace.com",
+    "transport": "dtctl",
+    "dtctl_context": "demo",
+    "ui_url": "https://demo.apps.dynatrace.com",
+    "classic_url": "",
+    "platform_url": ""
+  },
+  "verdict": "affected",
+  "verdict_note": "Configurations explicitly reference classic queue entities or metrics.",
+  "sources": [
+    {
+      "name": "dashboards",
+      "state": "complete",
+      "reason": "",
+      "items_checked": 42,
+      "items_unread": 0
+    },
+    {
+      "name": "notebooks",
+      "state": "complete",
+      "reason": "",
+      "items_checked": 10,
+      "items_unread": 0
+    },
+    {
+      "name": "slos",
+      "state": "complete",
+      "reason": "",
+      "items_checked": 15,
+      "items_unread": 0
+    },
+    {
+      "name": "classic_slos",
+      "state": "complete",
+      "reason": "",
+      "items_checked": 8,
+      "items_unread": 0
+    },
+    {
+      "name": "metric_events",
+      "state": "complete",
+      "reason": "",
+      "items_checked": 20,
+      "items_unread": 0
+    },
+    {
+      "name": "srgs",
+      "state": "partial",
+      "reason": "1/4 objects could not be read",
+      "items_checked": 4,
+      "items_unread": 1
+    },
+    {
+      "name": "davis_anomaly_detectors",
+      "state": "complete",
+      "reason": "",
+      "items_checked": 2,
+      "items_unread": 0
+    }
+  ],
+  "incomplete_sources": [
+    "srgs"
+  ],
+  "totals": {
+    "artifacts_affected": 3,
+    "references": 4,
+    "queue_ids_referenced": 1,
+    "classic_metric_keys_referenced": 2
+  },
+  "report_scope": "detection only; no replacement queries or configurations are generated",
+  "cache": {
+    "format": 1,
+    "purpose": "Reusable messaging and queue usage scan data",
+    "contains": "referenced queue identities, matching values, and affected configuration bodies"
+  },
+  "enrichment": {
+    "queue_lookup": {
+      "state": "complete",
+      "reason": "",
+      "ids_checked": 1,
+      "ids_resolved": 1
+    }
+  },
+  "queues": [
+    {
+      "id": "QUEUE-0123456789ABCDEF",
+      "name": "orders",
+      "queue_name": "orders",
+      "destination_type": "QUEUE",
+      "vendor": "RabbitMQ",
+      "resolved": true,
+      "affected_artifact_count": 2,
+      "link": "https://demo.apps.dynatrace.com/ui/apps/dynatrace.classic.queues/ui/entity/QUEUE-0123456789ABCDEF"
+    }
+  ],
+  "classic_metric_keys": [
+    "builtin:queue.incoming_requests",
+    "builtin:queue.outgoing_requests"
+  ],
+  "artifacts": [
+    {
+      "source": "classic_slos",
+      "kind": "SETTINGS/builtin:monitoring.slo",
+      "id": "vu9U3hXa3q0AAAABACdidWlsdGluOm1vbml0b3Jpbmcuc2xvAAZ0ZW5hbnQ",
+      "name": "Order intake throughput",
+      "link": "https://demo.apps.dynatrace.com/ui/intent/dynatrace.classic.settings/settings-open-settings-by-id#%7B%22dt.settings.object_id%22%3A%22vu9U3hXa3q0AAAABACdidWlsdGluOm1vbml0b3Jpbmcuc2xvAAZ0ZW5hbnQ%22%7D",
+      "scope": "environment",
+      "queue_ids": [
+        "QUEUE-0123456789ABCDEF"
+      ],
+      "metric_keys": [
+        "builtin:queue.outgoing_requests"
+      ],
+      "impact_types": [
+        "queue entity ID",
+        "classic queue metric"
+      ],
+      "reference_count": 2,
+      "references": [
+        {
+          "field_path": "value.metricExpression",
+          "text": "builtin:queue.outgoing_requests:splitBy():sum",
+          "queue_ids": [],
+          "metric_keys": [
+            "builtin:queue.outgoing_requests"
+          ]
+        },
+        {
+          "field_path": "value.filter",
+          "text": "type(\"QUEUE\"),entityId(\"QUEUE-0123456789ABCDEF\")",
+          "queue_ids": [
+            "QUEUE-0123456789ABCDEF"
+          ],
+          "metric_keys": []
+        }
+      ]
+    },
+    {
+      "source": "dashboards",
+      "kind": "DASHBOARD",
+      "id": "11111111-2222-3333-4444-555555555555",
+      "name": "Messaging overview",
+      "link": "https://demo.apps.dynatrace.com/ui/intent/dynatrace.dashboards/view-dashboard#%7B%22dt.document.id%22%3A%2211111111-2222-3333-4444-555555555555%22%7D",
+      "scope": null,
+      "queue_ids": [
+        "QUEUE-0123456789ABCDEF"
+      ],
+      "metric_keys": [],
+      "impact_types": [
+        "queue entity ID"
+      ],
+      "reference_count": 1,
+      "references": [
+        {
+          "field_path": "content.tiles.1.query",
+          "text": "fetch spans | filter dt.entity.queue == \"QUEUE-0123456789ABCDEF\"",
+          "queue_ids": [
+            "QUEUE-0123456789ABCDEF"
+          ],
+          "metric_keys": []
+        }
+      ]
+    },
+    {
+      "source": "slos",
+      "kind": "SLO",
+      "id": "demo-slo-id",
+      "name": "Incoming message rate",
+      "link": "https://demo.apps.dynatrace.com/ui/intent/dynatrace.service.level.objectives/view-slo#%7B%22dt.slo.id%22%3A%22demo-slo-id%22%7D",
+      "scope": null,
+      "queue_ids": [],
+      "metric_keys": [
+        "builtin:queue.incoming_requests"
+      ],
+      "impact_types": [
+        "classic queue metric"
+      ],
+      "reference_count": 1,
+      "references": [
+        {
+          "field_path": "customSli.indicator",
+          "text": "timeseries incoming = sum(`builtin:queue.incoming_requests`)\n| fieldsAdd sli = incoming[]",
+          "queue_ids": [],
+          "metric_keys": [
+            "builtin:queue.incoming_requests"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -45,13 +45,13 @@ picture.
 | 1 | Query Execution | `Events - Query`, `Log Management & Analytics - Query`, `Traces - Query`, `Files - Query` | DQL scans run inside workflow scripts |
 | 2 | AppEngine Functions | `AppEngine Functions - Small` | JS/Python function invocations |
 | 3 | Automation Workflow | `Automation Workflow` | Workflow existence time (workflow-hours) — **STANDARD workflows only** |
-| 4 | AI Invocations | `AI Units`, `AI Function Standard Call` | AI invocations from workflow AI actions — `usage.quantity.billable` (Units) for AI Units, `billed_invocations` for AI Function Standard Call |
+| 4 | AI Invocations | `AI Units`, `AI Function Standard Call` | AI invocations from workflow AI actions — `usage.quantity.billable` (Units) for AI Units (LLM work), `billed_invocations` for AI Function Standard Call (non-LLM tool calls triggered by AI) |
 
 Always check all four before concluding what a workflow costs.
 
 > **Signal 3 applies to `STANDARD` workflows only.** `SIMPLE` and `DRAFT` workflows
-> emit no `Automation Workflow` BUE — cost lives in signals 1, 2, and (if the
-> workflow uses AI actions) 4. Only Signal 3 is inapplicable.
+> emit no `Automation Workflow` BUE — cost lives in signals 1, 2, and 4 (zero when the
+> workflow has no AI actions). Only Signal 3 is inapplicable.
 > Resolve `dt.automation_engine.workflow.type` from `WORKFLOW_EVENT` before
 > interpreting Signal 3. See
 > [Dynatrace Automation billing docs](https://docs.dynatrace.com/docs/license/capabilities/automation/automation).
@@ -87,22 +87,23 @@ ranking can order workflows differently from their actual bill.
 > **Multi-type dedup:** this query spans multiple BUE Query `event.type`s, so
 > use compound `dedup {event.id, event.type}`. Plain `dedup event.id` would
 > silently drop same-id siblings across types (an id can repeat across
-> `Logs`/`Events`/`Traces`/`Files` query events).
+> Query event types).
 
 ```dql-template
 fetch dt.system.events, from: -30d
 | filter event.kind == "BILLING_USAGE_EVENT"
-| filter in(event.type, "Log Management & Analytics - Query", "Events - Query", "Traces - Query", "Files - Query")
+| filter endsWith(event.type, " - Query")
 | dedup {event.id, event.type}
 | filter client.workflow_context == "<workflow-uuid>"
-| summarize total_billed_gib = sum(toDouble(billed_bytes) / 1073741824), by: {event.type}
-| sort total_billed_gib desc
+| summarize billable_usage = sum(billed_bytes), by: {event.type}
+| fieldsAdd billable_gib = billable_usage / 1073741824
+| sort billable_usage desc
 ```
 
 **Fallback when BUE attribution is null:** `client.workflow_context` is a
 recently added BUE attribute, so older BUEs in the retention window emit it as
 null (this is time-based, not tenant-specific — see
-[query-cost-attribution.md § Step 1a](query-cost-attribution.md#step-1a--coverage-check)
+[query-cost-attribution.md § Coverage Check](query-cost-attribution.md#coverage-check)
 for a coverage check).
 Where it is null, attribute via QEE AUTOMATION pool — this yields diagnostic
 `scanned_bytes`, not billable bytes, so use it only to fill coverage gaps:
@@ -183,9 +184,9 @@ fetch dt.system.events, from: -30d
 
 ## Step 4 — AI Invocation Cost (BUE)
 
-If the workflow uses AI/LLM actions, also check Signal 4 BUEs:
+Always check Signal 4 BUEs; report zero/absent when the workflow has no AI actions:
 
-**AI Function Standard Call** (non-LLM tool usage):
+**AI Function Standard Call** (non-LLM tool calls triggered by AI):
 
 ```dql
 fetch dt.system.events, from: -30d
@@ -218,19 +219,20 @@ partly zero-rated workflow above the one that actually costs the most:
 ```dql
 fetch dt.system.events, from: -30d
 | filter event.kind == "BILLING_USAGE_EVENT"
-| filter in(event.type, "Log Management & Analytics - Query", "Events - Query", "Traces - Query", "Files - Query")
+| filter endsWith(event.type, " - Query")
 | dedup {event.id, event.type}
 | filter isNotNull(client.workflow_context)
-| summarize total_billed_gib = sum(toDouble(billed_bytes) / 1073741824),
+| summarize billable_usage = sum(billed_bytes),
     by: {client.workflow_context}
-| sort total_billed_gib desc
+| fieldsAdd billable_gib = billable_usage / 1073741824
+| sort billable_usage desc
 | limit 20
 ```
 
 > **Coverage fallback:** where `client.workflow_context` is null on the BUE
 > (recently added attribute — older BUEs in the retention window carry no
 > value; see
-> [query-cost-attribution.md § Step 1a](query-cost-attribution.md#step-1a--coverage-check)),
+> [query-cost-attribution.md § Coverage Check](query-cost-attribution.md#coverage-check)),
 > fall back to QEE AUTOMATION pool (`client.workflow_context`) for a diagnostic
 > `scanned_bytes` ranking. Never rank by `qee_events` (bucket-touches). See
 > [How Often Did the Workflow Run](#how-often-did-the-workflow-run).

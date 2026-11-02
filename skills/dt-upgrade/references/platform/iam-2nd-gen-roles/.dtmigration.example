@@ -1,0 +1,55 @@
+# .dtmigration — local credentials for the management-zone permission scope capture
+#
+# Copy this file to .dtmigration in your working directory, then fill in the
+# values below. .dtmigration is git-ignored and must never be committed.
+#
+# This file is REQUIRED. The capture script (scripts/extract-mz-permission-scopes.ts)
+# parses it itself to obtain an access token, so the calling agent never has to
+# open it. The script does not look anywhere else for credentials (not dtctl, not
+# the OS keychain, not environment variables).
+#
+# Unlike the other dt-upgrade references, this one targets the ACCOUNT-level API
+# at https://api.dynatrace.com, not a tenant. Account endpoints authenticate with
+# a bearer JWT, so a tenant API token (dt0c01.*) or platform token (dt0s16.*)
+# will NOT work here — those are environment-scoped. An account-level OAuth
+# client is required, and the script exchanges it for a short-lived JWT that is
+# held in memory only: never written to disk and never logged.
+#
+# Create the OAuth client in Dynatrace:
+#   Account Management > Identity & access management > OAuth clients > Create client
+#
+# Required scope — grant ONLY this one:
+#   account-idm-read     read groups and their permission assignments
+#
+# The capture is strictly read-only: it issues no POST, PUT or DELETE. Do NOT
+# add account-idm-write, iam-policies-management, account-env-read/write,
+# account-uac-read/write or account-audit-logs-read — none are needed, and a
+# read-only client cannot damage an account's RBAC if the credential leaks.
+
+export DT_IAM_CLIENT_ID="dt0s02.XXXXXXXX"
+export DT_IAM_CLIENT_SECRET="dt0s02.XXXXXXXX.YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY"
+
+# The account to scan. Optional: --account-id on the command line takes
+# precedence, which lets one credential file serve several accounts.
+export DT_IAM_ACCOUNT_UUID="00000000-0000-0000-0000-000000000000"
+
+# ── Endpoint overrides — required for non-production stages ──────────────────
+#
+# Both default to production, so leave them unset for a normal SaaS account.
+# Set BOTH together when targeting another stage: the SSO host and the API host
+# must belong to the same stage, or the token will be rejected.
+#
+#                    | token URL                                          | API URL
+#   production       | https://sso.dynatrace.com/sso/oauth2/token         | https://api.dynatrace.com
+#
+# Production (the defaults — no need to set these):
+# export DT_IAM_TOKEN_URL="https://sso.dynatrace.com/sso/oauth2/token"
+# export DT_IAM_API_URL="https://api.dynatrace.com"
+#
+# Space-separated OAuth scopes requested for the token.
+# export DT_IAM_SCOPES="account-idm-read"
+#
+# The OAuth `resource` parameter, which identifies the target account. Defaults
+# to urn:dtaccount:<account-uuid>. Set it to an empty value to omit the
+# parameter entirely, if your SSO does not expect it.
+# export DT_IAM_OAUTH_RESOURCE="urn:dtaccount:00000000-0000-0000-0000-000000000000"

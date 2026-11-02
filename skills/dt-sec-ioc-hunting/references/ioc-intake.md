@@ -3,6 +3,18 @@
 Extract, normalize, and bucket indicators of compromise (IoCs) from any input
 before running hunt queries.
 
+## Contents
+
+- [Supported IoC Taxonomy](#supported-ioc-taxonomy)
+- [Extraction from Unstructured Input](#extraction-from-unstructured-input)
+  - [Web-page / URL-sourced Input](#web-page--url-sourced-input)
+  - [Grouping](#grouping)
+  - [IoC Hygiene (before hunting)](#ioc-hygiene-before-hunting)
+  - [URL Cleaning](#url-cleaning)
+  - [STIX Pattern Handling](#stix-pattern-handling)
+  - [Output Format](#output-format)
+- [Pulling IoCs From an Ingested THREAT_REPORT](#pulling-iocs-from-an-ingested-threat_report)
+
 ## Supported IoC Taxonomy
 
 | Type | Description | Field in THREAT_REPORT | Hunt targets |
@@ -56,7 +68,48 @@ Hashes (pool md5, sha1, and sha256 together), or MITRE TTPs.
 - Libraries and packages (for example `react`, `log4j`) are not a hunt type.
 Surface them alongside their associated CVE for the `dt-sec-insights`
 vulnerability leg.
-- Hosts (for example `vps-zap812595-1.zap-srv.com`) fold into Domains.
+- Dotted hosts / FQDNs (for example `vps-zap812595-1.zap-srv.com`) fold into Domains. A dotless
+token that is not hexadecimal and not an IP, URL, email, CVE, or MITRE id (for example
+`zz9plural`) fits no type: it is unclassifiable (see IoC Hygiene), not a Domain, unless the
+source labels it a host.
+
+### IoC Hygiene (before hunting)
+
+Reports often carry values that cannot be attacker infrastructure or that only add noise.
+Apply this after grouping and before building any hunt query. **Filter these IoCs out — do not
+hunt them** — and list them in the final section of the report (`exposure-scoring.md`
+§ Section 8):
+
+- **Invalid IPs:** unspecified (`0.0.0.0`, `::`, `::0000`), loopback (`127.0.0.0/8`, `::1`),
+  private (RFC 1918 `10/8`, `172.16/12`, `192.168/16`; IPv6 ULA `fc00::/7`), and link-local
+  (`169.254/16`, `fe80::/10`). These are the same exclusions the Secondary-IP extraction
+  rollup applies (`ipIsPrivate`, `ipIsLoopback`, `ipIsLinkLocal`). Also invalid as an
+  attacker address: multicast (`224.0.0.0/4`, `ff00::/8`), the limited broadcast
+  `255.255.255.255`, and the reserved `240.0.0.0/4` block.
+- **Invalid hashes:** values that are not hexadecimal or whose length is not 32 (MD5),
+  40 (SHA-1) or 64 (SHA-256) characters, and the all-zero hash of any of those lengths.
+- **Unclassifiable tokens:** a dotless token that is not hexadecimal and not an IP, URL, email,
+  CVE, or MITRE id (for example `zz9plural`). It is not a valid hostname IoC unless the source
+  explicitly labels it a host. Filter it (reason `unclassifiable`); never fold it into Domains.
+- **Noise IoCs:** IP ranges written in CIDR notation (for example `185.220.100.0/23`) or labelled
+  as a network or range by the source — an exact-match hunt cannot test a range. A bare address
+  ending in `.0` (for example `185.220.101.0`) is a valid host address, **not** a range: hunt it
+  as a normal IP unless a prefix length or the source says otherwise. Also noise: well-known public
+  sites, CDNs, search and social platforms (for example `stackoverflow.com`, `twitter.com`) and
+  URLs on them; reserved or example domains (`example.com`, `*.example`, `*.test`,
+  `*.invalid`); names that only resolve inside a network (`localhost`, `*.localhost`,
+  `*.local`, `*.internal`, `*.lan`); and the hashes of an empty input (MD5
+  `d41d8cd98f00b204e9800998ecf8427e`, SHA-1 `da39a3ee5e6b4b0d3255bfef95601890afd80709`,
+  SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`), which match
+  unrelated content everywhere. Test or scan targets that are deliberately public (for
+  example `scanme.nmap.org`) are **not** noise: hunt them unless the user says otherwise.
+
+**Override:** hunt a filtered IoC only if the user explicitly asks to include it (for example
+"also hunt the filtered domains" or "don't filter noise"). Then treat it as a normal IoC. A plain
+list of IoCs is not an explicit request to include noise or unclassifiable tokens.
+
+Record each filtered value with its reason in the optional `Filtered` array (below) so the
+report can list it.
 
 ### URL Cleaning
 
@@ -99,6 +152,9 @@ Produce a typed JSON object with one key per IoC type.
 - Deduplicate within each bucket.
 - Include a `Report` field when the input is a named threat-intelligence
 report - a JSON object with `name` and `tags` extracted from input.
+- Include an optional `Filtered` array of `{"value": "...", "reason": "..."}` objects for IoCs
+  removed by IoC Hygiene (values are removed from their type bucket). Omit it when nothing
+  was filtered.
 
 Validation before returning:
 - Re-read every URL in output and confirm no trailing `'`, `]`, or `",`.

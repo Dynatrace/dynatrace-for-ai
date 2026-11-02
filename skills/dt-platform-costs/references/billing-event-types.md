@@ -198,26 +198,20 @@ Charged per scan volume. Billed unit: `billed_bytes` (long).
 `client.application_context`, `client.function_context`, `client.source`,
 `client.client_context`, `client.workflow_context`, `client.internal_service_context`,
 `action_type` (values: `"QUERY"`, `"DELETION"`), `user.id`, `user.email`,
-`ai_generated` (boolean, always present — `true` when the query was issued by an AI agent, `false` otherwise),
+`ai_generated` (boolean, always present — `true` when the query was issued by a Platform AI tool (CoPilot/Assist, Dynatrace MCP), `false` otherwise),
 `conversation_id` (string, optional — may be empty string on Query BUEs even when set on the originating AI Units or AI Function Standard Call BUE),
 `session_id` (string, optional)
 
-**Indirect AI costs:** Query BUEs with `ai_generated == true` represent scan volume triggered by AI agents
-— the indirect cost of AI functionality on top of the direct charges billed as `AI Units` and
-`AI Function Standard Call` BUEs. The `session_id` field links these Query BUEs to the corresponding
+**Indirect AI costs:** Query BUEs with `ai_generated == true` represent billed query volume triggered by Platform AI tools
+— the indirect cost of AI functionality on top of the direct charges: `AI Units` (LLM work) and
+`AI Function Standard Call` (non-LLM tool calls triggered by AI). The `session_id` field links these Query BUEs to the corresponding
 AI Units / AI Function Standard Call BUEs from the same session. See
-[query-cost-attribution.md → Step 2a — AI-Generated Queries](query-cost-attribution.md#step-2a--ai-generated-queries)
+[query-cost-attribution.md → AI and Agent Queries](query-cost-attribution.md#ai-and-agent-queries)
 for isolation queries.
 
 #### Query Attribution
 
-Coverage of `client.*` attribution fields depends on your tenant's query pool
-distribution, not on BUE event type. Use `coalesce(client.source, client.application_context, client.internal_service_context, client.workflow_context, client.function_context, client.client_context, "unknown")` for
-attribution. See
-[query-cost-attribution.md → BUE Query Attribution Fields](query-cost-attribution.md#bue-query-attribution-fields)
-for the per-pool breakdown and
-[query-cost-attribution.md → Step 1a](query-cost-attribution.md#step-1a--coverage-check)
-for the coverage check query.
+Selection predicate, attribution coalesce, `query_id` grain, `usage.bucket` coverage and QEE caveats: [query-cost-attribution.md § Rules](query-cost-attribution.md#rules), [§ BUE Attribution Fields](query-cost-attribution.md#bue-attribution-fields), [§ QEE Fallbacks](query-cost-attribution.md#qee-fallbacks).
 
 > **BUE Query events and workflow attribution fields** — 
 > The `client.workflow_context` field is available (contains the `workflow.id` value). To attribute query costs to a
@@ -231,8 +225,7 @@ for the coverage check query.
 
 **Digital Experience Monitoring - Query** details:
 - **Billed field:** `billed_bytes` (long)
-- **Pricing:** Preview — no Normalization Weight available. Not included in
-  standard cost estimation queries but can be queried for volume tracking.
+- **Pricing:** Preview, no normalization weight. Handling: [query-cost-attribution.md § BUE Attribution Fields](query-cost-attribution.md#bue-attribution-fields).
 - **Additional fields:** same as other Query types (`usage.bucket`, `query_id`,
   `query_start`, `client.source`, `client.application_context`,
   `client.function_context`, `client.client_context`,
@@ -242,10 +235,6 @@ for the coverage check query.
 - **Subcategories** (via `event.billing.category`): `"Synthetic events"` and
   RUM-related subcategories
 - **Provider:** `LIMA_USAGE_TRACKER`
-- To include DEM - Query in cost investigation, add it to the `filter in(event.type, ...)`
-  clause in [query-cost-attribution.md → Step 1](query-cost-attribution.md#step-1--top-sources-by-billable-scan-bue).
-  No `Normalization Weight` is available — omit from cost ranking, use
-  for usage/volume tracking only.
 
 ### Retain
 
@@ -383,11 +372,11 @@ Charged per invocation. Billed unit: `billed_invocations` (long). Appears as **S
 
 ### Agentic AppEngine
 
-AI-triggered invocations. Two types: non-LLM tool calls (`AI Function Standard Call`) and AI/LLM work (`AI Units`). `AI Function Standard Call` shares the **Standard Function Calls** rate-card item with `AppEngine Functions - Small`; `AI Units` is a separate rate-card item.
+AI-triggered invocations. Two event types: `AI Function Standard Call` (non-LLM tool calls triggered by AI; appears as **Standard Function Calls** in Account Management, like `AppEngine Functions - Small`) and `AI Units` (LLM work; separate rate-card item).
 
 | Event Type | Billed Field | Type | Notes |
 |------------|-------------|------|-------|
-| `AI Function Standard Call` | `billed_invocations` | long | Non-LLM tool usage (no LLM inference); typically 1 per call |
+| `AI Function Standard Call` | `billed_invocations` | long | Non-LLM tool calls triggered by AI (no LLM inference); typically 1 per call |
 | `AI Units` | `usage.quantity.billable` | double | AI/LLM work — model inference and LLM-based tools; `usage.unit` = `"Units"` |
 
 **Additional fields (AI Function Standard Call and AI Units):**

@@ -47,7 +47,7 @@ Dynatrace-native sources use these provenance fields:
 | `event.provider` | `product.name` | Notes |
 |---|---|---|
 | `Dynatrace` | (varies) | Dynatrace-native (RVA, SPM, internal). Filter native vulnerability/compliance via `product.vendor == "Dynatrace"`. |
-| `OneAgent` | `Runtime Application Protection` | Dynatrace RAP — runtime attack detections. Both `event.provider == "OneAgent"` and `product.name == "Runtime Application Protection"` are populated; either filter works (skill prefers the latter as canonical). Passes the cross-provider double-counting guard (see Canonical Cross-Provider Query below). |
+| `OneAgent` | `Runtime Application Protection` | Dynatrace RAP — runtime attack detections. Filter with the combined form `(product.name == "Runtime Application Protection" OR event.provider == "OneAgent")` (`product.name` is canonical; `event.provider` covers older rows that carry `product.name == "Application Security"`). Passes the cross-provider double-counting guard (see Canonical Cross-Provider Query below). |
 | `Dynatrace Automated Detections` | `Automated Detections` | Dynatrace built-in / custom detection rules — emits both `DETECTION_FINDING` and `DETECTION_EXECUTION_SUMMARY` |
 
 External findings arrive from any ingested security tool (cloud-security posture/threat
@@ -60,7 +60,7 @@ queries — see [Broad-Question Query Decomposition](#broad-question-query-decom
 
 ```dql
 fetch security.events, from: -24h
-| filter product.vendor != "Dynatrace" OR event.type == "DETECTION_FINDING"
+| filterOut (product.vendor == "Dynatrace" or event.provider == "Dynatrace") and event.type != "DETECTION_FINDING"
 | summarize count = count(), by: {event.provider, product.name, product.vendor, event.type}
 | sort count desc
 ```
@@ -81,15 +81,21 @@ the per-domain references link here rather than restating it.
 
 **Step 2 — scope with exact match once strings are confirmed.** Prefer exact equality over fuzzy `contains` — it avoids false positives from providers whose names share a substring with the target:
 
+**Placeholders:** `<ExactProviderString>` / `<ExactProductString>` — the exact `event.provider` / `product.name` values returned by the Step 1 discovery query (plain strings, case as shown there, e.g. `Amazon GuardDuty`, `GuardDuty`). Both are plain string literals, not typed fields. This is a filter fragment: append it after a `fetch security.events, from:now()-24h` (and an `event.type` filter).
+
 ```dql-snippet
 // Exact match (preferred for known provider — substitute strings from discovery)
 | filter event.provider == "<ExactProviderString>"
       OR product.name == "<ExactProductString>"
 ```
 
+For timing questions ("since when has this provider reported", "when was its last finding") add first/last-seen columns per [common-patterns.md § 19](common-patterns.md#19-first-seen--last-seen).
+
 If the same integration appears via multiple paths (e.g. `event.provider == "Amazon GuardDuty"` for the direct integration and `event.provider == "AWS Security Hub" AND product.name == "GuardDuty"` for the Security Hub relay), combine both exact conditions with `OR`.
 
-**During discovery only — fuzzy match.** Use `contains(<field>, "…", caseSensitive:false)` only when the exact string is not yet known:
+**During discovery only — fuzzy match.** Use `contains(<field>, "…", caseSensitive:false)` only when the exact string is not yet known.
+
+**Placeholders:** `<provider>` — a vendor or product keyword, e.g. `guardduty` or `crowdstrike` (plain string, any casing — `caseSensitive:false` is a named parameter). Same filter-fragment use as above.
 
 ```dql-snippet
 | filter contains(event.provider, "<provider>", caseSensitive:false)
@@ -146,7 +152,7 @@ The canonical cross-provider summary template — combines external findings and
 
 ```dql
 fetch security.events, from: -24h
-| filter product.vendor != "Dynatrace" OR event.type == "DETECTION_FINDING"
+| filterOut (product.vendor == "Dynatrace" or event.provider == "Dynatrace") and event.type != "DETECTION_FINDING"
 | filter in(event.type, {"VULNERABILITY_FINDING", "DETECTION_FINDING", "COMPLIANCE_FINDING"})
 // All three finding types are required — dropping any one omits an entire category:
 // VULNERABILITY_FINDING covers external scanners; DETECTION_FINDING covers RAP + external;
@@ -167,30 +173,38 @@ fetch security.events, from: -24h
      OR compliance.status == "FAILED")
 | summarize {
     finding.count = count(),
-    affected_object.types = arrayRemoveNulls(collectDistinct(object.type)),
-    affected_smartscape.node.ids = arrayRemoveNulls(collectDistinct(dt.smartscape_source.id)),
-    finding.ids = arrayRemoveNulls(collectDistinct(finding.id)),
-    finding.titles = arrayRemoveNulls(collectDistinct(finding.title)),
-    finding.times = collectDistinct(finding.time.created),
-    affected_object.ids = arrayRemoveNulls(collectDistinct(object.id)),
-    affected_object.names = arrayRemoveNulls(collectDistinct(object.name)),
+    finding.distinct.count = countDistinctExact(finding.id),
+    affected_object.count = countDistinctExact(object.id),
+    first_seen = takeMin(finding.time.created),
+    last_seen = takeMax(finding.time.created),
+    // Samples only (max 10 each): counts above are exact; fetch full lists with a follow-up query
+    affected_object.types = arrayRemoveNulls(collectDistinct(object.type, maxLength:10)),
+    affected_smartscape.node.ids = arrayRemoveNulls(collectDistinct(dt.smartscape_source.id, maxLength:10)),
+    finding.ids = arrayRemoveNulls(collectDistinct(finding.id, maxLength:10)),
+    finding.titles = arrayRemoveNulls(collectDistinct(finding.title, maxLength:10)),
+    affected_object.ids = arrayRemoveNulls(collectDistinct(object.id, maxLength:10)),
+    affected_object.names = arrayRemoveNulls(collectDistinct(object.name, maxLength:10)),
     vulnerable_components = arrayConcat(
-      arrayRemoveNulls(collectDistinct(software_component.name)),
-      arrayRemoveNulls(collectDistinct(component.name))
+      arrayRemoveNulls(collectDistinct(software_component.name, maxLength:10)),
+      arrayRemoveNulls(collectDistinct(component.name, maxLength:10))
     )
   }, by: {event.provider, product.name, event.type, dt.security.risk.level}
 | sort finding.count desc
 | limit 100
 ```
 
+**Copy the `summarize` block verbatim.** Its collectors (`finding.ids`, `affected_object.types`, `affected_smartscape.node.ids`, titles, object ids / names) are part of the contract, not decoration — add filters (a risk level, a provider) *before* the `summarize`, never trim collectors or `by:` keys out of it.
+
 ### Mandatory guards for any cross-provider count or summary
 
 The canonical query above includes four structural guards. **All four must be applied together** for cross-provider count/percentage/summary questions — dropping any one silently corrupts the result. Treat them as mandatory boilerplate, not optional optimization:
 
-1. **SD-isNotNull guard** — `isNotNull(event.id) AND isNotNull(event.provider) AND isNotNull(finding.type) AND ...` drops rows that don't satisfy the Semantic Dictionary contract. Without it, the Threats & Exploits app filters them out but DQL counts them, so DQL totals exceed app totals. The short form `filterOut isNull(event.type) or isNull(object.id) or isNull(finding.id)` catches most malformed rows; the full 9-field guard in the canonical query above is authoritative.
+1. **SD-isNotNull guard** — `isNotNull(event.id) AND isNotNull(event.provider) AND isNotNull(finding.type) AND ...` drops rows that don't satisfy the Semantic Dictionary contract. Without it, the Threats & Exploits app filters them out but DQL counts them, so DQL totals exceed app totals. The short form `filterOut isNull(event.type) or isNull(object.id) or isNull(finding.id)` catches most malformed rows in `*_FINDING`-only queries; the full 9-field guard in the canonical query above is authoritative. **Never put `isNull(finding.id)` in a guard that also counts scan events** (`VULNERABILITY_SCAN`, `COMPLIANCE_SCAN`) — scans carry no `finding.id`, so `Scans` becomes 0; guard the finding counter instead (`countIf(<finding types> and isNotNull(finding.id))`).
 2. **Cross-finding-type union** — `filter in(event.type, {"VULNERABILITY_FINDING", "DETECTION_FINDING", "COMPLIANCE_FINDING"})` restricts to the three normalized finding streams. All three are required — dropping any one omits an entire category. Do not narrow to a single event type for a cross-provider summary.
 3. **Compliance-FAILED guard** — `filter (not exists(compliance.result.status.level) or compliance.result.status.level == "FAILED" or compliance.status == "FAILED")` skips PASSED / MANUAL / NOT_RELEVANT compliance rows.
-4. **Double-counting guard** — `filter product.vendor != "Dynatrace" OR event.type == "DETECTION_FINDING"` (see § below).
+4. **Double-counting guard** — `filterOut (product.vendor == "Dynatrace" or event.provider == "Dynatrace") and event.type != "DETECTION_FINDING"` (null-safe; see § below).
+
+**Cap every collector at 10 samples (`maxLength:10`) and carry exact counts.** An uncapped `collectDistinct` over a high-volume provider (one tenant: 13,000+ finding IDs in 24h) pushes the result past the 204,800-byte limit; the platform then silently drops whole rows (`BYTE_LIMIT_ADDED`), so a broad question like "which products are integrated" sees 1–3 providers instead of all of them. Use `countDistinctExact` for the numbers, `takeMin`/`takeMax` for first/last seen, and 10-item samples for ids, titles, names and entities. When the user (or the hunt) needs the full list for one provider or object, run a follow-up query scoped to that group (see the drill-down recipes) instead of widening this one.
 
 **Use `summarize` — never raw row projection past `limit 50`.** The cross-provider stream is high-volume; raw `| fields ... | sort timestamp desc | limit 50` will pick rows from whichever provider happens to emit first and silently truncate the breadth the question asked for. The canonical pattern is `fetch → filter → summarize → sort → limit`.
 
@@ -208,13 +222,22 @@ Dynatrace-generated vulnerabilities and compliance findings** to avoid counting
 each state-report row and every scan attempt:
 
 ```dql-snippet
-| filter product.vendor != "Dynatrace" OR event.type == "DETECTION_FINDING"
+| filterOut (product.vendor == "Dynatrace" or event.provider == "Dynatrace") and event.type != "DETECTION_FINDING"
 ```
+
+**Null-safe by design.** Dynatrace identifies itself on different fields per event family:
+RVA/KSPM rows carry `product.vendor == "Dynatrace"` with `event.provider` null;
+`VULNERABILITY_STATE_REPORT_EVENT` rows carry `event.provider == "Dynatrace"` with `product.vendor`
+null; and some external products (for example Runecast Analyzer `COMPLIANCE_FINDING`) leave **both**
+null. The guard therefore *excludes* Dynatrace explicitly (`filterOut`, testing both fields) instead
+of *keeping* "not Dynatrace" (`filter product.vendor != "Dynatrace"`), because `null != "Dynatrace"`
+is null and a positive `filter` silently drops every null-vendor row, including legitimate external
+ones. This is the single home for these null semantics; other references point here.
 
 This allows:
 
 - **Dynatrace detections** (one-shot `DETECTION_FINDING` — safe to include)
-- **All external findings** (not from Dynatrace at all)
+- **All external findings**, including rows whose `product.vendor` / `event.provider` is null
 
 and excludes:
 
@@ -243,10 +266,10 @@ KSPM compliance stream, which is expensive even at `24h` **and** double-counts s
 
 > **Not this:** the single external-only
 > [Which external integrations are active](#which-external-integrations-are-active-and-volume)
-> query applies **only** when the user explicitly scopes to external / third-party tools — e.g.
-> "which **external** integrations / tools are sending us data?". A bare "which security products
-> are integrated?" is **DT-inclusive by default** → use the decomposition (which queries RVA and
-> KSPM). When in doubt, decompose.
+> query applies when the user asks which **integrations / tools are sending, reporting or ingesting
+> data** (external / third-party, DT-native excluded) — e.g. "which security integrations are sending
+> us data?". A bare "which security products are integrated (incl. Dynatrace)?" / "what security data
+> do we have?" is **DT-inclusive by default** → use the decomposition (which queries RVA and KSPM).
 
 Instead, **decompose into three independent queries, each on its own window, and
 merge at the presentation layer:**
@@ -255,10 +278,10 @@ merge at the presentation layer:**
 |---|---|---|---|
 | **A — External + DT detections** | all external providers (vulnerability / detection / compliance findings) + DT RAP & Automated Detections | [Canonical Cross-Provider Query](#canonical-cross-provider-query) (double-counting + SD guards) | `24h` (widen as the question needs) |
 | **B — DT vulnerabilities (RVA)** | Dynatrace-native CVEs / runtime vulnerabilities | canonical RVA pipeline → [vulnerabilities-dynatrace.md § DT RVA: Full Snapshot Queries](vulnerabilities-dynatrace.md) | `30m` fixed |
-| **C — DT compliance (KSPM)** | Dynatrace-native CIS / DORA / NIST / STIG | canonical SPM pipeline → [compliance.md § DT SPM: Base Pattern](compliance.md) | `1h` fixed |
+| **C — DT compliance (KSPM)** | Dynatrace-native CIS / DORA / NIST / STIG / Security Essentials | canonical SPM pipeline → [compliance.md § DT SPM: Base Pattern](compliance.md) | `1h` fixed |
 
 Stream A's double-counting guard
-(`product.vendor != "Dynatrace" OR event.type == "DETECTION_FINDING"`) deliberately
+(`filterOut (product.vendor == "Dynatrace" or event.provider == "Dynatrace") and event.type != "DETECTION_FINDING"`) deliberately
 excludes DT RVA and DT KSPM — they are **absent from Stream A by design** and must
 be picked up by Streams B and C. A `30m` RVA snapshot and a `1h` KSPM snapshot report
 each product's **current finding count** without scanning history.
@@ -267,10 +290,17 @@ each product's **current finding count** without scanning history.
 > recent findings* — not that the product is absent. Before reporting RVA or KSPM as
 > "not integrated", confirm presence with a wider low-cardinality probe over `24h` — RVA
 > `VULNERABILITY_STATE_REPORT_EVENT` filtered to `event.provider=="Dynatrace"`, KSPM
-> `COMPLIANCE_SCAN_COMPLETED` filtered to `product.vendor=="Dynatrace"` (RVA keys off
-> `event.provider`, SPM off `product.vendor` — see [data-model.md § Provider Taxonomy](data-model.md)).
-> These marker streams are far cheaper than the full finding streams, so a `24h` presence check
-> stays inexpensive.
+> `COMPLIANCE_SCAN_COMPLETED`, `COMPLIANCE_FINDING` **and** `COMPLIANCE_SCAN`, all filtered to
+> `product.vendor=="Dynatrace" AND product.name=="Security Posture Management"` (RVA keys off
+> `event.provider`, SPM off `product.vendor`; `event.provider` is null on many SPM rows — see
+> [data-model.md § Provider Taxonomy](data-model.md)). Probe all three because the scan-completed
+> marker is written only for Kubernetes (KSPM) scans, while `COMPLIANCE_SCAN` also covers CSPM objects: a tenant with Dynatrace compliance
+> findings but no marker (for example CSPM-only, `object.type` `AWS_*`) has SPM but no KSPM
+> scan markers, and the `COMPLIANCE_SCAN_COMPLETED` inner join then returns nothing — report
+> that as "no KSPM scan data", not "SPM not integrated". `product.name` pins SPM because
+> other tools (for example Runecast) can also write `COMPLIANCE_SCAN_COMPLETED` with
+> `product.vendor=="Dynatrace"`. These probes are far cheaper than the full finding
+> streams, so a `24h` presence check stays inexpensive.
 
 **Prohibitions:**
 
@@ -287,7 +317,7 @@ disjoint by construction.
 > broad question, present **Stream C's KSPM compliance failed-rule count as the headline
 > summary**, with **CIS first** (CIS is the mandatory K8s baseline; sort it to the top via
 > [compliance.md § CIS-Primary Standard Summary](compliance.md)). List the other KSPM
-> standards (DORA / NIST / DISA STIG) immediately after as *additional* failed rules that
+> standards (DORA / NIST / DISA STIG / Security Essentials) immediately after as *additional* failed rules that
 > may overlap with CIS — never sum failed counts across standards. Then show Stream B (RVA
 > vulnerabilities) and Stream A (external + DT detections) beneath. This is a **presentation**
 > choice only — the streams stay disjoint by construction (a correctness property); leading
@@ -296,7 +326,7 @@ disjoint by construction.
 **Entity-scoped broad questions follow the same decomposition.** If the user asks
 for "security findings" on a specific entity (host, K8s node, workload, cluster,
 service), do not query only RVA/SPM. Run Stream A scoped to the entity with the
-wide entity OR-chain (`dt.smartscape_source.id`, `dt.entity.*`, `object.*`,
+wide entity OR-chain (`dt.smartscape_source.id`, `dt.smartscape.*`, `object.*`,
 relevant `k8s.*`) and merge it with
 Stream B (RVA `affected_entity.*` / `related_entities.*`) and Stream C (SPM object
 scope). A 0-row Stream A result means **no external findings matched that entity**
@@ -306,7 +336,7 @@ presentation order above.
 When the user explicitly asks about *compliance / misconfigurations* on the entity (rather
 than all findings), render Stream C as the **Entity Security-Tab View** — three tables
 mirroring the entity Security tab (CIS default, failed-only):
-**Table 1** Dynatrace CIS failed rules → **Table 2** other DT standards (DORA/NIST/STIG,
+**Table 1** Dynatrace CIS failed rules → **Table 2** other DT standards (DORA/NIST/STIG/Security Essentials,
 overlap caveat) → **Table 3** the external `COMPLIANCE_FINDING` subset of Stream A (externally
 ingested misconfigurations) scoped to the entity. See
 [compliance.md § Entity Security-Tab View](compliance.md) (broad posture/count questions
@@ -319,7 +349,7 @@ instead use § CIS-Primary Standard Summary).
 The canonical cross-provider pattern in this file **always** includes the double-counting guard:
 
 ```dql-snippet
-| filter product.vendor != "Dynatrace" OR event.type == "DETECTION_FINDING"
+| filterOut (product.vendor == "Dynatrace" or event.provider == "Dynatrace") and event.type != "DETECTION_FINDING"
 ```
 
 This guard excludes DT RVA vulnerability state reports and DT KSPM compliance findings — the high-cardinality snapshot streams that carry strict 30m / 1h window requirements. Because those streams are already filtered out, **cross-provider queries are not snapshot-constrained**.
@@ -338,7 +368,7 @@ For the domain-specific snapshot constraints (RVA 30m fixed window, SPM 1h scan-
 - [compliance.md § Snapshot vs. History](compliance.md) — SPM 1h fixed window
 - [detections.md](detections.md) — detection streams have no snapshot constraint; use the window that covers the attack history the question requires
 
-**Matching a UI app's view.** If the user asks "what does the Threats & Exploits / SPM / Vulnerabilities app show right now?", apply the app's default time-picker value. App defaults are defined in [SKILL.md § Default Time Ranges](../SKILL.md#default-time-ranges-in-the-dynatrace-apps).
+**Matching a UI app's view.** If the user asks "what does the Threats & Exploits / SPM / Vulnerabilities app show right now?", apply the app's default time-picker value. App defaults are defined in [SKILL.md § Universal Best Practices #5](../SKILL.md#universal-best-practices) (window table with the app defaults).
 
 ---
 
@@ -354,10 +384,10 @@ that double-counts the DT RVA/KSPM snapshot streams and scans them needlessly.
 
 ```dql
 fetch security.events, from:now()-24h
-| filterOut isNull(event.type) or isNull(object.id) or isNull(finding.id)
-| filter product.vendor != "Dynatrace" OR event.type == "DETECTION_FINDING"
+| filterOut isNull(event.type) or isNull(object.id)
+| filterOut (product.vendor == "Dynatrace" or event.provider == "Dynatrace") and event.type != "DETECTION_FINDING"
 | summarize {
-    Findings=countIf(in(event.type,{"VULNERABILITY_FINDING","DETECTION_FINDING","COMPLIANCE_FINDING"})),
+    Findings=countIf(in(event.type,{"VULNERABILITY_FINDING","DETECTION_FINDING","COMPLIANCE_FINDING"}) and isNotNull(finding.id)),
     Scans=countIf(in(event.type,{"VULNERABILITY_SCAN","COMPLIANCE_SCAN"}))
   }, by:{Product=product.name, Provider=event.provider}
 | sort Findings desc
@@ -381,7 +411,7 @@ Latest 100 ingested findings across all providers. For genuinely "new" findings 
 `*_FINDING` event types.
 
 > **Always include the double-counting guard, even on this raw stream.** Earlier
-> versions of this section dropped the `product.vendor != "Dynatrace" OR event.type == "DETECTION_FINDING"` guard with the rationale "we already filter to `*_FINDING`
+> versions of this section dropped the `filterOut (product.vendor == "Dynatrace" or event.provider == "Dynatrace") and event.type != "DETECTION_FINDING"` guard with the rationale "we already filter to `*_FINDING`
 > event types, so state-report duplication isn't possible." That's true for the
 > three event types listed, but the moment a downstream question becomes "give me
 > a summary of what arrived" / "by provider" / "by risk level", the model adds a
@@ -396,7 +426,7 @@ Latest 100 ingested findings across all providers. For genuinely "new" findings 
 fetch security.events, from:now()-24h
 | filterOut isNull(event.type) or isNull(object.id) or isNull(finding.id)
 | filter in(event.type,{"VULNERABILITY_FINDING","DETECTION_FINDING","COMPLIANCE_FINDING"})
-| filter product.vendor != "Dynatrace" OR event.type == "DETECTION_FINDING"
+| filterOut (product.vendor == "Dynatrace" or event.provider == "Dynatrace") and event.type != "DETECTION_FINDING"
 | sort timestamp desc
 | limit 100
 ```
@@ -407,23 +437,29 @@ To keep results lean while preserving entity context, add a `fieldsKeep` project
 fetch security.events, from:now()-24h
 | filterOut isNull(event.type) or isNull(object.id) or isNull(finding.id)
 | filter in(event.type,{"VULNERABILITY_FINDING","DETECTION_FINDING","COMPLIANCE_FINDING"})
-| filter product.vendor != "Dynatrace" OR event.type == "DETECTION_FINDING"
+| filterOut (product.vendor == "Dynatrace" or event.provider == "Dynatrace") and event.type != "DETECTION_FINDING"
 | sort timestamp desc
 | limit 100
-| fieldsKeep timestamp, "dt.smartscape*", "dt.entity*", "dt.source*",
+| fieldsKeep timestamp, "dt.smartscape*",
             event.type, event.provider, product.name,
             finding.id, finding.title, dt.security.risk.level,
             object.id, object.name, object.type
 ```
 
-For new findings only in a specific window:
+For new findings only in a specific window (answers "new findings across all providers, excluding Dynatrace vulnerabilities and compliance" — keep the guard, the failed-only compliance filter and all five `by:` keys; external compliance `PASSED` rows are not findings):
 
 ```dql
 fetch security.events, from:now()-24h
 | filterOut isNull(event.type) or isNull(object.id) or isNull(finding.id)
 | filter in(event.type,{"VULNERABILITY_FINDING","DETECTION_FINDING","COMPLIANCE_FINDING"})
+| filterOut (product.vendor == "Dynatrace" or event.provider == "Dynatrace") and event.type != "DETECTION_FINDING"
+// Compliance: only failed (skip PASSED, MANUAL, NOT_RELEVANT)
+| filter (not exists(compliance.result.status.level)
+     OR compliance.result.status.level == "FAILED"
+     OR compliance.status == "FAILED")
 | filter toTimestamp(finding.time.created) > now() - 24h
-| summarize findings=count(), by:{event.type, event.provider, dt.security.risk.level}
+| summarize findings=count(),
+            by:{event.type, event.provider, product.vendor, product.name, dt.security.risk.level}
 | sort findings desc
 ```
 
@@ -441,12 +477,19 @@ to match the entity across the rich scoping-field set.
 
 **Direct findings** (entity is the `object.id`/`object.name`):
 
-```dql
+**Placeholders:**
+
+- `<ENTITY_NAME>` — the entity's display name as the provider reports it in `object.name`, e.g. a host, pod, or service name. Plain string, exact match.
+- `<ENTITY_ID>` — the entity's identifier as reported in `object.id`; the format is provider-specific (e.g. an AWS instance id such as `i-0abc1234def567890`, or a Smartscape id like `PROCESS-2BFEC6517F8B5A64`). Find both values with one lookup: `fetch security.events, from:now()-24h | filter contains(object.name, "<part of name>", caseSensitive:false) | summarize count(), by:{object.id, object.name, object.type} | limit 10`.
+- Type pitfall: `object.id` is a string for external providers but a typed Smartscape id on Dynatrace-sourced rows (`PROCESS-…`); a bare string literal does not match typed ids, so for Dynatrace entities compare with `toString(object.id) == "…"` instead.
+
+```dql-template
 fetch security.events, from:now()-24h
-| filterOut isNull(event.type) or isNull(object.id) or isNull(finding.id)
 | filter in(event.type,{"VULNERABILITY_FINDING","DETECTION_FINDING","COMPLIANCE_FINDING"})
-| filter product.vendor != "Dynatrace" OR event.type == "DETECTION_FINDING"
-| filter object.name == "my-service" OR object.id == "PROCESS_GROUP-1234567890ABCDEF"
+| filterOut (product.vendor == "Dynatrace" or event.provider == "Dynatrace") and event.type != "DETECTION_FINDING"
+// Short guard only: the entity filter below already narrows the rows
+| filter isNotNull(finding.id) AND isNotNull(object.id)
+| filter object.name == "<ENTITY_NAME>" OR toString(object.id) == "<ENTITY_ID>"
 | summarize {
     findings=count(),
     Critical=countIf(dt.security.risk.level=="CRITICAL"),
@@ -455,15 +498,22 @@ fetch security.events, from:now()-24h
 | sort Critical desc
 ```
 
+This template does not use the 9-field guard: it would drop sources whose `event.provider` is null
+(for example Runecast Analyzer) and rows with a null `dt.security.risk.level`. Null-risk rows count
+in `findings` but not in `Critical`/`High`, and null-provider sources show up as a group with an
+empty `event.provider`; report them rather than filtering them out.
+
 **Including indirect/related entities (UC-G4):** for DT RVA vulnerabilities,
 run the canonical pipeline and then filter on `related_entities.names` or
 `related_entities.ids` after Step 3 to capture findings where the entity is a
 related (not directly affected) entity:
 
+**Placeholders:** `<ENTITY_NAME>` — display name as listed in `related_entities.names`; `<ENTITY_ID>` — the **classic** (2nd-gen) id as listed in `related_entities.ids`, e.g. `HOST-0123456789ABCDEF` (type prefix as reported — see the prefix table in [vulnerabilities-dynatrace.md § One known entity](vulnerabilities-dynatrace.md#one-known-entity--step-2-scope)). Both are plain strings tested with `in(value, array)`.
+
 ```dql-snippet
 // After Steps 1–3 of the RVA pipeline:
-| filter in("my-service", related_entities.names)
-      OR in("PROCESS_GROUP-1234...", related_entities.ids)
+| filter in("<ENTITY_NAME>", related_entities.names)
+      OR in("<ENTITY_ID>", related_entities.ids)
 ```
 
 **Note:** UC-G5 (problem-scoped security) first requires extracting affected entity
@@ -481,7 +531,7 @@ query itself is identical to UC-G4.
 fetch security.events, from: -24h
 | filterOut isNull(event.type) or isNull(object.id) or isNull(finding.id)
 | filter in(event.type, {"VULNERABILITY_FINDING", "DETECTION_FINDING", "COMPLIANCE_FINDING"})
-| filter product.vendor != "Dynatrace" OR event.type == "DETECTION_FINDING"
+| filterOut (product.vendor == "Dynatrace" or event.provider == "Dynatrace") and event.type != "DETECTION_FINDING"
 | filter (not exists(compliance.result.status.level)
      OR compliance.result.status.level == "FAILED"
      OR compliance.status == "FAILED")
@@ -497,7 +547,7 @@ All four mandatory guards applied; all three finding types included; all four `b
 ```dql
 fetch security.events, from: -24h
 // Double-counting guard: exclude DT vulnerability/compliance state reports; keep DT detections
-| filter product.vendor != "Dynatrace" OR event.type == "DETECTION_FINDING"
+| filterOut (product.vendor == "Dynatrace" or event.provider == "Dynatrace") and event.type != "DETECTION_FINDING"
 // All three finding types required — do not drop any
 | filter in(event.type, {"VULNERABILITY_FINDING", "DETECTION_FINDING", "COMPLIANCE_FINDING"})
 // SD-isNotNull guard: mandatory — prevents malformed rows from inflating counts
@@ -510,13 +560,18 @@ fetch security.events, from: -24h
      OR compliance.status == "FAILED")
 | filter dt.security.risk.level == "CRITICAL"
 // Preserve all four by: keys — do not drop any
+// Same collectors as the Canonical Cross-Provider Query — copy the whole summarize verbatim, do not trim any
 | summarize {
-    findings.count = count(),
-    finding.titles = arraySlice(collectDistinct(finding.title), from: 0, to: 5),
-    affected_object.ids = arrayRemoveNulls(collectDistinct(object.id)),
-    affected_object.names = arraySlice(collectDistinct(object.name), from: 0, to: 10)
+    finding.count = count(),
+    affected_object.count = countDistinctExact(object.id),
+    affected_object.types = arrayRemoveNulls(collectDistinct(object.type, maxLength:10)),
+    affected_smartscape.node.ids = arrayRemoveNulls(collectDistinct(dt.smartscape_source.id, maxLength:10)),
+    finding.ids = arrayRemoveNulls(collectDistinct(finding.id, maxLength:10)),
+    finding.titles = arrayRemoveNulls(collectDistinct(finding.title, maxLength:10)),
+    affected_object.ids = arrayRemoveNulls(collectDistinct(object.id, maxLength:10)),
+    affected_object.names = arrayRemoveNulls(collectDistinct(object.name, maxLength:10))
   }, by: {event.provider, product.name, event.type, dt.security.risk.level}
-| sort findings.count desc
+| sort finding.count desc
 | limit 50
 ```
 
@@ -526,13 +581,18 @@ Enumerate the **external** security tools sending data, with event volume and fi
 This is the integration-health question — distinct from a DT-inclusive posture overview (for
 that, use the [Broad-Question Query Decomposition](#broad-question-query-decomposition)). Exclude
 Dynatrace-native sources; the `FirstSeen`/`LastSeen` grain makes a multi-day window meaningful,
-so `-7d` is the natural default here (honor an explicitly requested window):
+so `-7d` is the natural default here (honor an explicitly requested window). Some integrations
+(for example Runecast Analyzer) carry no `event.provider` and no `product.vendor`, so a provider-only
+guard would hide them; keep a row when either `event.provider` or `product.name` is present and
+identify the integration by the `Products` column. Rows with neither (noise) stay excluded:
 
 ```dql
 fetch security.events, from:now()-7d
-| filter isNotNull(event.provider) and event.provider != "Dynatrace"
+| filterOut event.provider == "Dynatrace" or product.vendor == "Dynatrace"
+| filter isNotNull(event.provider) or isNotNull(product.name)
 | summarize {
     Events = count(),
+    Products = collectDistinct(product.name),
     EventTypes = collectDistinct(event.type),
     Findings = countIf(in(event.type, {"VULNERABILITY_FINDING", "DETECTION_FINDING", "COMPLIANCE_FINDING"})),
     Scans = countIf(in(event.type, {"VULNERABILITY_SCAN", "COMPLIANCE_SCAN"})),
@@ -542,6 +602,9 @@ fetch security.events, from:now()-7d
 | sort Events desc
 ```
 
+> **Naming rule:** when `event.provider` is null, name the integration by `Products` (for example
+> `Runecast Analyzer`); never drop or relabel the row as "unknown".
+>
 > **Scan-cost caveat:** external `VULNERABILITY_FINDING` volume is high (millions of rows on a
 > busy tenant) — a `-7d` scan here can approach the 500 GB limit. If you only need *current*
 > activity rather than 7-day first/last-seen, narrow to `-24h`; otherwise add `scanLimitGBytes`
@@ -564,12 +627,23 @@ fetch security.events, from: -24h
 // Preserve identity: object.type, object.id, object.name, and event.provider distinguish resources
 | summarize {
     findings.count = count(),
-    finding.titles = collectDistinct(finding.title),
-    affected_object.ids = collectDistinct(object.id),
-    affected_object.names = collectDistinct(object.name)
+    affected_object.count = countDistinctExact(object.id),
+    finding.titles = arrayRemoveNulls(collectDistinct(finding.title, maxLength:10)),
+    affected_object.ids = arrayRemoveNulls(collectDistinct(object.id, maxLength:10)),
+    affected_object.names = arrayRemoveNulls(collectDistinct(object.name, maxLength:10))
   }, by: {event.provider, product.name, dt.security.risk.level, object.type}
 | sort findings.count desc
 ```
+
+Reading the result: the `by:` includes `object.type`, so one risk level spans several rows; for "by
+risk level" add them up per `dt.security.risk.level` in the answer (affected objects are distinct per
+`object.type`, so sum them too). `findings.count` is a row count; replace it with
+`countDistinctExact(finding.id)` when re-emitted findings could inflate it. If the provider is missing
+from the 24h discovery, widen to 7d before concluding there is no data, and report the window used
+(the 24h -> 7d fallback in
+[detections.md § Widen-on-empty](detections.md#widen-on-empty-fallback-retrieval-queries)).
+
+When the user asks for timing ("since when", "last seen"), add `FirstCreated` / `LastReported` columns per [common-patterns.md § 19](common-patterns.md#19-first-seen--last-seen) (Recipe A) instead of improvising timestamp fields.
 
 ### Findings on a specific cloud resource
 
@@ -577,6 +651,13 @@ Use the entity OR-chain from
 [common-patterns.md § 5](common-patterns.md).
 
 ### Look up a finding by ID or title across providers
+
+**Placeholders:**
+
+- `<FINDING_ID>` — exact `finding.id`; format is provider-specific (see [data-model.md § Finding ID Format Cheatsheet](data-model.md#finding-id-format-cheatsheet)), e.g. `A-18NMJSIF` (RAP) or a GUID. Copy it from any listing row.
+- `<SCAN_ID>` — exact `scan.id` (set on scan/compliance events), plain string.
+- `<TITLE_SUBSTRING>`, `<DESCRIPTION_SUBSTRING>` — case-sensitive substrings of `finding.title` / `event.description`, e.g. `injection`.
+- The four conditions are OR-ed: delete the ones you have no value for (keep at least one; the first remaining condition replaces `or` with `| filter`).
 
 ```dql-template
 fetch security.events, from: -24h
@@ -587,7 +668,7 @@ fetch security.events, from: -24h
      or contains(event.description, "<DESCRIPTION_SUBSTRING>")
 | sort timestamp desc
 | limit 5
-| fieldsKeep timestamp, "dt.smartscape*", "dt.entity*", "dt.source*",
+| fieldsKeep timestamp, "dt.smartscape*",
             event.type, event.provider, finding.id, finding.title,
             dt.security.risk.level, object.id, object.name, object.type,
             event.description
@@ -606,8 +687,8 @@ fetch security.events, from: -24h
 | `VULNERABILITY_SCAN` | Dynatrace RVA + external scan coverage events |
 | `DETECTION_FINDING` | Dynatrace RAP + Automated Detections + external detection sources (ingested) |
 | `COMPLIANCE_FINDING` | Dynatrace SPM + external compliance / posture tools (ingested) |
-| `COMPLIANCE_SCAN` | External compliance scan coverage events |
-| `COMPLIANCE_SCAN_COMPLETED` | Dynatrace SPM scan completion markers |
+| `COMPLIANCE_SCAN` | Compliance scan coverage events — one per assessed object or assessment: Dynatrace CSPM per-object scans (`object.id`, `object.type` `AWS_*`, no `scan.id`) and external posture tools (for example Microsoft Defender for Cloud, with `scan.id`, `compliance.status`). The scan-coverage counterpart of `VULNERABILITY_SCAN`; distinct from `COMPLIANCE_SCAN_COMPLETED` (the per-scan-run KSPM marker) |
+| `COMPLIANCE_SCAN_COMPLETED` | SPM scan completion markers (one per Kubernetes scan run, carries `scan.id`; current event type in the Semantic Dictionary, written by Dynatrace KSPM and some third-party posture tools; absent on tenants without KSPM) |
 | `VULNERABILITY_COVERAGE_REPORT_EVENT` | **Deprecated** — use `VULNERABILITY_SCAN` |
 | `THREAT_REPORT` | External threat-intelligence platforms (AlienVault OTX, CrowdStrike Falcon Intelligence). **Threat intelligence, not a finding** — **excluded from every cross-provider query on this page** (no `finding.*` / `object.*` / `dt.security.risk.level`, not part of the double-counting guard or the 3-stream decomposition). Query separately via [threat-intelligence.md](threat-intelligence.md). |
 
@@ -618,7 +699,8 @@ fetch security.events, from: -24h
 1. **Lead with the semantic-dictionary filter** — cross-provider queries should
    only consider rows that populate the normalized fields.
 2. **Always apply the double-counting guard** —
-   `product.vendor != "Dynatrace" OR event.type == "DETECTION_FINDING"`. This is
+   `filterOut (product.vendor == "Dynatrace" or event.provider == "Dynatrace") and event.type != "DETECTION_FINDING"` (null-safe; see
+   [Double-Counting Guard](#double-counting-guard)). This is
    the canonical filter for cross-provider summaries — drops Dynatrace-native vulnerabilities and compliance (covered by the RVA and SPM snapshot patterns) while keeping Dynatrace detections.
 3. **Use the correct default window for the query class.** For cross-provider
    summary/aggregation queries, start at `24h` (summaries aggregate over time; a

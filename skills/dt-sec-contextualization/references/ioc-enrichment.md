@@ -120,10 +120,10 @@ fetch security.events, from:now()-7d
 | filterOut isNull(ioc)
 | fieldsAdd ioc = toString(ioc)
 | filter in(ioc, array("157.250.195.229", "162.221.93.164"))
-| summarize reports     = countDistinctExact(threat.report.id),
+| summarize {reports     = countDistinctExact(threat.report.id),
             reportNames = collectDistinct(threat.report.name),
             actors      = collectDistinct(threat.actor.names),
-            malware     = collectDistinct(threat.malware.families),
+            malware     = collectDistinct(threat.malware.families)},
             by: {ioc}
 | sort reports desc
 ```
@@ -163,7 +163,7 @@ across both. A sub-technique like `T1566.001` lives only in `subtechnique.ids`; 
 > **Routing — CVEs and MITRE go further, elsewhere.** Reverse-attributing a CVE or technique *to a
 > report* belongs here. But correlating it to **your environment** (CVE → `VULNERABILITY_FINDING` /
 > RVA, technique → `DETECTION_FINDING`) is the forward direction owned by
-> `dt-sec-insights/references/threat-intelligence.md` § Threat-Exposure Correlation. CVEs and MITRE
+> `dt-sec-ioc-hunting` (`hunt-security-events.md` § Report-driven correlation). CVEs and MITRE
 > TTPs are never hunted in logs or spans.
 
 ---
@@ -182,7 +182,7 @@ direct lookup, incorporate it alongside the report attribution; do not attempt t
 
 ## Best Practices
 
-1. **Load `dt-dql-essentials` first** — confirm DQL syntax/functions before generating queries.
+1. **Load `dt-dql-essentials` only when you write or adapt DQL beyond the canonical template** — run the template as written without it; load it before changing the query shape and on the first query error.
 2. **Always start from the canonical base** — SD-compliance `filterOut` guard +
    `dedup {threat.report.id}, sort:{timestamp desc}`. Skipping either double-counts revisions or
    admits non-conformant rows.
@@ -191,7 +191,7 @@ direct lookup, incorporate it alongside the report attribution; do not attempt t
    change snapshot semantics.
 4. **`countDistinctExact(threat.report.id)` after `expand`** — never raw `count()`.
 5. **Never use finding/entity/risk fields** — THREAT_REPORT carries no `finding.*`, `object.*`,
-   `dt.security.risk.*`, `dt.smartscape*`, or `dt.entity*`. It is not entity-scoped.
+   `dt.security.risk.*`, or `dt.smartscape*`. It is not entity-scoped.
 6. **Report zero matches truthfully** — "this IoC is not attributed to any ingested report in the
    last X" is a real, useful answer; never fabricate attribution.
 7. **One home per pattern** — reverse attribution lives here; forward correlation, overviews, and

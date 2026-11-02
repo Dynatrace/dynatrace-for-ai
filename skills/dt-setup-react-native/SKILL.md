@@ -2,13 +2,14 @@
 name: dt-setup-react-native
 license: Apache-2.0
 description: >-
-  Integrate the Dynatrace React Native Plugin into a React Native or Expo project —
+  Integrate the Dynatrace React Native Plugin and Session Replay into a React Native or Expo project —
   dependency setup, dynatrace.config.js, Babel registration, npx instrumentation,
-  navigation tracking, user privacy options, and verification. Handles both bare React Native
-  and Expo (babel-preset-expo) Babel configuration automatically.
+  navigation tracking, Session Replay, user privacy options, and verification. Handles both bare
+  React Native and Expo (babel-preset-expo) Babel configuration automatically.
   Trigger: "add Dynatrace to React Native", "React Native plugin setup", "instrument React Native app",
   "integrate Dynatrace RN", "mobile observability React Native", "react-native-plugin",
-  "dynatrace react native", "add Dynatrace to Expo", "instrument Expo app", "Dynatrace Expo setup".
+  "dynatrace react native", "add Dynatrace to Expo", "instrument Expo app", "Dynatrace Expo setup",
+  "React Native session replay", "react-native-session-replay", "enable session replay in React Native".
   Do NOT use for: querying RN RUM data (use dt-obs-frontends), non-React Native mobile setups,
   or Dynatrace server-side configuration.
 ---
@@ -18,8 +19,10 @@ description: >-
 ## Prerequisites
 
 - Node.js 16.0+ and npm available on `PATH`
-- An existing React Native project (v0.68+) or Expo project (v45+) with a `package.json` at the project root
+- An existing React Native project (v0.62+, React 16.11+) or Expo project (v44+) with a `package.json` at the project root
 - `android/` and `ios/` platform folders present (Expo managed workflow requires `npx expo prebuild` first)
+- Android: minSdk 23+, Android Gradle plugin and Gradle 8.1.1+, Java 17, Kotlin 2.0.21 — see the plugin README's Kotlin compatibility note if the build fails on Kotlin metadata
+- iOS: deployment target 15+
 - A Dynatrace environment with access to Experience Vitals (to obtain `applicationId` and `beaconUrl`, or to download `dynatrace.config.js`)
 - Console access to Experience Vitals → Mobile to configure app settings (Data Privacy, Enablement and Cost Control)
 - macOS with CocoaPods for iOS builds
@@ -30,15 +33,15 @@ Work through the steps below in order, interacting with the user at each decisio
 
 Before asking the user anything, check whether `dynatrace.config.js` exists at the project root.
 
-- **File exists:** Read it, show the `applicationId` and `beaconUrl`, and confirm they match the target environment. If correct, run the `userOptIn` check below and skip to Step 3 (config is already present — Step 2 is not needed).
+- **File exists:** Read it, show the `applicationId` and `beaconUrl`, and confirm they match the target environment (with manual startup, `autoStart: false`, they are intentionally absent — see Step 7a). If correct, run the `userOptIn` check below and skip to Step 3 (config is already present — Step 2 is not needed). A config downloaded from the console ships with `react.debug: true` and `DTXLogLevel` `ALL` — mention that debug logging should be removed before a production build.
 - **File does not exist:** Proceed to Step 2.
 
 **`userOptIn` check:**
 
 Inspect the file for `userOptIn` (Android block) and `DTXUserOptIn` (iOS block).
 
-- **Present on both platforms:** Trust the value as-is. If `true`, flag Step 9. If `false`, skip Step 9.
-- **Absent from either platform:** Ask the user: **"Do you have User Opt-In mode enabled or disabled?"** (If unsure: Experience Vitals → Mobile → [Your App] → Settings → Data Privacy.) Add the missing value to the relevant platform(s), then flag Step 9 if the final value is `true`.
+- **Present on both platforms:** Trust the value as-is. If `true`, flag Step 10. If `false`, skip Step 10 unless the user later chooses Session Replay in Step 9, which requires switching opt-in on.
+- **Absent from either platform:** Ask the user: **"Do you have User Opt-In mode enabled or disabled?"** (If unsure: Experience Vitals → Mobile → [Your App] → Settings → Data Privacy.) Add the missing value to the relevant platform(s), then flag Step 10 if the final value is `true`.
 
 ## Step 2 — Obtain `dynatrace.config.js` (only if Step 1 found no file)
 
@@ -49,13 +52,13 @@ Ask the user which approach they prefer:
 1. Open their Dynatrace environment
 1. Navigate to: Experience Vitals → New Frontend → Mobile
 1. Enter app name and choose **React Native** as the platform
-1. On the **Select capability and settings** screen, configure monitoring features (crash reporting, user action monitoring, etc.)
+1. On the **Select capability and settings** screen, configure monitoring features (crash reporting, user action monitoring, Session Replay, etc.). These settings can be changed later via Experience Vitals → [App] → Settings → Enablement and Cost Control.
 1. Download `dynatrace.config.js` and place it at the project root (same level as `package.json`)
 
-Once the file is in place, apply the `userOptIn` check from Step 1 and flag Step 9 if needed.
+Once the file is in place, apply the `userOptIn` check from Step 1 and flag Step 10 if needed.
 
 **Option B — Provide credentials manually:**
-Read `references/config-js.md` for the full template and conditional blocks. Collect all required values from the user before creating any files, then apply the `userOptIn` check and flag Step 9 if needed.
+Read `references/config-js.md` for the full template and conditional blocks. Collect all required values from the user before creating any files, then apply the `userOptIn` check and flag Step 10 if needed.
 
 ## Step 3 — Install the plugin
 
@@ -78,7 +81,7 @@ If on macOS and targeting iOS, run:
 cd ios && pod install && cd ..
 ```
 
-Confirm success before continuing. CocoaPods must be installed (`gem install cocoapods` if missing).
+Confirm success before continuing. CocoaPods must be installed (`gem install cocoapods` if missing). If the Session Replay package is added later (Step 9), run `pod install` again.
 
 ## Step 5 — Register Babel plugin in `babel.config.js`
 
@@ -96,7 +99,6 @@ module.exports = {
 ```
 
 - If the plugins array already contains `'@dynatrace/react-native-plugin/instrumentation/BabelPluginDynatrace'`: skip this step.
-- If `useLegacyJscodeshift: true` is set in `dynatrace.config.js`: the Babel plugin is already applied internally — skip this step.
 - If the project already configures `metro.config.js` with `babelTransformerPath: '@dynatrace/react-native-plugin/lib/dynatrace-transformer'`: that is the legacy Metro transformer approach — auto-instrumentation is already handled; skip this step and Step 6.
 
 Common mistakes to flag and correct:
@@ -197,6 +199,42 @@ npx instrumentDynatrace plist=ios/YourApp/Info.plist
 
 Check `dynatrace.config.js` for `autoStart: false` in the `react` block. If present, the SDK will not start on its own and no data will be collected until `Dynatrace.start()` is called explicitly.
 
+Native auto start must be disabled in the same file, and the native blocks must **not** carry `applicationId` / `beaconUrl` (on iOS, `npx instrumentDynatrace` fails if `DTXApplicationID` or `DTXBeaconURL` are present while `DTXAutoStart` is `false`):
+
+- **Android:** replace the `autoStart { ... }` block with `autoStart.enabled false` and keep every other setting the app needs (`userOptIn`, `sessionReplay.enabled true`, `agentBehavior.*`) — the Gradle plugin still applies them at build time.
+- **iOS:** the plugin's guidance is that `DTXAutoStart` = `false` is the only property for a manual startup; other iOS keys are not guaranteed to be used. Pass anything else (for example opt-in mode) at runtime through `ConfigurationBuilder`.
+
+```js
+module.exports = {
+  react: {
+    autoStart: false,
+    // ...
+  },
+  android: {
+    config: `
+      dynatrace {
+        configurations {
+          defaultConfig {
+            autoStart.enabled false
+            agentBehavior.startupLoadBalancing true
+            agentBehavior.startupWithGrailEnabled true
+            // keep userOptIn / sessionReplay.enabled here if they were set
+          }
+        }
+      }
+    `,
+  },
+  ios: {
+    config: `
+      <key>DTXAutoStart</key>
+      <false/>
+    `,
+  },
+};
+```
+
+Re-run `npx instrumentDynatrace` after changing these blocks.
+
 Add the startup call at the top level of the app entry file (for example `App.tsx` or `index.js`). Any logic that depends on the SDK being ready goes after the `await`:
 
 ```ts
@@ -208,9 +246,11 @@ await Dynatrace.start(
 // SDK is initialized — place any SDK-dependent logic here
 ```
 
-Replace `<BEACON_URL>` and `<APPLICATION_ID>` with **the exact same values** from `dynatrace.config.js` — they must match or the SDK will report to the wrong environment.
+Replace `<BEACON_URL>` and `<APPLICATION_ID>` with the values for the target app (from the console's `dynatrace.config.js` download or the user's credentials).
 
-**Important:** Even with `autoStart: false`, the `beaconUrl` and `applicationId` must still be present in `dynatrace.config.js` (used by `npx instrumentDynatrace` to configure the native files). The values passed to `ConfigurationBuilder` at runtime take effect — values in the config file are ignored when manual startup is used.
+**Important:** With manual startup, `beaconUrl` and `applicationId` come only from the `ConfigurationBuilder` call. If native auto start is *not* disabled as shown above, the runtime values are discarded and the config-file values are used. Other `react` options in `dynatrace.config.js` (for example `lifecycle`) remain the baseline for manual startup.
+
+**Opt-in mode with manual startup:** `ConfigurationBuilder` has its own `userOptIn` setting that is passed to the native agent on `start` and defaults to `false`. If User Opt-In mode is on (Step 1, or switched on for Session Replay in Step 9), add `.withUserOptIn(true)` before `.buildConfiguration()` so the runtime value matches the config, and still make the `applyUserPrivacyOptions(...)` call in Step 10.
 
 **Tradeoff:** Manual startup causes the SDK to miss the native application start event and any interactions that happen before `start()` is called. Use `autoStart: true` (the default) unless runtime credential injection is a hard requirement.
 
@@ -238,13 +278,21 @@ Then re-run `npx instrumentDynatrace`.
 
 If `@react-navigation/native` is **not** present: inform the user that automatic view tracking requires `@react-navigation/native`. They can use `Dynatrace.startView("ScreenName")` for manual view tracking instead.
 
-## Step 9 — Privacy options call (only if `userOptIn: true`)
+## Step 9 — Session Replay (optional)
 
-**Skip this step if `userOptIn` was not set to `true` during Steps 1 or 2.**
+Ask the user: **"Do you want to enable Session Replay?"** If they already said so, or `@dynatrace/react-native-session-replay` is already in `package.json`, treat it as yes. On no, continue to Step 10.
 
-Read `references/user-opt-in.md` for the full guidance on `DataCollectionLevel`, `crashReportingOptedIn`, and placement options. Ask the user the questions defined there, then apply the call to the relevant file.
+Read `references/session-replay.md` for the Grail flags, plugin version check, package install, Android config flag, `SessionReplay.configure(...)` call, masking, and console capability. Remember the answer — Step 10 needs it.
 
-## Step 10 — Post-setup summary
+**Session Replay requires `userOptIn: true`:** the Android Gradle plugin fails the build if `sessionReplay.enabled true` is set without it. If the user chose Session Replay while `userOptIn` is `false`, `references/session-replay.md` (section 4) covers switching it on with the user's consent — Step 10 then becomes required.
+
+## Step 10 — Privacy options call (only if `userOptIn: true`)
+
+**Skip this step if `userOptIn` was not `true` after Steps 1, 2 and 9.**
+
+Read `references/user-opt-in.md` for the full guidance on `DataCollectionLevel`, `crashReportingOptedIn`, Session Replay consent, and placement options. Ask the user the questions defined there, then apply the call to the relevant file.
+
+## Step 11 — Post-setup summary
 
 Confirm to the user what is active:
 
@@ -262,18 +310,21 @@ Confirm to the user what is active:
 
 - Privacy mode: [userOptIn: true — consent call added / opt-out (SDK default)]
 - Navigation tracking: [react.navigation.enabled: true / manual via Dynatrace.startView()]
+- Session Replay: [package added, `SessionReplay.configure(...)` added, Android `sessionReplay.enabled true` set, console capability confirmed, masking level chosen, screenRecordOptedIn set if opt-in / not enabled]
 
-## Step 11 — Verification
+## Step 12 — Verification
 
 Read `references/verification.md` and show the user the verification checklist. If no data appears after 5 minutes, work through the troubleshooting steps in that file.
 
 ## Reference Files
 
-- `references/config-js.md` — Full `dynatrace.config.js` template with Grail and userOptIn conditional blocks
-- `references/user-opt-in.md` — `applyUserPrivacyOptions` guidance, `DataCollectionLevel` options, placement options
+- `references/config-js.md` — Full `dynatrace.config.js` template with userOptIn, Session Replay and manual-startup conditional blocks
+- `references/user-opt-in.md` — `applyUserPrivacyOptions` guidance, `DataCollectionLevel` options, Session Replay consent, placement options
+- `references/session-replay.md` — Session Replay setup: Grail flags, plugin version, package, Android flag, `configure`, masking, console capability
 - `references/verification.md` — Post-setup verification checklist and troubleshooting
 
 ## External References
 
 - [@dynatrace/react-native-plugin on npm](https://www.npmjs.com/package/@dynatrace/react-native-plugin) — package changelog, API docs, and latest version
+- [@dynatrace/react-native-session-replay on npm](https://www.npmjs.com/package/@dynatrace/react-native-session-replay) — Session Replay package, requirements, and changelog
 - [Dynatrace React Native Installation Docs](https://docs.dynatrace.com/docs/observe/digital-experience/new-rum-experience/mobile-frontends/react-native) — official setup guide
