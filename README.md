@@ -168,7 +168,7 @@ The MCP server is remote — Dynatrace hosts it, so there is nothing to install.
 | Skill | Description |
 |-------|-------------|
 | [dt-migration](skills/dt-migration/SKILL.md) | Migrate classic entity-based DQL and topology navigation to Smartscape equivalents. |
-| [dt-upgrade](skills/dt-upgrade/SKILL.md) | Guide an upgrade from classic/2nd-gen to 3rd-gen Dynatrace: tenant readiness, migration actions per feature area, and AWS/Azure/GCP cloud integration cutover to Smartscape on Grail. Release candidate. |
+| [dt-upgrade](skills/dt-upgrade/SKILL.md) | Guide an upgrade from classic/2nd-gen to 3rd-gen Dynatrace: tenant readiness, migration actions per feature area, and AWS/Azure/GCP cloud integration cutover to Smartscape on Grail. |
 
 ## Prompts
 

@@ -82,7 +82,7 @@ Dynatrace Apps:
 
 Migration:
 - dt-migration: Migrate classic entities to Smartscape.
-- dt-upgrade: Upgrade from classic/2nd-gen to 3rd-gen — tenant readiness, per-area migration actions, AWS/Azure/GCP cloud integration cutover. Release candidate.
+- dt-upgrade: Upgrade from classic/2nd-gen to 3rd-gen — tenant readiness, per-area migration actions, AWS/Azure/GCP cloud integration cutover.
 
 ## Available prompts
 
