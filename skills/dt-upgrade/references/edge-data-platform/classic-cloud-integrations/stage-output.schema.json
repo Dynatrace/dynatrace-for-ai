@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "stage-output-manifest",
+  "title": "Cloud Migration Run Manifest",
+  "description": "Front-matter manifest for the consolidated cloud-migration stage-output document.",
+  "type": "object",
+  "required": ["contract_version", "run_id", "tenant", "providers", "stages_completed", "stages_in_progress"],
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version. Increment when breaking changes are made to the contract."
+    },
+    "run_id": {
+      "type": "string",
+      "description": "Unique identifier for this migration run. Format: <ISO-8601>-<tenant-slug>.",
+      "examples": ["2026-05-15T14-23-07Z-acme-prod"]
+    },
+    "tenant": {
+      "type": "string",
+      "description": "Dynatrace environment URL.",
+      "examples": ["acme-prod.live.dynatrace.com"]
+    },
+    "providers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/provider" },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Cloud providers discovered in Stage 1."
+    },
+    "stages_completed": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/stage_name" },
+      "uniqueItems": true,
+      "description": "Stage names that have been completed and whose sections are present in the document."
+    },
+    "stages_in_progress": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/stage_name" },
+      "maxItems": 1,
+      "description": "The stage currently being executed (at most one at a time)."
+    },
+    "skill_version": {
+      "type": "string",
+      "description": "Semver of the skill that produced this document.",
+      "examples": ["1.2.0"]
+    }
+  },
+  "$defs": {
+    "provider": {
+      "type": "string",
+      "enum": ["aws", "azure", "gcp"]
+    },
+    "stage_name": {
+      "type": "string",
+      "enum": ["discovery", "assessment", "guidance", "cutover"]
+    },
+    "connection_status": {
+      "type": "string",
+      "enum": ["Not Started", "Parallel", "Complete"]
+    },
+    "availability": {
+      "type": "string",
+      "enum": ["recommended", "autodiscovered", "none"]
+    },
+    "signoff_status": {
+      "type": "string",
+      "enum": ["pending", "approved", "rolled-back"]
+    },
+    "connection_finding": {
+      "type": "object",
+      "required": ["provider", "account_id", "name", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "$ref": "#/$defs/provider" },
+        "account_id": {
+          "type": "string",
+          "description": "AWS account ID, Azure subscription UUID, or GCP project ID."
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable connection or subscription name."
+        },
+        "status": { "$ref": "#/$defs/connection_status" },
+        "metric_streams_blocked": {
+          "type": "boolean",
+          "description": "True when an AWS account has both a classic connection and active Metric Streams traffic.",
+          "default": false
+        }
+      }
+    },
+    "detection_finding": {
+      "type": "object",
+      "required": ["asset_id", "asset_name", "asset_type", "provider"],
+      "properties": {
+        "asset_id": { "type": "string" },
+        "asset_name": { "type": "string" },
+        "asset_type": {
+          "type": "string",
+          "enum": ["dashboard", "notebook", "classic-dashboard", "metric-event", "infrastructure-detection", "anomaly-detector", "slo"]
+        },
+        "provider": { "$ref": "#/$defs/provider" },
+        "metric_keys": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Classic metric keys detected in this asset."
+        },
+        "metric_prefixes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Classic metric prefixes detected (when full keys are not available)."
+        },
+        "entity_types": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Classic entity types detected (e.g. dt.entity.ec2_instance)."
+        },
+        "entity_selectors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Classic entity selectors detected."
+        },
+        "blockers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Blocker codes preventing direct migration (e.g. 'eol-service', 'metric-streams')."
+        },
+        "details": {
+          "type": "object",
+          "description": "Extra context keyed by blocker type (eol_services, metric_streams_keys, analyzer_type, etc.)."
+        }
+      }
+    },
+    "mapping_finding": {
+      "type": "object",
+      "required": ["classic_key", "new_key", "availability"],
+      "additionalProperties": false,
+      "properties": {
+        "classic_key": { "type": "string" },
+        "new_key": {
+          "type": "string",
+          "description": "Resolved new-connection DAC key, or 'not-matched'."
+        },
+        "availability": { "$ref": "#/$defs/availability" },
+        "end_of_life": {
+          "type": "boolean",
+          "default": false
+        },
+        "eol_date": {
+          "type": ["string", "null"],
+          "description": "ISO-8601 date string or null."
+        },
+        "eol_announcement_url": {
+          "type": ["string", "null"]
+        }
+      }
+    }
+  }
+}

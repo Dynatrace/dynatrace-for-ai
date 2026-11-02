@@ -1,0 +1,10 @@
+{
+  "description": "AWS CloudWatch namespace names used to query the DAC for metric mappings",
+  "services": [
+    "AWS/RDS", "AWS/Lambda", "AWS/SQS", "AWS/ApplicationELB", "AWS/ElastiCache",
+    "AWS/ECS", "AWS/EC2", "AWS/ES", "AWS/Kafka", "AWS/Neptune", "AWS/Cassandra",
+    "AWS/CloudFront", "AWS/Route53", "AWS/SES", "AWS/WAFV2", "AWS/CodeBuild",
+    "AWS/DocDB", "AWS/AmazonMQ", "AWS/AppStream", "ContainerInsights",
+    "AWS/ApiGateway", "AWS/AutoScaling", "AWS/Bedrock"
+  ]
+}

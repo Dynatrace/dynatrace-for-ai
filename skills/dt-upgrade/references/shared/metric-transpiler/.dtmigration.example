@@ -1,0 +1,31 @@
+# .dtmigration — local credential for the Metric Transpiler
+#
+# Copy this file to .dtmigration in your working directory, then fill in the
+# token below. .dtmigration is git-ignored and must never be committed.
+#
+# This file is REQUIRED. The transpiler client script (scripts/transpile.ts)
+# parses it itself to build the Authorization header, so the calling agent
+# never has to open it. The script does not look anywhere else for a token
+# (not dtctl, not the OS keychain, not the environment).
+#
+# The target environment is NOT configured here — the script resolves it from
+# the active dtctl context (`dtctl config current-context`) and reads that
+# context config (`dtctl config view --context=<name> -o json`), then converts
+# the platform URL to the classic Environment API URL automatically. Make sure
+# the right context is selected (`dtctl config use-context <name>`) before
+# running.
+#
+# Only for unusual deployments where that conversion does not apply, you may
+# pin the classic environment URL explicitly (used verbatim, overrides dtctl):
+# export DT_TRANSPILE_ENV_URL="https://<your-env>.live.dynatrace.com"
+#
+# The Metric Transpiler endpoints
+#   GET  /api/v2/metrics/transpile
+#   POST /api/v2/metrics/transpileBulk
+# live on the Classic Environment API v2 and cannot be called via dtctl.
+#
+# Create the API token in Dynatrace: Personal access tokens > Create token,
+# with the "metrics:read" scope.
+
+# API token (sent as: Authorization: Api-Token <token>), scope: metrics:read
+export DT_TRANSPILE_TOKEN="dt0c01.XXXXXXXXXXXXXXXXXXXXXXXX.YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY"

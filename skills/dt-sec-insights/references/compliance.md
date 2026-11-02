@@ -6,75 +6,61 @@ external provider compliance findings.
 > **Cross-references:** field reference → [data-model.md § Compliance Fields](data-model.md#compliance-fields-spm) ·
 > time-window rules → [common-patterns.md](common-patterns.md).
 
-> **SPM has three flavors:** KSPM (Kubernetes — DT-native, the
-> security-analyzer-service), CSPM (cloud posture) and VSPM (VMware posture),
-> the latter two delivered via an external/partner integration. The DQL patterns
-> in this file target **KSPM**.
-> CSPM/VSPM ride on the same `security.events` table but use the cross-provider
-> `finding.*` namespace, not `compliance.rule.*` — see
-> [all-security-events.md](all-security-events.md) and § External Compliance
-> below for those.
+> **Scope.** SPM has three flavors: KSPM (Kubernetes, DT-native security-analyzer-service), CSPM (cloud
+> posture) and VSPM (VMware posture), the latter two via external/partner integrations. The DQL in this file
+> targets **KSPM**. CSPM/VSPM ride on the same `security.events` table but use the cross-provider `finding.*`
+> namespace, not `compliance.rule.*` — see [all-security-events.md](all-security-events.md) and § External
+> Compliance below. KSPM assesses **Kubernetes resources only** (clusters, nodes, pods, deployments,
+> statefulsets, daemonsets, jobs, cronjobs, replicasets, replication controllers): there are no DT-native
+> findings for AWS / Azure / GCP / host / process entities, so "what's our AWS compliance posture?" needs CSPM
+> or another external integration.
 
-> **KSPM scope is Kubernetes-only.** The DT-native SPM analyzer assesses K8s
-> clusters, nodes, pods, deployments, statefulsets, daemonsets, jobs, cronjobs,
-> replicasets, replication controllers. There are no DT-native compliance
-> findings against AWS / Azure / GCP / host / process entities. If the user
-> asks "what's our AWS compliance posture?" they need CSPM or another external
-> integration.
+> **KSPM standards — `compliance.standard.short_name` is `CIS`, `DORA`, `NIST`, `DISA STIG` or `Security Essentials`.** STIG is the
+> full `"DISA STIG"` label, not bare `"STIG"` (`== "STIG"` returns nothing). Scope with
+> **`contains(compliance.standard.short_name, "<keyword>", caseSensitive:false)`** instead of equality — it
+> tolerates the DISA prefix, version suffixes and case mismatches across all five. PCI DSS, ISO 27001, HIPAA,
+> GDPR, BSI C5, TISAX, Cyber Essentials, Essential Eight, etc. arrive only via CSPM/VSPM or other external
+> integrations and don't populate the KSPM rule namespace. CIS is mandatory for K8s; DORA / NIST / DISA STIG
+> are opt-in (Settings → Application Security → Security Posture Management). Security Essentials rule ids
+> carry the `DTSE-` prefix.
 
-> **KSPM standards — `compliance.standard.short_name` values: `CIS`, `DORA`,
-> `NIST`, `DISA STIG`.** Note STIG specifically: the short_name is the full
-> `"DISA STIG"` label, not bare `"STIG"`. A filter like
-> `compliance.standard.short_name == "STIG"` returns nothing. For all standard
-> scoping, prefer **`contains(compliance.standard.short_name, "<keyword>", caseSensitive:false)`**
-> over exact equality — it tolerates the DISA prefix, version suffixes, and
-> case mismatches uniformly across all four standards. PCI DSS, ISO 27001,
-> HIPAA, GDPR, BSI C5, TISAX, Cyber Essentials, Essential Eight, etc. arrive
-> only via CSPM/VSPM or other external integrations — they don't
-> populate the KSPM rule namespace. CIS is mandatory for K8s; DORA / NIST /
-> DISA STIG are opt-in (configurable in Settings → Application Security →
-> Security Posture Management).
+> **Snapshot vs. history.** DT SPM queries use a **1-hour fixed window** (`from:now()-1h`), aligned with the
+> scan-completion cycle (an ActiveGate ships a fresh configuration dataset, typically hourly per K8s cluster),
+> so the latest `COMPLIANCE_SCAN_COMPLETED` event is captured per object and the inner join succeeds. Widening
+> adds cost, not history; if no scan completed in the last 1h for an object, its findings do NOT appear
+> (inner-join behavior — by design). Widen past 1h only for genuine history questions (e.g. finding age).
 
-> **Snapshot vs. history.** DT SPM queries use a **1-hour fixed window**
-> (`from:now()-1h`). This is aligned with the scan-completion cycle — it ensures
-> the latest `COMPLIANCE_SCAN_COMPLETED` event is captured per object so the
-> inner join succeeds. Widening doesn't extend history; if no scan completed in
-> the last 1h for an object, that object's findings will NOT appear (inner-join
-> behavior — by design). Scans are triggered when an ActiveGate ships a fresh
-> configuration dataset (typically hourly per K8s cluster).
+> **Rule statuses.** The enum is `PASSED`, `FAILED`, `MANUAL`, `NOT_RELEVANT` — not `PASS`/`FAIL` — in
+> `compliance.result.status.level`, **never** `event.status` (a generic `Active`/`Closed` lifecycle field,
+> null or wrong on `COMPLIANCE_FINDING` rows).
+> — Count failures with an explicit equality: `countIf(compliance.result.status.level == "FAILED")`. A negation
+> (`!= "PASSED"`) wrongly folds `MANUAL` and `NOT_RELEVANT` into the failed count.
+> — `NOT_RELEVANT` (rule doesn't apply to the object, e.g. a K8s version mismatch) is always excluded by the
+> base filter and never counted in pass/fail totals. The SPM app's "Recommended" view excludes it; "Complete"
+> includes it.
+> — `MANUAL` (the analyzer can't auto-evaluate it; the Dynatrace docs say manual results aren't currently
+> actionable) is a triage hint, not a remediable defect — never counted as `PASSED` or in a pass-rate numerator.
+> — **Percent compliant** = `Passed / Rules`, rounded to a whole number, with `MANUAL` kept in `Rules`
+>   (`Rules` = passed + manual + failed; `NOT_RELEVANT` is not counted). This is exactly what the SPM
+>   Overview card shows per standard (for example 89 passed of 134 rules, 33 manual, 12 failed = 66%), and
+>   it is the golden's `passRate`. When `Manual > 0`, you may add `Passed / (Passed + Failed)` as an
+>   "auto-evaluated only" figure, labelled as such; never present it as the app's percentage. External
+>   tools are per-finding rows (rule x object), so their figure is `Passed / Findings`: say so, and do not
+>   sum or compare it with KSPM rule counts.
+> — Per-rule precedence is `FAILED > MANUAL > PASSED` (Step 2 derives it); any re-derivation must follow it or
+> the verdict silently disagrees with the SPM app.
+> — The default tool filter is FAILED-only; to compute a pass rate, set `resultStatuses=ALL` so `PASSED` is in
+> the denominator.
 
-> **NOT_RELEVANT.** Always excluded by the base filter. These are rules that
-> don't apply to the assessed object (e.g. AWS rule on a GCP resource, or a
-> rule that requires a K8s version mismatch). Never count them in pass/fail
-> totals. The SPM app's "Recommended" view excludes them by default; "Complete"
-> view includes them.
-
-> **MANUAL is currently non-actionable.** A `MANUAL` rule is one the analyzer
-> can't auto-evaluate (e.g. it depends on physical-security checks, or
-> external-control configuration the analyzer can't see). The Dynatrace docs
-> note "Manual results aren't currently actionable" — there's no remediation
-> workflow. Treat MANUAL as a triage hint, not a remediable defect, and don't
-> include it in pass-rate numerators.
-
-> **No mute / exemption / waiver mechanism.** Unlike vulnerabilities, compliance
-> findings have no `mute.*` namespace in `security.events`. "Accepted risk" is
-> not modeled in DQL. If asked "show me accepted compliance findings," explain
-> the field doesn't exist (the SPM app may surface acceptance UI-side, but it's
-> not exposed to queries).
-
-> **Default tool filter is FAILED-only.** To compute pass rate ("how compliant
-> are we?"), set `resultStatuses=ALL` so PASSED is in the denominator.
-
-> **Compliance status field and values — use `compliance.result.status.level`, never `event.status`.**
-> The canonical enum is `PASSED`, `FAILED`, `MANUAL`, `NOT_RELEVANT` — not `PASS`/`FAIL`. Always count
-> failures with an explicit equality check: `countIf(compliance.result.status.level == "FAILED")`.
-> Using a negation (`!= "PASSED"`) wrongly folds `MANUAL` and `NOT_RELEVANT` into the failed count.
-> `event.status` is a generic event-lifecycle field (`Active`/`Closed`) unrelated to compliance verdicts;
-> it is null or wrong on `COMPLIANCE_FINDING` rows. Additional field rules:
+> **Field rules.**
 > — Standard field: `compliance.standard.short_name` (not `compliance.rule.standard`, which does not exist in the Semantic Dictionary).
 > — Severity field: `compliance.rule.severity.level` (not bare `compliance.rule.severity`, which resolves to nothing).
 > — Latest-scan join uses `on: {scan.id}` shorthand — not `on: {left.scan.id == right.scan.id}` (`left.`/`right.` prefixes are body syntax only, not valid inside `on:`).
 > — Pass rate must be computed on **per-rule** verdicts (after Step 2 rollup), not directly on raw per-`(rule, object)` rows.
+
+> **No mute / exemption / waiver mechanism.** Unlike vulnerabilities, compliance findings have no `mute.*`
+> namespace in `security.events`; "accepted risk" is not modeled in DQL (the SPM app may surface acceptance
+> UI-side, but it isn't exposed to queries). If asked for "accepted compliance findings," explain the data isn't there.
 
 ---
 
@@ -100,7 +86,7 @@ using the external taxonomy (`compliance.standards` / `compliance.policy` /
 | Intent | Section |
 |---|---|
 | "configuration drift" / "newly failing rules" / "new violations vs last week" (DT KSPM) | [§ Week-over-Week Config Drift](#dt-spm-week-over-week-config-drift-newly-failing-rules) — prior-period **anti-join**; a `7d` fetch window or a created-time filter is NOT a substitute |
-| External violations "by standard" / "by framework" | [§ External Compliance](#external-compliance-queries-cspm--vspm--external-posture-tools) — `compliance.standards` is an **array**: always `expand compliance.standard = compliance.standards` before `summarize`, otherwise the per-standard breakdown collapses |
+| External violations "by standard" / "by framework" | [§ External Compliance](#external-compliance-queries-cspm--vspm--external-posture-tools) — `compliance.standards` is an **array** (Runecast fills only `compliance.standard.short_name`): use the template's `coalesce` + `expand` before `summarize`, otherwise the per-standard breakdown collapses or drops providers |
 | External findings "not present in the previous period" | [§ External Compliance](#external-compliance-queries-cspm--vspm--external-posture-tools) newness anti-join — same anti-join rule as drift |
 | Top failing external rules | [§ External Compliance](#external-compliance-queries-cspm--vspm--external-posture-tools) — group by `compliance.control` / `compliance.policy` (+ expanded standard), not by `finding.title` alone |
 
@@ -177,15 +163,10 @@ related entity identifiers.
         arrayRemoveNulls(collectDistinct(dt.smartscape.host)),
         arrayRemoveNulls(collectDistinct(dt.smartscape.k8s_cluster)),
         arrayRemoveNulls(collectDistinct(dt.smartscape.k8s_node)),
+        arrayRemoveNulls(collectDistinct(dt.smartscape.k8s_namespace)),
         arrayRemoveNulls(collectDistinct(dt.smartscape.k8s_pod)),
-        arrayRemoveNulls(collectDistinct(dt.entity.host)),
-        arrayRemoveNulls(collectDistinct(dt.entity.process_group)),
-        arrayRemoveNulls(collectDistinct(dt.entity.process_group_instance)),
-        arrayRemoveNulls(collectDistinct(dt.entity.kubernetes_cluster)),
         arrayRemoveNulls(collectDistinct(k8s.pod.uid)),
         arrayRemoveNulls(collectDistinct(k8s.cluster.uid)),
-        arrayRemoveNulls(collectDistinct(dt.entity.cloud_application_namespace)),
-        arrayRemoveNulls(collectDistinct(dt.entity.kubernetes_node)),
         arrayRemoveNulls(collectDistinct(azure.resource.id)),
         arrayRemoveNulls(collectDistinct(aws.resource.id)),
         arrayRemoveNulls(collectDistinct(gcp.resource.id)))
@@ -196,14 +177,9 @@ related entity identifiers.
       else: if(compliance.result.count.passed > 0, "PASSED", else: "NOT_RELEVANT")))
 ```
 
-**Why each stage exists:**
-
-| Stage | Purpose |
-|---|---|
-| Top-level filters | Scope to Dynatrace SPM-generated `COMPLIANCE_FINDING` rows; drop `NOT_RELEVANT`. |
-| `join` with `COMPLIANCE_SCAN_COMPLETED` | Dedupe to the **latest completed scan** per object. Without the join, repeated scan attempts double-count findings. |
-| `summarize … by: {compliance.rule.id}` | Rolls per-(rule, object) rows into per-rule rows with pass/fail/manual counters. |
-| `fieldsAdd compliance.result.status.level` | Derives a rule-level verdict: any failure → `FAILED`; otherwise any manual → `MANUAL`; else `PASSED`. |
+The inner join dedupes to the **latest completed scan** per object (without it, repeated scan attempts
+double-count findings). Step 2 rolls per-`(rule, object)` rows into per-rule verdicts: any failure → `FAILED`,
+else any manual → `MANUAL`, else `PASSED`.
 
 ---
 
@@ -222,7 +198,13 @@ Apply Step 1 + Step 2, then append:
 ### Pre-Aggregation Filters (insert between Step 1 and Step 2)
 
 These reduce data volume before the per-rule aggregation. All accept `"ALL"` as a
-no-op:
+no-op.
+
+Placeholders (dashboard variables — substitute a literal string, or `ALL` to disable the clause):
+
+- `${systems}` — cluster / account / project name, e.g. `appsec-ai-test` (`k8s.cluster.name`); get it from the cluster list or `fetch security.events | filter event.type=="COMPLIANCE_FINDING" | summarize count(), by:{k8s.cluster.name}`.
+- `${standards}` — standard short or full name, e.g. `CIS`, `DORA`.
+- `${ruleTitles}` / `${ruleIds}` — exact rule title or id (e.g. `CIS-83103`) from the per-rule summary.
 
 ```dql-snippet
 // Scope to a specific cluster / system (KSPM + external CSPM/cloud)
@@ -243,12 +225,13 @@ no-op:
 | filter ("${ruleIds}"    == "ALL" or compliance.rule.id    == "${ruleIds}")
 ```
 
-> **Standard short-name values for KSPM are limited to `CIS`, `DORA`, `NIST`,
-> `STIG`.** PCI / ISO / HIPAA / GDPR / BSI / TISAX / Cyber Essentials / Essential
-> Eight come only via CSPM/VSPM or other external integrations and
-> may or may not populate `compliance.standard.short_name` consistently.
-
 ### Post-Aggregation Filters (insert after Step 2)
+
+Placeholders (dashboard variables — substitute a literal string, or `ALL` to disable the clause):
+
+- `${riskLevels}` — comma-separated severities, e.g. `CRITICAL,HIGH`.
+- `${resultStatuses}` — one rule status: `FAILED`, `MANUAL` or `PASSED`.
+- `${entityIdsOrNames}` — entity filter: `ALL`, or one or more entity names / ids. Names and `object.id` strings (comma-separated, e.g. `appsec-ai-test`) match as strings. A Smartscape id (e.g. `K8S_CLUSTER-3C526BD42B1D45FA`, from `dt.smartscape.k8s_cluster` or `smartscapeNodes`) is typed in `related_entities.ids`, so it only matches through `toSmartscapeId("${entityIdsOrNames}")` — pass **one** Smartscape id at a time.
 
 ```dql-snippet
 // Filter by rule severity (CRITICAL / HIGH / MEDIUM / LOW)
@@ -260,7 +243,8 @@ no-op:
       OR in(affected_entity.ids,    splitString("${entityIdsOrNames}",","))
       OR in(affected_entity.names,  splitString("${entityIdsOrNames}",","))
       OR in(related_entities.names, splitString("${entityIdsOrNames}",","))
-      OR in(related_entities.ids,   splitString("${entityIdsOrNames}",",")))
+      OR in(related_entities.ids,   splitString("${entityIdsOrNames}",","))
+      OR in(toSmartscapeId("${entityIdsOrNames}"), related_entities.ids))
 ```
 
 ### Grouped by Standard with Pass Rate
@@ -289,19 +273,12 @@ the per-standard rollup above and force CIS to the top with the numeric-priority
 a boolean `sort … == "CIS" desc` is invalid DQL:
 
 ```dql-snippet
-// Step 1 + Step 2 (as above), then:
-| summarize {
-    Rules=count(),
-    Passed=countIf(compliance.result.status.level=="PASSED"),
-    Manual=countIf(compliance.result.status.level=="MANUAL"),
-    Failed=countIf(compliance.result.status.level=="FAILED")
-  }, by: {compliance.standard.short_name}
-| fieldsAdd passRate=round(Passed*100.0/Rules, decimals:0)
+// Grouped by Standard with Pass Rate (above), replacing its final `sort passRate asc` with:
 | fieldsAdd standardPriority=if(compliance.standard.short_name=="CIS", 0, else: 1)
 | sort standardPriority asc, Failed desc
 ```
 
-**Present the CIS row as the headline failed-rule count.** List DORA / NIST / DISA STIG rows
+**Present the CIS row as the headline failed-rule count.** List DORA / NIST / DISA STIG / Security Essentials rows
 immediately after as *additional* failed rules — phrase them as "additional failed rules from
 `<standard>`, which may overlap with CIS". **Do not sum failed counts across standards:** the
 standards overlap, so the same misconfiguration on the same object can fail a CIS rule *and* a
@@ -327,6 +304,8 @@ already dropped by the Step-1 base filter, consistent with the tab's failed-only
 
 **Table 1 — Dynatrace CIS failed rules** (the headline; mirrors the Security tab):
 
+Placeholders: `${entityIdsOrNames}` as described in § Post-Aggregation Filters — `ALL`, an entity name or `object.id` string, or one Smartscape id (matched via `toSmartscapeId`).
+
 ```dql-snippet
 // Step 1 + Step 2 (as above), then:
 | filter compliance.standard.short_name == "CIS"
@@ -336,7 +315,8 @@ already dropped by the Step-1 base filter, consistent with the tab's failed-only
       OR in(affected_entity.ids,    splitString("${entityIdsOrNames}",","))
       OR in(affected_entity.names,  splitString("${entityIdsOrNames}",","))
       OR in(related_entities.names, splitString("${entityIdsOrNames}",","))
-      OR in(related_entities.ids,   splitString("${entityIdsOrNames}",",")))
+      OR in(related_entities.ids,   splitString("${entityIdsOrNames}",","))
+      OR in(toSmartscapeId("${entityIdsOrNames}"), related_entities.ids))
 | fieldsAdd sevPriority = if(compliance.rule.severity.level=="CRITICAL", 0,
                           else: if(compliance.rule.severity.level=="HIGH",   1,
                           else: if(compliance.rule.severity.level=="MEDIUM", 2,
@@ -353,33 +333,13 @@ already dropped by the Step-1 base filter, consistent with the tab's failed-only
 > **recommendation section is already embedded in `compliance.rule.title`** (e.g.
 > "4.5.1 Prefer using secrets as files…"), so no `metadata_json` parse is needed for it.
 
-**Table 2 — additional failed rules from other Dynatrace standards** (DORA / NIST / DISA STIG).
-Same pipeline, `compliance.standard.short_name != "CIS"`, with a **Standard** column:
+**Table 2 — additional failed rules from other Dynatrace standards** (DORA / NIST / DISA STIG / Security Essentials).
+Same pipeline and `${entityIdsOrNames}` as Table 1, with two changes: replace the CIS filter with
+`compliance.standard.short_name != "CIS"` (keep `AND compliance.result.status.level == "FAILED"`), and add
+`Standard = compliance.standard.short_name,` as the first column of the final `fields`.
 
-```dql-snippet
-// Step 1 + Step 2 (as above), then:
-| filter compliance.standard.short_name != "CIS"
-     AND compliance.result.status.level == "FAILED"
-| filter ("${entityIdsOrNames}"=="ALL"
-      OR in(affected_entity.ids,    splitString("${entityIdsOrNames}",","))
-      OR in(affected_entity.names,  splitString("${entityIdsOrNames}",","))
-      OR in(related_entities.names, splitString("${entityIdsOrNames}",","))
-      OR in(related_entities.ids,   splitString("${entityIdsOrNames}",",")))
-| fieldsAdd sevPriority = if(compliance.rule.severity.level=="CRITICAL", 0,
-                          else: if(compliance.rule.severity.level=="HIGH",   1,
-                          else: if(compliance.rule.severity.level=="MEDIUM", 2,
-                          else: 3)))
-| sort sevPriority asc
-| fields Standard  = compliance.standard.short_name,
-         Severity  = compliance.rule.severity.level,
-         Rule      = compliance.rule.title,
-         `Rule ID` = compliance.rule.id,
-         Status    = compliance.result.status.level
-```
-
-> Label Table 2 as *additional* failed rules **that may overlap with CIS** — the standards
-> overlap, so the same misconfiguration on the entity can fail a CIS rule *and* a
-> DORA/NIST/STIG rule. **Never sum failed counts across Tables 1 and 2.**
+> Label Table 2 as *additional* failed rules **that may overlap with CIS**; **never sum failed counts across
+> Tables 1 and 2** (see [CIS-Primary Standard Summary](#cis-primary-standard-summary)).
 
 **Table 3 — externally ingested misconfigurations / compliance findings** (CSPM/VSPM and other
 external providers on the entity). Do **not** rebuild this — use the
@@ -387,10 +347,8 @@ external providers on the entity). Do **not** rebuild this — use the
 patterns below, scoping the
 **pre-aggregation** filter to the entity via `object.id` / `dt.smartscape_source.id` /
 `k8s.*` (external rows are raw per-finding; the KSPM `affected_entity.*` arrays do not apply).
-Use `from:now()-24h` for the external query — external findings arrive on a slower polling
-cycle and are not inner-joined to a scan event (unlike DT SPM which requires 1h).
-A 0-row result means no external posture tool reported on this entity — still state that
-explicitly.
+Use `from:now()-24h` (see the window note above). A 0-row result means no external posture tool reported
+on this entity — still state that explicitly.
 
 ### Grouped by Affected Systems with Pass Rate
 
@@ -441,12 +399,10 @@ record field:
 
 ---
 
-> **Do not use `scan.result.summary_json`.** Although `COMPLIANCE_SCAN_COMPLETED`
-> events carry a pre-computed `scan.result.summary_json` blob, agents **must not**
-> parse it for compliance posture answers. It bypasses the per-rule pipeline,
-> causes a second parallel query, and yields pre-aggregated data that cannot be
-> filtered, extended, or broken down by rule or severity. Always use the
-> `COMPLIANCE_FINDING` canonical pipeline (Steps 1 + 2) instead.
+> **Do not use `scan.result.summary_json`.** `COMPLIANCE_SCAN_COMPLETED` carries this pre-computed blob, but
+> agents **must not** parse it for posture answers (not even as a supplementary per-cluster query): it bypasses
+> the per-rule pipeline and its pre-aggregated data can't be filtered or broken down by rule or severity. Use the
+> `COMPLIANCE_FINDING` pipeline (Steps 1 + 2).
 
 ---
 
@@ -514,26 +470,59 @@ fetch security.events, from:now()-1h
 | filter isNull(right.object.id)   // present now, absent a week ago
 | summarize {
     compliance.rule.severity.level = takeFirst(compliance.rule.severity.level),
+    compliance.rule.severity.score = takeFirst(compliance.rule.severity.score),
     compliance.standard.short_name = takeFirst(compliance.standard.short_name),
     compliance.rule.title = takeFirst(compliance.rule.title),
     compliance.result.count.failed = countIf(compliance.result.status.level == "FAILED"),
+    last_scan.timestamp = max(last_scan.timestamp),
     k8s.cluster.names = collectDistinct(k8s.cluster.name),
     affected_entity.names = collectDistinct(object.name)
-  }, by: {compliance.rule.id, last_scan.timestamp}
+  }, by: {compliance.rule.id}
 | filter compliance.result.count.failed > 0
      AND in(compliance.rule.severity.level, array("CRITICAL","HIGH"))
-| sort compliance.result.count.failed desc
+| fieldsAdd severityRank = coalesce(compliance.rule.severity.score, 0)
+| sort severityRank desc, compliance.result.count.failed desc, compliance.rule.id asc
 | limit 50
 ```
 
 > The previous-period sub-window uses `to:-7d+30m` (a 30-min slice a week back) so it captures one
-> completed scan without pulling 7 days of rows. Adjust the offset for month-over-month, etc. If a
-> 30-min slice catches no completed scan, widen it (e.g. `to:-7d+2h`) so the prior-period baseline
-> isn't artificially empty — an empty baseline makes every current failure look "newly failing".
+> completed scan without pulling 7 days of rows. Adjust the offset for month-over-month, etc.
 >
-> The trailing `in(compliance.rule.severity.level, {"CRITICAL","HIGH"})` is an optional prioritizer
-> and may legitimately return zero rows when the period's newly-failing rules are all lower
-> severity — drop or widen it to see all newly-failing rules.
+> The `AND in(compliance.rule.severity.level, array("CRITICAL","HIGH"))` clause is part of the
+> canonical template because the question asks for "critical and high" drift. It may legitimately
+> return zero rows when the period's newly-failing rules are all lower severity. For an
+> all-severity drift question ("everything newly failing"), delete that one line and keep
+> `| filter compliance.result.count.failed > 0`; to widen instead, add `"MEDIUM"` / `"LOW"` to the array.
+>
+> **One row per rule, not per scan.** The final `summarize` groups by `compliance.rule.id` only.
+> `last_scan.timestamp` differs per scanned cluster, so grouping by it split one rule into one row
+> per cluster (DORA-67945 appeared twice) and made `limit 50` trim on those duplicates; it is now
+> a `max()` value, and `k8s.cluster.names` lists the clusters where the rule newly fails. For a
+> per-cluster question, group `by: {compliance.rule.id, k8s.cluster.name}` instead. The sort
+> coalesces `compliance.rule.severity.score` (0-10, populated on every live KSPM row) into
+> `severityRank` and ends on `compliance.rule.id`, so ties order deterministically.
+>
+> **Baseline coverage check (run before the drift query, or when the result looks inflated).**
+> Compare the scanned clusters in the current slice with the baseline slice:
+
+```dql
+fetch security.events, from:now()-1h
+| filter event.type == "COMPLIANCE_SCAN_COMPLETED" AND product.vendor == "Dynatrace"
+| summarize { scanned.objects = countDistinctExact(object.id), clusters = collectDistinct(k8s.cluster.name) }
+| fieldsAdd period = "current (now-1h)"
+| append [
+    fetch security.events, from:-7d, to:-7d+30m
+    | filter event.type == "COMPLIANCE_SCAN_COMPLETED" AND product.vendor == "Dynatrace"
+    | summarize { scanned.objects = countDistinctExact(object.id), clusters = collectDistinct(k8s.cluster.name) }
+    | fieldsAdd period = "baseline (-7d, 30m)"
+  ]
+| fields period, scanned.objects, clusters
+```
+
+> **Rule:** if the baseline row lists fewer clusters than the current row, widen the baseline
+> (`to:-7d+2h`) in **both** prior-period sub-queries of the drift template and say so in the answer;
+> on demo-live the 30m baseline covers 3 of 4 clusters (`demo-kspm` missing) and `to:-7d+2h` covers all 4.
+> Keep the default `30m` window otherwise.
 
 ---
 
@@ -556,9 +545,10 @@ applies directly after Step 1.
            `Related configuration properties` = allFindings,
            System = k8s.cluster.name,
            `Analyzed at` = timestamp
-| sort System == "unguard-dev" desc,
-       Result == "FAILED" desc, Result == "MANUAL" desc, Result == "PASSED" desc
-| fieldsKeep `Analyzed at`, System, "dt.smartscape*", "dt.entity*", "dt.source*",
+| fieldsAdd systemPriority = if(System == "unguard-dev", 0, else: 1),
+            resultPriority = if(Result == "FAILED", 0, else: if(Result == "MANUAL", 1, else: 2))
+| sort systemPriority asc, resultPriority asc
+| fieldsKeep `Analyzed at`, System, "dt.smartscape*",
             Result, `Resource name`, Type, `Resource type`,
             `Related configuration properties`
 ```
@@ -616,34 +606,29 @@ collapse all per-rule rows into a **single summary row**. This avoids a `by: {Cl
 and lets the final `summarize` include per-severity failure counts in the same query — one query,
 one result row:
 
+Placeholders: `<cluster-name>` — the Kubernetes cluster name as a plain string (`k8s.cluster.name`), e.g. `appsec-ai-test`; list the names with `fetch security.events, from:now()-1h | filter event.type=="COMPLIANCE_FINDING" AND product.vendor=="Dynatrace" | summarize count(), by:{k8s.cluster.name}`. It is a name, not a typed Smartscape id, so no `toSmartscapeId(...)`.
+
 ```dql-snippet
 // Step 1 (as above), then:
 // Pre-aggregation filter — scope to the named cluster
 | filter k8s.cluster.name == "<cluster-name>"
-// Step 2 — per-rule verdict (no cluster key needed; already filtered)
-| summarize {
-    compliance.rule.severity.level = takeFirst(compliance.rule.severity.level),
-    passed = countIf(compliance.result.status.level == "PASSED"),
-    failed = countIf(compliance.result.status.level == "FAILED"),
-    manual = countIf(compliance.result.status.level == "MANUAL")
-  }, by: {compliance.rule.id}
-| fieldsAdd ruleStatus =
-      if(failed > 0, "FAILED",
-      else: if(manual > 0, "MANUAL",
-      else: if(passed > 0, "PASSED", else: "NOT_RELEVANT")))
+// Step 2 (as above, no cluster key needed — already filtered), then:
 // Single summarize — rule counts + per-severity failure breakdown in one row (no by: clause)
 | summarize {
     Rules = count(),
-    Passed = countIf(ruleStatus == "PASSED"),
-    Manual = countIf(ruleStatus == "MANUAL"),
-    Failed = countIf(ruleStatus == "FAILED"),
-    CriticalFailed = countIf(ruleStatus == "FAILED" AND compliance.rule.severity.level == "CRITICAL"),
-    HighFailed    = countIf(ruleStatus == "FAILED" AND compliance.rule.severity.level == "HIGH"),
-    MediumFailed  = countIf(ruleStatus == "FAILED" AND compliance.rule.severity.level == "MEDIUM"),
-    LowFailed     = countIf(ruleStatus == "FAILED" AND compliance.rule.severity.level == "LOW")
+    Passed = countIf(compliance.result.status.level == "PASSED"),
+    Manual = countIf(compliance.result.status.level == "MANUAL"),
+    Failed = countIf(compliance.result.status.level == "FAILED"),
+    CriticalFailed = countIf(compliance.result.status.level == "FAILED" AND compliance.rule.severity.level == "CRITICAL"),
+    HighFailed    = countIf(compliance.result.status.level == "FAILED" AND compliance.rule.severity.level == "HIGH"),
+    MediumFailed  = countIf(compliance.result.status.level == "FAILED" AND compliance.rule.severity.level == "MEDIUM"),
+    LowFailed     = countIf(compliance.result.status.level == "FAILED" AND compliance.rule.severity.level == "LOW")
   }
 | fieldsAdd passRate = round(Passed * 100.0 / Rules, decimals: 0)
 ```
+
+Step 2 reuses the shared block, so the verdict logic matches every other pattern; its entity collectors add
+some cost, which is acceptable once scoped to a single cluster.
 
 If a standard filter is also needed (e.g. "DORA posture on eks-live"), add it as a second
 pre-aggregation filter right after the cluster filter:
@@ -696,8 +681,9 @@ not as failures. Surface the question (description) and the `Unknown` value:
            Severity = compliance.rule.severity.level,
            Question = finding.description,
            CurrentValue = finding.value
-| sort Severity == "CRITICAL" desc, Severity == "HIGH" desc
-| fieldsKeep timestamp, "dt.smartscape*", "dt.entity*", "dt.source*",
+| fieldsAdd severityPriority = if(Severity == "CRITICAL", 0, else: if(Severity == "HIGH", 1, else: 2))
+| sort severityPriority asc
+| fieldsKeep timestamp, "dt.smartscape*",
             System, Resource, ResourceType, Rule, RuleID, Severity, Question, CurrentValue
 ```
 
@@ -723,11 +709,12 @@ fetch security.events, from:now()-30d
      AND product.vendor == "Dynatrace"
      AND product.name == "Security Posture Management"
      AND compliance.result.status.level == "FAILED"
-| summarize firstFailedAt = takeMin(toTimestamp(finding.time.created)),
-            lastSeen = takeMax(toTimestamp(finding.time.created)),
-            scans = countDistinctExact(scan.id),
-            by: {compliance.rule.id, compliance.rule.title,
-                 object.id, object.name, k8s.cluster.name}
+| summarize {
+    firstFailedAt = takeMin(toTimestamp(finding.time.created)),
+    lastSeen = takeMax(toTimestamp(finding.time.created)),
+    scans = countDistinctExact(scan.id)
+  }, by: {compliance.rule.id, compliance.rule.title,
+          object.id, object.name, k8s.cluster.name}
 | fieldsAdd ageDays = round((toLong(now()) - toLong(firstFailedAt)) / 1000000000.0 / 86400, decimals: 1)
 | sort ageDays desc
 | limit 50
@@ -738,6 +725,11 @@ asks "this rule on this object." `finding.time.created` is a string timestamp, s
 wrap it with `toTimestamp(...)` before `takeMin`, `takeMax`, comparisons, or age
 math.
 
+Placeholders:
+
+- `<RULE_ID>` — SPM rule id (`compliance.rule.id`), e.g. `CIS-83103` or `DORA-67955`. Take it from the per-rule summary (Step 2) or the rule drilldown above.
+- `<OBJECT_ID>` — scanned-object id (`object.id`), a plain string (a GUID such as `21afbe74-12fc-4fdd-a5c5-d01607e378d9` or a classic-style id), not a typed Smartscape id, so no `toSmartscapeId(...)` wrapper. Take it from the `object.id` of the same rule's FAILED rows (Step 1).
+
 ```dql-template
 fetch security.events, from:now()-30d
 | filter event.type == "COMPLIANCE_FINDING"
@@ -745,10 +737,11 @@ fetch security.events, from:now()-30d
      AND product.name == "Security Posture Management"
      AND compliance.result.status.level == "FAILED"
 | filter compliance.rule.id == "<RULE_ID>" AND object.id == "<OBJECT_ID>"
-| summarize firstFailedAt = takeMin(toTimestamp(finding.time.created)),
-            lastSeen = takeMax(toTimestamp(finding.time.created)),
-            scans = countDistinctExact(scan.id),
-            by: {compliance.rule.id, compliance.rule.title, object.id, object.name}
+| summarize {
+    firstFailedAt = takeMin(toTimestamp(finding.time.created)),
+    lastSeen = takeMax(toTimestamp(finding.time.created)),
+    scans = countDistinctExact(scan.id)
+  }, by: {compliance.rule.id, compliance.rule.title, object.id, object.name}
 | fieldsAdd ageDays = round((toLong(now()) - toLong(firstFailedAt)) / 1000000000.0 / 86400, decimals: 1)
 ```
 
@@ -798,29 +791,94 @@ fetch security.events, from:now()-24h
 | filterOut event.provider=="Dynatrace" or product.vendor=="Dynatrace"
 | fieldsAdd statusNormalized = coalesce(compliance.result.status.level, compliance.status)
 | filterOut statusNormalized == "NOT_RELEVANT"
-| filter isNotNull(compliance.standards)
-| expand compliance.standard = compliance.standards
+| fieldsAdd standardList = coalesce(compliance.standards, array(compliance.standard.short_name)),
+            riskLevel = coalesce(dt.security.risk.level, compliance.rule.severity.level)
+| expand compliance.standard = standardList
+| filter isNotNull(compliance.standard)
 | summarize {
     Findings=count(),
     Failed=countIf(statusNormalized == "FAILED"),
-    Critical=countIf(dt.security.risk.level == "CRITICAL" AND statusNormalized == "FAILED"),
-    High=countIf(dt.security.risk.level == "HIGH" AND statusNormalized == "FAILED"),
-    SampleTitles=collectDistinct(finding.title, maxLength: 10),
+    Critical=countIf(riskLevel == "CRITICAL" AND statusNormalized == "FAILED"),
+    High=countIf(riskLevel == "HIGH" AND statusNormalized == "FAILED"),
+    SampleTitles=collectDistinct(coalesce(finding.title, compliance.rule.title), maxLength: 10),
     AffectedObjects=countDistinctExact(object.id)
   }, by:{event.provider, product.name, compliance.standard}
 | sort Critical desc, High desc, Failed desc, Findings desc
 ```
 
-> Providers that don't populate `compliance.standards` won't appear after `filter isNotNull(...)`.
-> For those, fall back to grouping by `finding.title` / `finding.type` (see Field caveat below).
+> **The standard lives in different fields per provider.** Defender-style CSPM fills the
+> `compliance.standards` array; Runecast fills only `compliance.standard.short_name` (plus
+> `compliance.rule.id` / `.title` / `.severity.level`) and leaves `compliance.standards`,
+> `dt.security.risk.level`, `compliance.control` and `compliance.policy` null. The `coalesce` above
+> covers both; filtering on `compliance.standards` alone silently drops Runecast. Providers with
+> neither field (e.g. AWS Security Hub "Coverage" findings) would be dropped by `isNotNull(compliance.standard)`;
+> use the fallback variant below.
 
-**Top failing controls by policy/control** — variant: swap the `by:` clause after `expand`:
+**Discovery — which standard field does each external provider populate?** Run this first when the by-standard
+result lacks a provider you expect, or when the provider set is unknown. One row per provider shows how many
+`COMPLIANCE_FINDING` rows carry `compliance.standards`, `compliance.standard.short_name`, or neither:
+
+```dql
+fetch security.events, from:now()-24h
+| filter event.type == "COMPLIANCE_FINDING"
+| filterOut event.provider == "Dynatrace" or product.vendor == "Dynatrace"
+| summarize {
+    Findings=count(),
+    withStandards=countIf(isNotNull(compliance.standards)),
+    withShortName=countIf(isNotNull(compliance.standard.short_name)),
+    withNeither=countIf(isNull(compliance.standards) and isNull(compliance.standard.short_name))
+  }, by:{event.provider, product.vendor, product.name}
+| sort Findings desc
+```
+
+> **Reading the result.** A provider with `withStandards` or `withShortName` > 0 is covered by the by-standard
+> query (its `coalesce` handles both). A provider whose rows are all `withNeither` is dropped by
+> `isNotNull(compliance.standard)`: report it with the fallback variant below (group by `finding.type` /
+> `finding.title`, no standard column) and state in the answer which providers were grouped that way.
+> `event.provider` can be null (Runecast), so identify providers by `product.name` as well.
+
+**Fallback variant — providers with neither `compliance.standards` nor `compliance.standard.short_name`.**
+Run it in addition to the by-standard query only when a provider is missing from that result. It groups by
+`finding.type` and lists `coalesce(finding.title, compliance.rule.title)` as the sample titles, with the same
+FAILED filter and `riskLevel` coalesce (no `compliance.standard` column exists for these rows):
+
+```dql
+fetch security.events, from:now()-24h
+| filter event.type == "COMPLIANCE_FINDING"
+| filterOut event.provider=="Dynatrace" or product.vendor=="Dynatrace"
+| filter isNull(compliance.standards) and isNull(compliance.standard.short_name)
+| fieldsAdd statusNormalized = coalesce(compliance.result.status.level, compliance.status),
+            riskLevel = coalesce(dt.security.risk.level, compliance.rule.severity.level),
+            findingTitle = coalesce(finding.title, compliance.rule.title)
+| filter statusNormalized == "FAILED"
+| summarize {
+    Failed=count(),
+    Critical=countIf(riskLevel == "CRITICAL"),
+    High=countIf(riskLevel == "HIGH"),
+    SampleTitles=collectDistinct(findingTitle, maxLength: 5),
+    AffectedObjects=countDistinctExact(object.id)
+  }, by:{event.provider, product.name, finding.type}
+| sort Critical desc, High desc, Failed desc
+```
+
+**Top failing controls** — variant: after `filter isNotNull(compliance.standard)` in the by-standard query, keep only
+FAILED rows and group by one coalesced control key. `compliance.control` (Defender-style), `compliance.rule.id`
+(Runecast) and `compliance.policy` are populated per provider, and Runecast has no `dt.security.risk.score`, so the
+sort falls back to `AffectedObjects` (`coalesce(maxScore, 0)` keeps null-score rows from sorting first). The final `limit 10`
+ranks scored providers ahead of Runecast, so for an all-provider answer rank per provider
+(`filter product.name == "<product>"`) instead of relying on one global limit:
 
 ```dql-snippet
-// …after `expand compliance.standard = compliance.standards`, replace the summarize `by:` with:
-  }, by:{event.provider, product.name, compliance.standard, dt.security.risk.level,
-         compliance.policy, compliance.control}
-| sort Critical desc, High desc, Findings desc
+// …after `filter isNotNull(compliance.standard)` in the by-standard query, replace summarize + sort with:
+| filter statusNormalized == "FAILED"
+| fieldsAdd control = coalesce(compliance.control, compliance.rule.id, compliance.policy)
+| summarize {
+    Findings=count(),
+    SampleTitles=collectDistinct(coalesce(finding.title, compliance.rule.title), maxLength: 5),
+    maxScore=takeMax(dt.security.risk.score),
+    AffectedObjects=countDistinctExact(object.id)
+  }, by:{event.provider, product.name, compliance.standard, riskLevel, control}
+| sort coalesce(maxScore, 0) desc, AffectedObjects desc
 | limit 10
 ```
 
@@ -830,32 +888,56 @@ fetch security.events, from:now()-24h
 // This-period findings
 fetch security.events, from:-7d, to:now()
 | filter event.type == "COMPLIANCE_FINDING"
-     AND product.vendor != "Dynatrace" AND event.provider != "Dynatrace"
+| filterOut event.provider == "Dynatrace" or product.vendor == "Dynatrace"
 | filter finding.time.created > now()-7d
-| filter isNotNull(compliance.standards)
-| expand compliance.standard = compliance.standards
-| dedup {object.id, finding.id}
-// Anti-join the prior period: keep only findings absent a week ago
-| join kind:outer, on:{object.id, finding.id}, [
+| fieldsAdd standardList = coalesce(compliance.standards, array(compliance.standard.short_name)),
+            findingKey = coalesce(compliance.rule.id, finding.id),
+            riskLevel = coalesce(dt.security.risk.level, compliance.rule.severity.level)
+| filter in(riskLevel, array("CRITICAL", "HIGH"))
+// Dedup per finding BEFORE expanding standards (newest row wins) so every mapped standard survives
+| dedup {object.id, findingKey}, sort:{timestamp desc}
+// Anti-join the prior period at finding level: keep only findings absent a week ago
+| join kind:outer, on:{object.id, findingKey}, [
     fetch security.events, from:-14d, to:-7d
     | filter event.type == "COMPLIANCE_FINDING"
-         AND product.vendor != "Dynatrace" AND event.provider != "Dynatrace"
+    | filterOut event.provider == "Dynatrace" or product.vendor == "Dynatrace"
     | filter finding.time.created > now()-14d and finding.time.created < now()-7d
-    | filter isNotNull(compliance.standards)
-    | expand compliance.standard = compliance.standards
-    | dedup {object.id, finding.id}
-    | fields object.id, finding.id
+    | fieldsAdd findingKey = coalesce(compliance.rule.id, finding.id)
+    | dedup {object.id, findingKey}
+    | fields object.id, findingKey
   ]
-| filter isNull(right.finding.id)
+| filter isNull(right.findingKey)
+| expand compliance.standard = standardList
+| filter isNotNull(compliance.standard)
+| fieldsAdd control = coalesce(compliance.control, compliance.rule.id, compliance.policy)
 | summarize {
     Findings=count(),
-    SampleTitles=collectDistinct(finding.title, maxLength: 5),
+    SampleTitles=collectDistinct(coalesce(finding.title, compliance.rule.title), maxLength: 5),
     maxScore=takeMax(dt.security.risk.score),
     AffectedObjects=countDistinctExact(object.id)
-  }, by:{event.provider, product.name, compliance.standard, dt.security.risk.level,
-         compliance.policy, compliance.control}
-| sort maxScore desc, Findings desc
+  }, by:{event.provider, product.name, compliance.standard, riskLevel, control}
+| sort coalesce(maxScore, 0) desc, AffectedObjects desc, compliance.standard asc, control asc
 ```
+
+> **Severity filter is applied to the current period only, before the dedup and join.** It is canonical for the
+> "critical and high" question; for every severity, delete the `| filter in(riskLevel, array("CRITICAL", "HIGH"))` line. The prior-period side
+> stays unfiltered on severity so a finding that merely escalated from MEDIUM to HIGH is not reported as new.
+> `riskLevel` coalesces `compliance.rule.severity.level` so Runecast rows (null `dt.security.risk.level`) are
+> kept. Runecast has no `dt.security.risk.score`, so `coalesce(maxScore, 0)` sorts every Runecast row after all
+> scored rows (on demo-live: 10 Defender rows ahead of 358 Runecast rows). Do **not** append a global `limit` to
+> this result; cap per provider instead (rerun with `filter product.name == "<product>"`; Runecast has a null `event.provider`), otherwise the null-score provider is cut off.
+
+> **Dedup and anti-join are per finding; standards expand last.** `dedup {object.id, findingKey}` after
+> `expand compliance.standard` kept one arbitrary standard row per finding, so a finding mapped to several
+> standards was counted under only one of them. Deduping first (newest row wins via `sort:{timestamp desc}`),
+> anti-joining on `{object.id, findingKey}`, then expanding gives each new finding one row per mapped standard
+> and makes per-standard counts deterministic. A finding is "new" or not as a whole; a standard added to an
+> existing finding does not make it new. (demo-live has only single-standard rows, so totals match the old shape
+> there: Runecast CIS 349, HIPAA 247, PCI DSS 241, GDPR 198, Cyber Essentials 106; Defender Azure CSPM 36.)
+
+> **Anti-join key is `compliance.rule.id`, falling back to `finding.id`.** Runecast mints a new
+> `finding.id` on every scan, so a `finding.id` join would call every finding "new"; Defender-style
+> CSPM has no `compliance.rule.id` but a stable `finding.id`. The coalesced `findingKey` handles both.
 
 ### Scoping external compliance to a provider
 
@@ -863,28 +945,18 @@ External compliance findings come from CSPM/VSPM and other ingested posture tool
 its own provider string and standard coverage. To scope to one, use the shared provider pattern
 in [all-security-events.md § Scoping to a Specific Provider](all-security-events.md#scoping-to-a-specific-provider-any-finding-type);
 discover the active providers first (`summarize by {event.provider, product.vendor, product.name}`).
-External standard names populate `compliance.standards` (not `compliance.standard.short_name`).
+External standard names populate `compliance.standards` (array) or, for Runecast, `compliance.standard.short_name`; coalesce both (see § External compliance by standard).
 
 ### Field caveat — KSPM `compliance.rule.*` vs. external taxonomy
 
-External compliance findings use a **different** compliance namespace than KSPM. They do **not**
-populate the KSPM rule/standard fields (`compliance.rule.id`, `compliance.rule.title`,
-`compliance.rule.severity.level`, `compliance.standard.short_name` / `.name`) — those will
-be null. Instead, external rows carry the
-**external taxonomy** documented above: `compliance.standards` (array), `compliance.control`,
-`compliance.policy`, `compliance.status`, `compliance.requirements`.
-
-- For external findings, group/filter/sort by `compliance.standards` (expand the array),
-  `compliance.policy`, `compliance.control` — and `finding.title` / `finding.type` for
-  display. Do **not** use `compliance.rule.*` or `compliance.standard.short_name` on them.
-- The DT KSPM query patterns (Steps 1 + 2 above) are **incompatible** with external
-  compliance findings — they require the KSPM `compliance.rule.*` namespace and the
-  inner-join to `COMPLIANCE_SCAN_COMPLETED` (which only DT KSPM emits).
-- Status: external rows usually populate the top-level `compliance.status`
-  (`FAILED` / `PASSED`) rather than `compliance.result.status.level` — coalesce both
-  (`coalesce(compliance.result.status.level, compliance.status)`) when filtering.
-- `compliance.requirements` is type-inconsistent (array on some providers, `""` on others) —
-  surface it if asked, but don't build filters or grouping on it.
+Most external rows (Defender-style CSPM) do **not** populate the KSPM rule/standard fields (`compliance.rule.id`,
+`compliance.rule.title`, `compliance.rule.severity.level`, `compliance.standard.short_name` / `.name`) — they are
+null; Runecast is the exception and fills them. Group, filter and sort by the external taxonomy documented above:
+`compliance.standards` (expand the array; coalesce with `compliance.standard.short_name`), `compliance.policy`,
+`compliance.control`, with `finding.title` / `finding.type` for display. For status, coalesce both fields:
+`coalesce(compliance.result.status.level, compliance.status)`. The KSPM patterns (Steps 1 + 2) are
+**incompatible** with external findings: they require `compliance.rule.*` and the inner join to
+`COMPLIANCE_SCAN_COMPLETED`, which only DT KSPM emits.
 
 For a cross-provider compliance view (DT KSPM + external aggregated by
 `dt.security.risk.level`), see [all-security-events.md](all-security-events.md).
@@ -893,64 +965,33 @@ For a cross-provider compliance view (DT KSPM + external aggregated by
 
 ## Best Practices
 
-1. **KSPM is K8s-only.** If the user's question implies AWS/Azure/GCP/host
-   compliance, route them to CSPM/external — DT-native KSPM has no rules for
-   those scopes.
-2. **Pin `product.name == "Security Posture Management"`** for KSPM scoping
-   when precision matters; `product.vendor == "Dynatrace"` alone is shared
-   with RVA and other DT products.
-3. **Always exclude `NOT_RELEVANT`** in the base filter and in pass-rate math.
-   It's the docs' "Recommended" view default for a reason.
-4. **MANUAL is not a defect** — surface it separately, never count it as
-   PASSED, never count it in numerator of "pass rate." It's an open question.
-5. **Per-rule status precedence is `FAILED > MANUAL > PASSED`** — Step 2's
-   `fieldsAdd` derives this. If you re-derive it elsewhere, follow the same
-   precedence (or the per-rule verdict will silently disagree with the SPM app).
-6. **Severity is `CRITICAL / HIGH / MEDIUM / LOW`** — exactly four. KSPM does
-   not emit `NONE` or `NOT_AVAILABLE`. CCSS-derived since 2026-03-10.
-7. **Never parse `compliance.rule.metadata_json`** — it is forbidden in this skill.
+Scope (KSPM is K8s-only, `product.name` pinning), status semantics (`NOT_RELEVANT`, `MANUAL`, precedence),
+the 1h window, and the no-mute rule are stated once at the top of this file and in § Routing. Rules unique
+to this section:
+
+1. **Severity is `CRITICAL / HIGH / MEDIUM / LOW`** — exactly four. KSPM does not emit `NONE` or
+   `NOT_AVAILABLE`. CCSS-derived since 2026-03-10.
+2. **Never parse `compliance.rule.metadata_json`** — it is forbidden in this skill.
    Use `compliance.rule.id` (already standard-prefixed and human-recognizable, e.g.
    `CIS-2762`, `STIG-82824`, `DORA-67952`, `NIST-82827`) and `compliance.rule.title` as the
    rule identifiers. The finer benchmark-section citation (CIS `1.2.3`) is intentionally
    not surfaced.
-8. **Object identity has two fields on KSPM rows** — `object.type` (normalized
+3. **Object identity has two fields on KSPM rows** — `object.type` (normalized
    Dynatrace entity type, uppercase: `KUBERNETES_CLUSTER`, `KUBERNETES_NODE`,
    …) and `compliance.result.object.type` (analyzer's lowercase code:
    `k8scluster`, `k8snode`, …). They're different fields, not synonyms. **On
    external compliance findings**, `object.type` instead carries the
    vendor-reported value as-is (e.g. `AwsEc2Instance`); don't normalize.
-9. **Don't expect mute / waiver fields.** Compliance findings have no
-   `mute.*` namespace — that's vulnerability-only. If a user asks "show me
-   accepted-risk findings," explain the data isn't there.
-10. **`COMPLIANCE_SCAN_COMPLETED` is per-cluster, per-scan-run** — not per-object.
-    The inner-join on `scan.id` deduplicates findings to the latest scan; the
-    join target itself doesn't carry per-rule info. Per-rule rollups go through
-    `COMPLIANCE_FINDING` + Step 2.
-11. **No SPM scan-completed events for a specific cluster means no SPM coverage.**
-  If a named cluster (for example, `gke-live`) has no `COMPLIANCE_SCAN_COMPLETED`
-  events and no matching `COMPLIANCE_FINDING` rows for Security Posture
-  Management in the operational window, answer that SPM/KSPM is not covering
-  that cluster. The likely cause is that SPM is not enabled, deployed, or
-  configured for the cluster — not simply that the cluster has no violations.
-12. **Widen past 1h only when answering history questions** (e.g. compliance-
-    finding age). The 1h default is a snapshot window — widening it in the
-    snapshot pattern won't add data, only cost.
-13. **One query for compliance posture.** For "what is my compliance posture?"
-    run a single query: Steps 1 + 2 + "Grouped by Standard with Pass Rate"
-    extension. Do not add a supplementary `scan.result.summary_json` query for
-    per-cluster scores. If the user explicitly asks for a per-cluster breakdown
-    in the same prompt, run the 3-step per-cluster variant from
-    § "Per-Cluster + Per-Namespace Breakdown" as a second query — not a third.
-14. **Per-cluster pass rate requires a per-rule-per-cluster Step 2.** Grouping
-    directly by `k8s.cluster.name` after Step 1 counts object-check results, not
-    rules — the pass rate will be inflated and inconsistent with the per-standard
-    summary. Always run the 3-step pipeline: Step 1 → per-rule-per-cluster
-    summarize → per-cluster rule counts. See § "Per-Cluster + Per-Namespace
-    Breakdown".
-14. **Answer posture questions overall first; per-cluster only on request.**
-    For "what is my DORA/CIS/NIST posture?" — the primary answer is one query:
-    Steps 1+2 + "Grouped by Standard with Pass Rate" (filtered to the named
-    standard). Do **not** jump to a per-cluster breakdown unless the user
-    explicitly asks for it ("by cluster", "per system", "which clusters fail").
-    If asked for both in one prompt, run two queries: standard summary first,
-    then the per-cluster 3-step variant.
+4. **`COMPLIANCE_SCAN_COMPLETED` is per-cluster, per-scan-run** — not per-object.
+   The inner-join on `scan.id` deduplicates findings to the latest scan; the
+   join target itself doesn't carry per-rule info. Per-rule rollups go through
+   `COMPLIANCE_FINDING` + Step 2.
+5. **No SPM scan-completed events for a specific cluster means no SPM coverage.**
+   If a named cluster (for example, `gke-live`) has no `COMPLIANCE_SCAN_COMPLETED`
+   events and no matching `COMPLIANCE_FINDING` rows for Security Posture
+   Management in the operational window, answer that SPM/KSPM is not covering
+   that cluster. The likely cause is that SPM is not enabled, deployed, or
+   configured for the cluster — not simply that the cluster has no violations.
+6. **Posture questions: one query, overall first.** Follow the Base Pattern callout (standard summary
+   first; per-cluster 3-step variant only on request, as a second query). Per-cluster pass rate must go
+   through the per-rule-per-cluster Step 2 — see § "Per-Cluster + Per-Namespace Breakdown".

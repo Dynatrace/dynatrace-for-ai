@@ -1,0 +1,1540 @@
+{
+  "format": 1,
+  "source": "cluster-code-mapping.md",
+  "statuses": [
+    "CROSS_SPAN",
+    "DERIVED",
+    "DIRECT",
+    "DIRECT_CONDITIONAL",
+    "ENTITY_ENRICHED",
+    "SEMANTIC_CHANGE",
+    "UNCLASSIFIED",
+    "UNSUPPORTED"
+  ],
+  "catalogs": {
+    "conditionAttributes": [
+      {
+        "source": "ACTOR_SYSTEM",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`messaging.akka.actor.system`",
+        "targetFields": [
+          "messaging.akka.actor.system"
+        ]
+      },
+      {
+        "source": "AKKA_ACTOR_CLASS_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`messaging.akka.actor.type`",
+        "targetFields": [
+          "messaging.akka.actor.type"
+        ]
+      },
+      {
+        "source": "AKKA_ACTOR_MESSAGE_TYPE",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`messaging.akka.message.type`",
+        "targetFields": [
+          "messaging.akka.message.type"
+        ]
+      },
+      {
+        "source": "AKKA_ACTOR_PATH",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`messaging.akka.actor.path`",
+        "targetFields": [
+          "messaging.akka.actor.path"
+        ]
+      },
+      {
+        "source": "APPLICATION_BUILD_VERSION",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`deployment.release_build_version`",
+        "targetFields": [
+          "deployment.release_build_version"
+        ]
+      },
+      {
+        "source": "APPLICATION_ENVIRONMENT",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`deployment.release_stage`",
+        "targetFields": [
+          "deployment.release_stage"
+        ]
+      },
+      {
+        "source": "APPLICATION_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`deployment.release_product`",
+        "targetFields": [
+          "deployment.release_product"
+        ]
+      },
+      {
+        "source": "APPLICATION_RELEASE_VERSION",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`deployment.release_version`",
+        "targetFields": [
+          "deployment.release_version"
+        ]
+      },
+      {
+        "source": "AZURE_FUNCTIONS_FUNCTION_NAME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the Azure Functions function name, so this cannot be migrated."
+      },
+      {
+        "source": "AZURE_FUNCTIONS_SITE_NAME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the Azure Functions site name, so this cannot be migrated."
+      },
+      {
+        "source": "CICS_PROGRAM_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`ibm.cics.program`",
+        "targetFields": [
+          "ibm.cics.program"
+        ]
+      },
+      {
+        "source": "CICS_SYSTEM_ID",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`cics.transaction.system_id`",
+        "targetFields": [
+          "cics.transaction.system_id"
+        ]
+      },
+      {
+        "source": "CICS_TASK_ID",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`cics.transaction.task_id`",
+        "targetFields": [
+          "cics.transaction.task_id"
+        ]
+      },
+      {
+        "source": "CICS_TRANSACTION_ID",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`zos.transaction.id`",
+        "targetFields": [
+          "zos.transaction.id"
+        ]
+      },
+      {
+        "source": "CICS_USER_ID",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`cics.transaction.user_id`",
+        "targetFields": [
+          "cics.transaction.user_id"
+        ]
+      },
+      {
+        "source": "CPU_TIME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`span.timing.cpu`",
+        "targetFields": [
+          "span.timing.cpu"
+        ]
+      },
+      {
+        "source": "CTG_GATEWAY_URL",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`ctg.request.gateway_url`",
+        "targetFields": [
+          "ctg.request.gateway_url"
+        ]
+      },
+      {
+        "source": "CTG_PROGRAM",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`ibm.cics.program`",
+        "targetFields": [
+          "ibm.cics.program"
+        ]
+      },
+      {
+        "source": "CTG_SERVER_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`ctg.request.server_id`",
+        "targetFields": [
+          "ctg.request.server_id"
+        ]
+      },
+      {
+        "source": "CTG_TRANSACTION_ID",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`zos.transaction.id`",
+        "targetFields": [
+          "zos.transaction.id"
+        ]
+      },
+      {
+        "source": "CUSTOMSERVICE_CLASS",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`custom_service.name`",
+        "targetFields": [
+          "custom_service.name"
+        ]
+      },
+      {
+        "source": "CUSTOMSERVICE_METHOD",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`custom_service.method`",
+        "targetFields": [
+          "custom_service.method"
+        ]
+      },
+      {
+        "source": "DATABASE_CHILD_CALL_COUNT",
+        "status": "CROSS_SPAN",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Classic added this up over the calls a request made further down the chain. A processor looks at one span at a time and cannot total up child calls."
+      },
+      {
+        "source": "DATABASE_CHILD_CALL_TIME",
+        "status": "CROSS_SPAN",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Classic added this up over the calls a request made further down the chain. A processor looks at one span at a time and cannot total up child calls."
+      },
+      {
+        "source": "DATABASE_HOST",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`server.address`",
+        "targetFields": [
+          "server.address"
+        ]
+      },
+      {
+        "source": "DATABASE_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`db.namespace`",
+        "targetFields": [
+          "db.namespace"
+        ]
+      },
+      {
+        "source": "DATABASE_STATEMENT",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`db.query.text`",
+        "targetFields": [
+          "db.query.text"
+        ]
+      },
+      {
+        "source": "DATABASE_TYPE",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`db.system`",
+        "targetFields": [
+          "db.system"
+        ]
+      },
+      {
+        "source": "DATABASE_URL",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`db.connection_string`",
+        "targetFields": [
+          "db.connection_string"
+        ]
+      },
+      {
+        "source": "DISK_IO_TIME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the time a request spent on disk I/O, so this cannot be migrated."
+      },
+      {
+        "source": "ERROR_COUNT",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "The condition counts the exceptions a request produced. Spans carry no such count, so this condition cannot be carried over."
+      },
+      {
+        "source": "ESB_APPLICATION_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`esb.application.name`",
+        "targetFields": [
+          "esb.application.name"
+        ]
+      },
+      {
+        "source": "ESB_INPUT_TYPE",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the integration-bus input type, so this cannot be migrated."
+      },
+      {
+        "source": "ESB_LIBRARY_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`esb.library.name`",
+        "targetFields": [
+          "esb.library.name"
+        ]
+      },
+      {
+        "source": "ESB_MESSAGE_FLOW_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`esb.workflow.name`",
+        "targetFields": [
+          "esb.workflow.name"
+        ]
+      },
+      {
+        "source": "EXCEPTION_CLASS",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "The condition looks at the exception class of a request. On spans the exception is recorded as a separate event, which a metric processor cannot read, so this condition cannot be carried over."
+      },
+      {
+        "source": "EXCEPTION_MESSAGE",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "The condition looks at the exception message of a request. On spans the exception is recorded as a separate event, which a metric processor cannot read, so this condition cannot be carried over."
+      },
+      {
+        "source": "FAILED_STATE",
+        "status": "SEMANTIC_CHANGE",
+        "target": "`dt.failure_detection.verdict`",
+        "targetFields": [
+          "dt.failure_detection.verdict"
+        ],
+        "report_comment": "Classic treats a request as failed when either the caller or the service saw a failure. The span records only what the service saw, so a metric built on it would cover a different set of requests. Deciding which of the two you want is not something this migration can do for you."
+      },
+      {
+        "source": "FAILURE_REASON",
+        "status": "UNSUPPORTED",
+        "target": "Not migrated",
+        "targetFields": [],
+        "report_comment": "Classic gives one reason for a failure, such as an HTTP code or an exception. A span records a list of detection results instead, and there is no one-to-one match between the two."
+      },
+      {
+        "source": "FLAW_STATE",
+        "status": "UNSUPPORTED",
+        "target": "Not migrated — candidate found but deferred",
+        "targetFields": [],
+        "report_comment": "Classic checks whether the request had internal data-quality problems. Spans record several unrelated kinds of such problems under one field, so the same check cannot be repeated reliably."
+      },
+      {
+        "source": "HTTP_REQUEST_METHOD",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`http.request.method`",
+        "targetFields": [
+          "http.request.method"
+        ]
+      },
+      {
+        "source": "HTTP_STATUS",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`http.response.status_code`",
+        "targetFields": [
+          "http.response.status_code"
+        ]
+      },
+      {
+        "source": "HTTP_STATUS_CLASS",
+        "status": "DERIVED",
+        "target": "Derived range over `http.response.status_code`",
+        "targetFields": [
+          "http.response.status_code"
+        ]
+      },
+      {
+        "source": "IMS_PROGRAM_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`ims.execution.transaction.psb_name`",
+        "targetFields": [
+          "ims.execution.transaction.psb_name"
+        ]
+      },
+      {
+        "source": "IMS_TRANSACTION_ID",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`zos.transaction.id`",
+        "targetFields": [
+          "zos.transaction.id"
+        ]
+      },
+      {
+        "source": "IMS_USER_ID",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`ims.message.transaction.user_id`",
+        "targetFields": [
+          "ims.message.transaction.user_id"
+        ]
+      },
+      {
+        "source": "IO_TIME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the time a request spent on I/O, so this cannot be migrated."
+      },
+      {
+        "source": "IS_KEY_REQUEST",
+        "status": "DIRECT",
+        "target": "No field needed — Phase 3 has no non-key requests",
+        "targetFields": []
+      },
+      {
+        "source": "LAMBDA_COLDSTART",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry AWS Lambda cold-start information, so this cannot be migrated."
+      },
+      {
+        "source": "LOCK_TIME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the time a request spent waiting for locks, so this cannot be migrated."
+      },
+      {
+        "source": "MESSAGING_DESTINATION_TYPE",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`messaging.destination.kind`",
+        "targetFields": [
+          "messaging.destination.kind"
+        ]
+      },
+      {
+        "source": "MESSAGING_IS_TEMPORARY_QUEUE",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`messaging.destination.temporary`",
+        "targetFields": [
+          "messaging.destination.temporary"
+        ]
+      },
+      {
+        "source": "MESSAGING_QUEUE_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`messaging.destination.name`",
+        "targetFields": [
+          "messaging.destination.name"
+        ]
+      },
+      {
+        "source": "MESSAGING_QUEUE_VENDOR",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`messaging.system`",
+        "targetFields": [
+          "messaging.system"
+        ]
+      },
+      {
+        "source": "NETWORK_IO_TIME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the time a request spent on network I/O, so this cannot be migrated."
+      },
+      {
+        "source": "NON_DATABASE_CHILD_CALL_COUNT",
+        "status": "CROSS_SPAN",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Classic added this up over the calls a request made further down the chain. A processor looks at one span at a time and cannot total up child calls."
+      },
+      {
+        "source": "NON_DATABASE_CHILD_CALL_TIME",
+        "status": "CROSS_SPAN",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Classic added this up over the calls a request made further down the chain. A processor looks at one span at a time and cannot total up child calls."
+      },
+      {
+        "source": "ONE_AGENT_ATTRIBUTE",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "This reads a technology-specific OneAgent value that has no general span field."
+      },
+      {
+        "source": "PROCESS_GROUP_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`dt.process_group.detected_name`",
+        "targetFields": [
+          "dt.process_group.detected_name"
+        ],
+        "report_comment": "The classic metric selects process groups by the name shown in the UI. The migrated metric compares the name the agent detected, which is the same string unless a naming rule renamed the group. For a renamed group the condition does not match."
+      },
+      {
+        "source": "PROCESS_GROUP_TAG",
+        "status": "SEMANTIC_CHANGE",
+        "target": "`primary_tags.<key>` only after equivalent primary-tag enrichment",
+        "targetFields": [
+          "primary_tags.<key>"
+        ],
+        "report_comment": "Process-group tags are no longer evaluated, so a condition on them cannot be checked."
+      },
+      {
+        "source": "REMOTE_ENDPOINT",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the classic remote endpoint value, so this cannot be migrated."
+      },
+      {
+        "source": "REMOTE_METHOD",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`rpc.method`",
+        "targetFields": [
+          "rpc.method"
+        ]
+      },
+      {
+        "source": "REMOTE_SERVICE_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`rpc.service`",
+        "targetFields": [
+          "rpc.service"
+        ]
+      },
+      {
+        "source": "REQUEST_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`endpoint.name`",
+        "targetFields": [
+          "endpoint.name"
+        ]
+      },
+      {
+        "source": "REQUEST_TYPE",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Classic sorts requests into groups such as \"Default requests\". Spans have no such grouping — span kind and HTTP method are different things — so this condition cannot be checked."
+      },
+      {
+        "source": "RESPONSE_TIME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "Entry-span `duration`",
+        "targetFields": []
+      },
+      {
+        "source": "RESPONSE_TIME_CLIENT",
+        "status": "SEMANTIC_CHANGE",
+        "target": "Client-span `duration` only after identifying equivalent client-side service-call span",
+        "targetFields": [],
+        "report_comment": "Classic measures this the way the caller saw it. The migration extracts from the span the service itself produced, which records the server side, so the two do not measure the same thing."
+      },
+      {
+        "source": "RMI_CLASS",
+        "status": "SEMANTIC_CHANGE",
+        "target": "`code.namespace` on current forwarded CSM dimensions; `rpc.service` in existing migration mapping",
+        "targetFields": [
+          "code.namespace",
+          "rpc.service"
+        ],
+        "report_comment": "The two existing mappings for RMI calls disagree about which span field holds this. It is left out rather than guessed."
+      },
+      {
+        "source": "RMI_METHOD",
+        "status": "SEMANTIC_CHANGE",
+        "target": "`code.function` on current forwarded CSM dimensions; `rpc.method` in existing migration mapping",
+        "targetFields": [
+          "code.function",
+          "rpc.method"
+        ],
+        "report_comment": "The two existing mappings for RMI calls disagree about which span field holds this. It is left out rather than guessed."
+      },
+      {
+        "source": "SERVICE_DISPLAY_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`dt.service.name`",
+        "targetFields": [
+          "dt.service.name"
+        ],
+        "report_comment": "The classic metric selects services by the name shown in the UI. The migrated metric compares the name the agent detected, which is the same string unless a naming rule renamed the service. For a renamed service the condition does not match."
+      },
+      {
+        "source": "SERVICE_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`dt.service.name`",
+        "targetFields": [
+          "dt.service.name"
+        ]
+      },
+      {
+        "source": "SERVICE_PORT",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "The port on the span is not the same value as the port on the classic service, so this condition cannot be carried over."
+      },
+      {
+        "source": "SERVICE_PUBLIC_DOMAIN_NAME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the public domain name of a service, so this cannot be migrated."
+      },
+      {
+        "source": "SERVICE_REQUEST_ATTRIBUTE",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`request_attribute.<configured-display-name>`",
+        "targetFields": []
+      },
+      {
+        "source": "SERVICE_SOFTWARE_TECH",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Classic compares one main technology per service. The replacement holds a list of technologies, so a single-value comparison does not carry over."
+      },
+      {
+        "source": "SERVICE_TAG",
+        "status": "SEMANTIC_CHANGE",
+        "target": "`primary_tags.<key>` only if an equivalent primary tag exists",
+        "targetFields": [
+          "primary_tags.<key>"
+        ],
+        "report_comment": "Service tags are not available on spans, so a condition on them cannot be checked."
+      },
+      {
+        "source": "SERVICE_TYPE",
+        "status": "ENTITY_ENRICHED",
+        "target": "`dt.service.sdv1_type` on the Smartscape `SERVICE` node, resolved to a service list at config-generation time",
+        "targetFields": [
+          "dt.service.sdv1_type"
+        ]
+      },
+      {
+        "source": "SERVICE_WEB_APPLICATION_ID",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`servlet.context.name`",
+        "targetFields": [
+          "servlet.context.name"
+        ]
+      },
+      {
+        "source": "SERVICE_WEB_CONTEXT_ROOT",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`servlet.context.path`",
+        "targetFields": [
+          "servlet.context.path"
+        ]
+      },
+      {
+        "source": "SERVICE_WEB_SERVER_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`http.server_name`",
+        "targetFields": [
+          "http.server_name"
+        ]
+      },
+      {
+        "source": "SERVICE_WEB_SERVICE_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`rpc.service`",
+        "targetFields": [
+          "rpc.service"
+        ]
+      },
+      {
+        "source": "SERVICE_WEB_SERVICE_NAMESPACE",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`rpc.namespace`",
+        "targetFields": [
+          "rpc.namespace"
+        ]
+      },
+      {
+        "source": "SUSPENSION_TIME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry garbage-collection suspension time, so this cannot be migrated."
+      },
+      {
+        "source": "TOTAL_PROCESSING_TIME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Classic added this up over the calls a request made further down the chain. A processor looks at one span at a time and cannot total up child calls."
+      },
+      {
+        "source": "WAIT_TIME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the time a request spent waiting, so this cannot be migrated."
+      },
+      {
+        "source": "WEBREQUEST_QUERY",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`url.query`",
+        "targetFields": [
+          "url.query"
+        ]
+      },
+      {
+        "source": "WEBREQUEST_RELATIVE_URL",
+        "status": "DERIVED",
+        "target": "Derived from `url.path` plus optional `?` and `url.query`",
+        "targetFields": [
+          "url.path",
+          "url.query"
+        ]
+      },
+      {
+        "source": "WEBREQUEST_URL",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`url.full`",
+        "targetFields": [
+          "url.full"
+        ]
+      },
+      {
+        "source": "WEBREQUEST_URL_HOST",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`server.address`",
+        "targetFields": [
+          "server.address"
+        ]
+      },
+      {
+        "source": "WEBREQUEST_URL_PATH",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`url.path`",
+        "targetFields": [
+          "url.path"
+        ]
+      },
+      {
+        "source": "WEBREQUEST_URL_PATH_CLEAN",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Classic computed a cleaned-up version of the URL path. Only the raw path is on the span."
+      },
+      {
+        "source": "WEBREQUEST_URL_PORT",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`server.port`",
+        "targetFields": [
+          "server.port"
+        ]
+      },
+      {
+        "source": "WEBSERVICE_ENDPOINT",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the classic web-service endpoint, so this cannot be migrated."
+      },
+      {
+        "source": "WEBSERVICE_METHOD",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`rpc.method`",
+        "targetFields": [
+          "rpc.method"
+        ]
+      },
+      {
+        "source": "ZOS_CALL_TYPE",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`zos.transaction.call_type`",
+        "targetFields": [
+          "zos.transaction.call_type"
+        ]
+      },
+      {
+        "source": "IIB_APPLICATION_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`esb.application.name`, with `esb.vendor` = `ibm`",
+        "targetFields": [
+          "esb.application.name",
+          "esb.vendor"
+        ],
+        "hiddenLegacyAlias": true
+      },
+      {
+        "source": "IIB_INPUT_TYPE",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "hiddenLegacyAlias": true,
+        "report_comment": "Spans do not carry the integration-bus input type, so this cannot be migrated."
+      },
+      {
+        "source": "IIB_LIBRARY_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`esb.library.name`",
+        "targetFields": [
+          "esb.library.name"
+        ],
+        "hiddenLegacyAlias": true
+      },
+      {
+        "source": "IIB_MESSAGE_FLOW_NAME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`esb.workflow.name`",
+        "targetFields": [
+          "esb.workflow.name"
+        ],
+        "hiddenLegacyAlias": true
+      }
+    ],
+    "measurements": [
+      {
+        "source": "CPU_TIME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`samplingAwareValueMetric` or `samplingAwareHistogramMetric`, field `span.timing.cpu`",
+        "targetFields": [
+          "span.timing.cpu"
+        ]
+      },
+      {
+        "source": "DATABASE_CHILD_CALL_COUNT",
+        "status": "CROSS_SPAN",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Classic added this up over the calls a request made further down the chain. A processor looks at one span at a time and cannot total up child calls."
+      },
+      {
+        "source": "DATABASE_CHILD_CALL_TIME",
+        "status": "CROSS_SPAN",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Classic added this up over the calls a request made further down the chain. A processor looks at one span at a time and cannot total up child calls."
+      },
+      {
+        "source": "DISK_IO_TIME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the time a request spent on disk I/O, so this cannot be migrated."
+      },
+      {
+        "source": "EXCEPTION_COUNT",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "The metric counts how many exceptions a request produced. Spans carry no such count, so this metric cannot be migrated."
+      },
+      {
+        "source": "FAILED_REQUEST_COUNT",
+        "status": "SEMANTIC_CHANGE",
+        "target": "`samplingAwareCounterMetric` counting spans whose `dt.failure_detection.verdict` is `failure`",
+        "targetFields": [
+          "dt.failure_detection.verdict"
+        ],
+        "report_comment": "Classic treats a request as failed when either the caller or the service saw a failure. The span records only what the service saw, so a metric built on it would cover a different set of requests. Deciding which of the two you want is not something this migration can do for you."
+      },
+      {
+        "source": "FAILED_REQUEST_COUNT_CLIENT",
+        "status": "SEMANTIC_CHANGE",
+        "target": "No generic replacement found",
+        "targetFields": [],
+        "report_comment": "Classic measures this the way the caller saw it. The migration extracts from the span the service itself produced, which records the server side, so the two do not measure the same thing."
+      },
+      {
+        "source": "FAILURE_RATE",
+        "status": "SEMANTIC_CHANGE",
+        "target": "`samplingAwareCounterMetric` with derived boolean `failed` dimension from `dt.failure_detection.verdict`",
+        "targetFields": [
+          "dt.failure_detection.verdict"
+        ],
+        "report_comment": "Classic treats a request as failed when either the caller or the service saw a failure. The span records only what the service saw, so a metric built on it would cover a different set of requests. Deciding which of the two you want is not something this migration can do for you."
+      },
+      {
+        "source": "FAILURE_RATE_CLIENT",
+        "status": "SEMANTIC_CHANGE",
+        "target": "No generic replacement found",
+        "targetFields": [],
+        "report_comment": "Classic measures this the way the caller saw it. The migration extracts from the span the service itself produced, which records the server side, so the two do not measure the same thing."
+      },
+      {
+        "source": "HTTP_4XX_ERROR_COUNT",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`samplingAwareCounterMetric` counting spans whose `http.response.status_code` is 400-499",
+        "targetFields": [
+          "http.response.status_code"
+        ]
+      },
+      {
+        "source": "HTTP_4XX_ERROR_COUNT_CLIENT",
+        "status": "SEMANTIC_CHANGE",
+        "target": "Client-span counter, status matcher 400-499",
+        "targetFields": [],
+        "report_comment": "Classic measures this the way the caller saw it. The migration extracts from the span the service itself produced, which records the server side, so the two do not measure the same thing."
+      },
+      {
+        "source": "HTTP_5XX_ERROR_COUNT",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`samplingAwareCounterMetric` counting spans whose `http.response.status_code` is 500-599",
+        "targetFields": [
+          "http.response.status_code"
+        ]
+      },
+      {
+        "source": "HTTP_5XX_ERROR_COUNT_CLIENT",
+        "status": "SEMANTIC_CHANGE",
+        "target": "Client-span counter, status matcher 500-599",
+        "targetFields": [],
+        "report_comment": "Classic measures this the way the caller saw it. The migration extracts from the span the service itself produced, which records the server side, so the two do not measure the same thing."
+      },
+      {
+        "source": "IO_TIME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the time a request spent on I/O, so this cannot be migrated."
+      },
+      {
+        "source": "LOCK_TIME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the time a request spent waiting for locks, so this cannot be migrated."
+      },
+      {
+        "source": "NETWORK_IO_TIME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the time a request spent on network I/O, so this cannot be migrated."
+      },
+      {
+        "source": "NON_DATABASE_CHILD_CALL_COUNT",
+        "status": "CROSS_SPAN",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Classic added this up over the calls a request made further down the chain. A processor looks at one span at a time and cannot total up child calls."
+      },
+      {
+        "source": "NON_DATABASE_CHILD_CALL_TIME",
+        "status": "CROSS_SPAN",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Classic added this up over the calls a request made further down the chain. A processor looks at one span at a time and cannot total up child calls."
+      },
+      {
+        "source": "PROCESSING_TIME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Classic added this up over the calls a request made further down the chain. A processor looks at one span at a time and cannot total up child calls."
+      },
+      {
+        "source": "REQUEST_ATTRIBUTE",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`samplingAwareValueMetric` or `samplingAwareHistogramMetric`, field `request_attribute.<name>`",
+        "targetFields": [
+          "request_attribute.<name>"
+        ]
+      },
+      {
+        "source": "REQUEST_COUNT",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`samplingAwareCounterMetric`",
+        "targetFields": []
+      },
+      {
+        "source": "RESPONSE_TIME",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "`samplingAwareHistogramMetric`, `measurement: duration`",
+        "targetFields": []
+      },
+      {
+        "source": "RESPONSE_TIME_CLIENT",
+        "status": "SEMANTIC_CHANGE",
+        "target": "Client-span histogram, `measurement: duration`",
+        "targetFields": [],
+        "report_comment": "Classic measures this the way the caller saw it. The migration extracts from the span the service itself produced, which records the server side, so the two do not measure the same thing."
+      },
+      {
+        "source": "SUCCESSFUL_REQUEST_COUNT",
+        "status": "SEMANTIC_CHANGE",
+        "target": "`samplingAwareCounterMetric` counting spans whose `dt.failure_detection.verdict` is `success`",
+        "targetFields": [
+          "dt.failure_detection.verdict"
+        ],
+        "report_comment": "Classic treats a request as failed when either the caller or the service saw a failure. The span records only what the service saw, so a metric built on it would count some of those requests as successful."
+      },
+      {
+        "source": "SUCCESSFUL_REQUEST_COUNT_CLIENT",
+        "status": "SEMANTIC_CHANGE",
+        "target": "No generic replacement found",
+        "targetFields": [],
+        "report_comment": "Classic measures this the way the caller saw it. The migration extracts from the span the service itself produced, which records the server side, so the two do not measure the same thing."
+      },
+      {
+        "source": "WAIT_TIME",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the time a request spent waiting, so this cannot be migrated."
+      }
+    ],
+    "comparisons": [
+      {
+        "source": "EQUALS",
+        "status": "DIRECT",
+        "target": "`<field> == <value>` when `caseSensitive: true`; `matchesValue(<field>, <value>, caseSensitive: false)` when `false`",
+        "targetFields": []
+      },
+      {
+        "source": "EQUALS_ANY_OF",
+        "status": "DIRECT",
+        "target": "`matchesValue(<field>, {<values>}, caseSensitive: <flag>)`",
+        "targetFields": []
+      },
+      {
+        "source": "EXISTS",
+        "status": "DIRECT",
+        "target": "`isNotNull(<field>)`",
+        "targetFields": []
+      },
+      {
+        "source": "BEGINS_WITH",
+        "status": "DIRECT",
+        "target": "`startsWith(<field>, <value>, <caseSensitive>)`",
+        "targetFields": []
+      },
+      {
+        "source": "BEGINS_WITH_ANY_OF",
+        "status": "DIRECT",
+        "target": "OR of `startsWith` predicates",
+        "targetFields": []
+      },
+      {
+        "source": "ENDS_WITH",
+        "status": "DIRECT",
+        "target": "`endsWith(<field>, <value>, <caseSensitive>)`",
+        "targetFields": []
+      },
+      {
+        "source": "ENDS_WITH_ANY_OF",
+        "status": "DIRECT",
+        "target": "OR of `endsWith` predicates",
+        "targetFields": []
+      },
+      {
+        "source": "CONTAINS",
+        "status": "DIRECT",
+        "target": "`contains(<field>, <value>, <caseSensitive>)`",
+        "targetFields": []
+      },
+      {
+        "source": "REGEX_MATCHES",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "The condition matches a regular expression anywhere in the value. A processor cannot run regular expressions, and there is no close enough substitute."
+      },
+      {
+        "source": "GREATER_THAN",
+        "status": "DIRECT",
+        "target": "`<field> > <value>`",
+        "targetFields": []
+      },
+      {
+        "source": "GREATER_THAN_OR_EQUAL",
+        "status": "DIRECT",
+        "target": "`<field> >= <value>`",
+        "targetFields": []
+      },
+      {
+        "source": "LOWER_THAN",
+        "status": "DIRECT",
+        "target": "`<field> < <value>`",
+        "targetFields": []
+      },
+      {
+        "source": "LOWER_THAN_OR_EQUAL",
+        "status": "DIRECT",
+        "target": "`<field> <= <value>`",
+        "targetFields": []
+      },
+      {
+        "source": "TAG_KEY_EQUALS",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "This matches on a tag key. Tags are not available on spans, so it cannot be checked."
+      },
+      {
+        "source": "TAG_KEY_EQUALS_ANY_OF",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "This matches on a list of tag keys. Tags are not available on spans, so it cannot be checked."
+      }
+    ],
+    "comparisonTypes": [
+      {
+        "source": "STRING",
+        "status": "DIRECT",
+        "target": "String literal(s), with `caseSensitive` stated explicitly",
+        "targetFields": []
+      },
+      {
+        "source": "FAST_STRING",
+        "status": "DIRECT",
+        "target": "String literal(s), with `caseSensitive` stated explicitly",
+        "targetFields": []
+      },
+      {
+        "source": "NUMBER",
+        "status": "DIRECT",
+        "target": "Numeric literal(s)",
+        "targetFields": []
+      },
+      {
+        "source": "BOOLEAN",
+        "status": "DIRECT",
+        "target": "Boolean literal(s)",
+        "targetFields": []
+      },
+      {
+        "source": "HTTP_METHOD",
+        "status": "DIRECT",
+        "target": "String enum on `http.request.method`",
+        "targetFields": [
+          "http.request.method"
+        ]
+      },
+      {
+        "source": "HTTP_STATUS_CLASS",
+        "status": "DERIVED",
+        "target": "Range over `http.response.status_code`; `NO_RESPONSE` as missing field",
+        "targetFields": [
+          "http.response.status_code"
+        ]
+      },
+      {
+        "source": "STRING_REQUEST_ATTRIBUTE",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "Dynamic `request_attribute.<name>` string or string array",
+        "targetFields": [
+          "request_attribute.<name>"
+        ]
+      },
+      {
+        "source": "NUMBER_REQUEST_ATTRIBUTE",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "Dynamic numeric field or numeric array",
+        "targetFields": []
+      },
+      {
+        "source": "TAG",
+        "status": "UNSUPPORTED",
+        "target": "No direct generic mapping; primary-tag redesign required",
+        "targetFields": [],
+        "report_comment": "Tags are not available on spans, so a tag comparison cannot be checked."
+      },
+      {
+        "source": "SERVICE_TYPE",
+        "status": "ENTITY_ENRICHED",
+        "target": "`dt.service.sdv1_type` on the Smartscape `SERVICE` node — resolved at config-generation time, not matched on the span",
+        "targetFields": [
+          "dt.service.sdv1_type"
+        ]
+      },
+      {
+        "source": "FAILED_STATE",
+        "status": "SEMANTIC_CHANGE",
+        "target": "`dt.failure_detection.verdict` — `FAILED` → `\"failure\"`, `SUCCESSFUL` → `\"success\"`",
+        "targetFields": [
+          "dt.failure_detection.verdict"
+        ],
+        "report_comment": "Classic treats a request as failed when either the caller or the service saw a failure. The span records only what the service saw, so a metric built on it would cover a different set of requests. Deciding which of the two you want is not something this migration can do for you."
+      },
+      {
+        "source": "FAILURE_REASON",
+        "status": "UNSUPPORTED",
+        "target": "Not migrated",
+        "targetFields": [],
+        "report_comment": "Classic gives one reason for a failure, such as an HTTP code or an exception. A span records a list of detection results instead, and there is no one-to-one match between the two."
+      },
+      {
+        "source": "FLAW_STATE",
+        "status": "UNSUPPORTED",
+        "target": "Not migrated — candidate found but deferred",
+        "targetFields": [],
+        "report_comment": "Classic checks whether the request had internal data-quality problems. Spans record several unrelated kinds of such problems under one field, so the same check cannot be repeated reliably."
+      },
+      {
+        "source": "ESB_INPUT_NODE_TYPE",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the integration-bus input node type, so this cannot be migrated."
+      },
+      {
+        "source": "IIB_INPUT_NODE_TYPE",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "Spans do not carry the integration-bus input node type, so this cannot be migrated."
+      },
+      {
+        "source": "ZOS_CALL_TYPE",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "String enum on `zos.transaction.call_type`",
+        "targetFields": [
+          "zos.transaction.call_type"
+        ]
+      },
+      {
+        "source": "STRING_ONE_AGENT_ATTRIBUTE",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "This compares a technology-specific OneAgent value that has no general span field."
+      }
+    ],
+    "dimensions": [
+      {
+        "source": "dimensionDefinition.name",
+        "status": "DIRECT",
+        "target": "`destinationFieldName` for the extracted metric dimension",
+        "targetFields": []
+      },
+      {
+        "source": "Literal dimensionDefinition.dimension, including All requests",
+        "status": "DIRECT",
+        "target": "Constant metric dimension",
+        "targetFields": []
+      },
+      {
+        "source": "Built-in placeholder such as {Request:Name}",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "Field metric dimension from the attribute table above",
+        "targetFields": []
+      },
+      {
+        "source": "Custom {placeholder}",
+        "status": "DERIVED",
+        "target": "Preceding DQL processor to materialize a field, then field metric dimension",
+        "targetFields": []
+      },
+      {
+        "source": "topX",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found in metric extraction settings",
+        "targetFields": [],
+        "report_comment": "Classic kept only the top values of this split. The migrated metric keeps every value, so sorting and limiting move into the query that reads it."
+      },
+      {
+        "source": "topXDirection: ASCENDING",
+        "status": "UNSUPPORTED",
+        "target": "No ingestion-time replacement",
+        "targetFields": [],
+        "report_comment": "Classic sorted the split values to pick the top ones. The migrated metric keeps every value; sort in the query instead."
+      },
+      {
+        "source": "topXDirection: DESCENDING",
+        "status": "UNSUPPORTED",
+        "target": "No ingestion-time replacement",
+        "targetFields": [],
+        "report_comment": "Classic sorted the split values to pick the top ones. The migrated metric keeps every value; sort in the query instead."
+      },
+      {
+        "source": "topXAggregation: AVERAGE",
+        "status": "UNSUPPORTED",
+        "target": "No ingestion-time replacement",
+        "targetFields": [],
+        "report_comment": "Classic used this to rank the split values before keeping the top ones. The migrated metric keeps every value, so the ranking moves into the query that reads it."
+      },
+      {
+        "source": "topXAggregation: COUNT",
+        "status": "UNSUPPORTED",
+        "target": "No ingestion-time replacement",
+        "targetFields": [],
+        "report_comment": "Classic used this to rank the split values before keeping the top ones. The migrated metric keeps every value, so the ranking moves into the query that reads it."
+      },
+      {
+        "source": "topXAggregation: MAX",
+        "status": "UNSUPPORTED",
+        "target": "No ingestion-time replacement",
+        "targetFields": [],
+        "report_comment": "Classic used this to rank the split values before keeping the top ones. The migrated metric keeps every value, so the ranking moves into the query that reads it."
+      },
+      {
+        "source": "topXAggregation: MIN",
+        "status": "UNSUPPORTED",
+        "target": "No ingestion-time replacement",
+        "targetFields": [],
+        "report_comment": "Classic used this to rank the split values before keeping the top ones. The migrated metric keeps every value, so the ranking moves into the query that reads it."
+      },
+      {
+        "source": "topXAggregation: OF_INTEREST_RATIO",
+        "status": "UNSUPPORTED",
+        "target": "No ingestion-time replacement",
+        "targetFields": [],
+        "report_comment": "Classic used this to rank the split values before keeping the top ones. The migrated metric keeps every value, so the ranking moves into the query that reads it."
+      },
+      {
+        "source": "topXAggregation: OTHER_RATIO",
+        "status": "UNSUPPORTED",
+        "target": "No ingestion-time replacement",
+        "targetFields": [],
+        "report_comment": "Classic used this to rank the split values before keeping the top ones. The migrated metric keeps every value, so the ranking moves into the query that reads it."
+      },
+      {
+        "source": "topXAggregation: SINGLE_VALUE",
+        "status": "UNSUPPORTED",
+        "target": "No ingestion-time replacement",
+        "targetFields": [],
+        "report_comment": "Classic used this to rank the split values before keeping the top ones. The migrated metric keeps every value, so the ranking moves into the query that reads it."
+      },
+      {
+        "source": "topXAggregation: SUM",
+        "status": "UNSUPPORTED",
+        "target": "No ingestion-time replacement",
+        "targetFields": [],
+        "report_comment": "Classic used this to rank the split values before keeping the top ones. The migrated metric keeps every value, so the ranking moves into the query that reads it."
+      },
+      {
+        "source": "Placeholder kind: ORIGINAL_TEXT",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "Direct source field",
+        "targetFields": []
+      },
+      {
+        "source": "Placeholder kind: BEFORE_DELIMITER",
+        "status": "DERIVED",
+        "target": "Preceding DQL extraction processor",
+        "targetFields": []
+      },
+      {
+        "source": "Placeholder kind: AFTER_DELIMITER",
+        "status": "DERIVED",
+        "target": "Preceding DQL extraction processor",
+        "targetFields": []
+      },
+      {
+        "source": "Placeholder kind: BETWEEN_DELIMITER",
+        "status": "DERIVED",
+        "target": "Preceding DQL extraction processor",
+        "targetFields": []
+      },
+      {
+        "source": "Placeholder kind: REGEX_EXTRACTION",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "The split value is pulled out of a longer text with a regular expression. A processor cannot run regular expressions."
+      },
+      {
+        "source": "Placeholder normalization: ORIGINAL",
+        "status": "DIRECT",
+        "target": "No transformation needed",
+        "targetFields": []
+      },
+      {
+        "source": "Placeholder normalization: TO_LOWER_CASE",
+        "status": "DERIVED",
+        "target": "Preceding DQL lowercase transformation",
+        "targetFields": []
+      },
+      {
+        "source": "Placeholder normalization: TO_UPPER_CASE",
+        "status": "DERIVED",
+        "target": "Preceding DQL uppercase transformation",
+        "targetFields": []
+      },
+      {
+        "source": "Placeholder useFromChildCalls: false",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "Root/entry-span field",
+        "targetFields": []
+      },
+      {
+        "source": "Placeholder useFromChildCalls: true",
+        "status": "UNSUPPORTED",
+        "target": "No generic replacement found",
+        "targetFields": [],
+        "report_comment": "The split value is taken from calls further down the chain. A processor looks at one span at a time."
+      },
+      {
+        "source": "Placeholder aggregation: FIRST",
+        "status": "UNSUPPORTED",
+        "target": "No generic replacement found for child-call values",
+        "targetFields": [],
+        "report_comment": "The split takes the first of several values captured during a request. A processor copies one field value and cannot choose between several."
+      },
+      {
+        "source": "Placeholder aggregation: LAST",
+        "status": "UNSUPPORTED",
+        "target": "No generic replacement found for child-call values",
+        "targetFields": [],
+        "report_comment": "The split takes the last of several values captured during a request. A processor copies one field value and cannot choose between several."
+      },
+      {
+        "source": "Placeholder aggregation: COUNT",
+        "status": "UNSUPPORTED",
+        "target": "No generic replacement found for child-call values",
+        "targetFields": [],
+        "report_comment": "The split counts how many values were captured during a request. A processor copies one field value and cannot count them."
+      },
+      {
+        "source": "Placeholder source.managementZone",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "The split value comes from a management zone. Management zones are not used in Phase 3."
+      },
+      {
+        "source": "Placeholder source.serviceTag",
+        "status": "UNSUPPORTED",
+        "target": "No direct replacement",
+        "targetFields": [],
+        "report_comment": "The split value comes from a service tag. Tags are not available on spans."
+      }
+    ],
+    "topLevel": [
+      {
+        "source": "tsmMetricKey",
+        "status": "DIRECT",
+        "target": "OpenPipeline metric `metricKey`, without `calc:`",
+        "targetFields": []
+      },
+      {
+        "source": "name",
+        "status": "DIRECT",
+        "target": "Pipeline `displayName` and processor `description`",
+        "targetFields": []
+      },
+      {
+        "source": "enabled",
+        "status": "DIRECT",
+        "target": "Processor `enabled`",
+        "targetFields": []
+      },
+      {
+        "source": "ignoreMutedRequests: false",
+        "status": "UNSUPPORTED",
+        "target": "No additional matcher",
+        "targetFields": [],
+        "report_comment": "Muted requests are counted, which is also what the migrated metric does."
+      },
+      {
+        "source": "ignoreMutedRequests: true",
+        "status": "UNSUPPORTED",
+        "target": "No replacement found",
+        "targetFields": [],
+        "report_comment": "The metric skips requests that were muted. Phase 3 has no request muting, so this cannot be carried over."
+      },
+      {
+        "source": "entityId",
+        "status": "DIRECT_CONDITIONAL",
+        "target": "Matcher on `dt.smartscape.service`, compared against the classic ID wrapped in `toSmartscapeId()`",
+        "targetFields": [
+          "dt.smartscape.service"
+        ]
+      },
+      {
+        "source": "managementZones",
+        "status": "UNSUPPORTED",
+        "target": "No direct replacement",
+        "targetFields": [],
+        "report_comment": "The metric is limited to a management zone. Spans do not carry management zones, so the same limit has to be rebuilt on a field that is on the span, such as a primary tag."
+      },
+      {
+        "source": "unitDisplayName",
+        "status": "UNSUPPORTED",
+        "target": "No OpenPipeline metric-extraction field",
+        "targetFields": [],
+        "report_comment": "The unit label is not carried over. Set it on the new metric key instead."
+      },
+      {
+        "source": "metadata",
+        "status": "UNSUPPORTED",
+        "target": "Do not migrate",
+        "targetFields": [],
+        "report_comment": "Internal version information; nothing to migrate."
+      }
+    ]
+  },
+  "units": {
+    "note": "OpenPipeline metric-extraction processors have no unit field. Every classic unit is carried for reporting only and has no target setting.",
+    "values": [
+      "AMPERE",
+      "BILLION",
+      "BIT",
+      "BIT_PER_HOUR",
+      "BIT_PER_MINUTE",
+      "BIT_PER_SECOND",
+      "BYTE",
+      "BYTE_PER_HOUR",
+      "BYTE_PER_MINUTE",
+      "BYTE_PER_SECOND",
+      "CORES",
+      "COUNT",
+      "DAY",
+      "DECIBEL_MILLI_WATT",
+      "GIBI_BYTE",
+      "GIBI_BYTE_PER_HOUR",
+      "GIBI_BYTE_PER_MINUTE",
+      "GIBI_BYTE_PER_SECOND",
+      "GIGA",
+      "GIGA_BYTE",
+      "GIGA_BYTE_PER_HOUR",
+      "GIGA_BYTE_PER_MINUTE",
+      "GIGA_BYTE_PER_SECOND",
+      "HERTZ",
+      "HOUR",
+      "KIBI_BYTE",
+      "KIBI_BYTE_PER_HOUR",
+      "KIBI_BYTE_PER_MINUTE",
+      "KIBI_BYTE_PER_SECOND",
+      "KILO",
+      "KILO_BYTE",
+      "KILO_BYTE_PER_HOUR",
+      "KILO_BYTE_PER_MINUTE",
+      "KILO_BYTE_PER_SECOND",
+      "KILO_METRE_PER_HOUR",
+      "MEBI_BYTE",
+      "MEBI_BYTE_PER_HOUR",
+      "MEBI_BYTE_PER_MINUTE",
+      "MEBI_BYTE_PER_SECOND",
+      "MEGA",
+      "MEGA_BYTE",
+      "MEGA_BYTE_PER_HOUR",
+      "MEGA_BYTE_PER_MINUTE",
+      "MEGA_BYTE_PER_SECOND",
+      "METRE_PER_HOUR",
+      "METRE_PER_SECOND",
+      "MICRO_SECOND",
+      "MILLION",
+      "MILLI_CORES",
+      "MILLI_SECOND",
+      "MILLI_SECOND_PER_MINUTE",
+      "MINUTE",
+      "MONTH",
+      "MSU",
+      "NANO_SECOND",
+      "NANO_SECOND_PER_MINUTE",
+      "NOT_APPLICABLE",
+      "PERCENT",
+      "PER_HOUR",
+      "PER_MINUTE",
+      "PER_SECOND",
+      "PIXEL",
+      "PROMILLE",
+      "RATIO",
+      "SECOND",
+      "STATE",
+      "TRILLION",
+      "UNSPECIFIED",
+      "VOLT",
+      "WATT",
+      "WEEK",
+      "YEAR"
+    ]
+  },
+  "note": "report_comment is the customer-facing explanation for an element that blocks a migration; it is the only text a report may print. The engineering derivation behind each status - the cluster source it was read from, the measurements, the open questions - is tracked in the Jira issue for this topic and deliberately not shipped here."
+}

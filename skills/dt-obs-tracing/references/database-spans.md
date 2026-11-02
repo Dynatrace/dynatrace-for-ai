@@ -11,7 +11,8 @@ Query database activity:
 ```dql
 fetch spans
 | filter isNotNull(db.query.text)
-| summarize spans=count(), by: { db.system, db.operation.name, db.collection.name }
+| fieldsAdd db.system.name = coalesce(db.system.name, db.system)
+| summarize spans=count(), by: { db.system.name, db.operation.name, db.collection.name }
 ```
 
 ### Database Spans by Service
@@ -22,10 +23,11 @@ Identify which services make database calls:
 fetch spans
 | filter span.kind == "client" and isNotNull(db.namespace)
 | fieldsAdd getNodeName(dt.smartscape.service)
+| fieldsAdd db.system.name = coalesce(db.system.name, db.system)
 | summarize {
     spans=count(),
     avg_duration=avg(duration)
-  }, by: { dt.smartscape.service.name, db.system, db.namespace }
+  }, by: { dt.smartscape.service.name, db.system.name, db.namespace }
 | sort spans desc
 ```
 
@@ -39,6 +41,7 @@ Count actual database calls (not just spans) per service:
 fetch spans
 | filter span.kind == "client" and isNotNull(db.namespace)
 | fieldsAdd getNodeName(dt.smartscape.service)
+| fieldsAdd db.system.name = coalesce(db.system.name, db.system)
 
 // Calculate multiplicity for extrapolation
 | fieldsAdd sampling.probability = (power(2, 56) - coalesce(sampling.threshold, 0)) * power(2, -56)
@@ -52,7 +55,7 @@ fetch spans
   }, by: {
     dt.smartscape.service.name,
     code.function,
-    db.system,
+    db.system.name,
     db.namespace,
     db.query.text
   }
@@ -70,6 +73,7 @@ Analyze database call durations with aggregation awareness:
 ```dql
 fetch spans
 | filter span.kind == "client" and isNotNull(db.query.text)
+| fieldsAdd db.system.name = coalesce(db.system.name, db.system)
 
 // Calculate average duration for aggregated spans
 | fieldsAdd aggregation.duration_avg = coalesce(
@@ -88,7 +92,7 @@ fetch spans
     operation_count = sum(multiplicity),
     avg_duration = sum(aggregation.duration_avg * multiplicity) / sum(multiplicity),
     p95_duration = percentile(aggregation.duration_avg, 95)
-  }, by: { db.system, db.operation.name, db.collection.name }
+  }, by: { db.system.name, db.operation.name, db.collection.name }
 | sort operation_count desc
 | limit 50
 ```
@@ -100,6 +104,7 @@ Find slowest database statements:
 ```dql
 fetch spans
 | filter span.kind == "client" and isNotNull(db.query.text)
+| fieldsAdd db.system.name = coalesce(db.system.name, db.system)
 | fieldsAdd aggregation.duration_avg = coalesce(
     aggregation.duration_sum / aggregation.count,
     duration
@@ -107,7 +112,7 @@ fetch spans
 | filter aggregation.duration_avg > 100ms
 | fields
     trace.id,
-    db.system,
+    db.system.name,
     db.query.text,
     duration=aggregation.duration_avg,
     aggregated_calls=aggregation.count
@@ -119,7 +124,7 @@ fetch spans
 
 Common database span attributes:
 
-- `db.system` - Database type (e.g., postgresql, mysql, mongodb)
+- `db.system.name` - Database type (e.g., postgresql, mysql, mongodb); the Semantic Dictionary still uses `db.system`, so use `coalesce(db.system.name, db.system)`
 - `db.namespace` - Database name
 - `db.query.text` - SQL/query statement
 - `db.operation.name` - Operation type (SELECT, INSERT, UPDATE, etc.)

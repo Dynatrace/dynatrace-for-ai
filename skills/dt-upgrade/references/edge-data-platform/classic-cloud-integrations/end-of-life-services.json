@@ -1,0 +1,429 @@
+[
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.CognitiveServices/accounts",
+    "kind": "InkRecognizer",
+    "endOfLifeDate": "2021-01-31",
+    "announcementUrl": "https://learn.microsoft.com/en-us/previous-versions/azure/cognitive-services/Ink-Recognizer/overview"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.ServiceFabricMesh/applications",
+    "kind": null,
+    "endOfLifeDate": "2021-04-28",
+    "announcementUrl": "https://azure.microsoft.com/updates/azure-service-fabric-mesh-preview-retirement/"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.ClassicCompute/virtualMachines",
+    "kind": null,
+    "endOfLifeDate": "2023-09-06",
+    "announcementUrl": "https://learn.microsoft.com/en-us/azure/virtual-machines/classic-vm-deprecation"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.DevSpaces/controllers",
+    "kind": null,
+    "endOfLifeDate": "2023-10-31",
+    "announcementUrl": "https://azure.microsoft.com/updates/azure-dev-spaces-is-retiring-on-31-october-2023/"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.DataLakeAnalytics/accounts",
+    "kind": null,
+    "endOfLifeDate": "2024-02-29",
+    "announcementUrl": "https://learn.microsoft.com/en-us/azure/data-lake-analytics/data-lake-analytics-overview"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.DataLakeStore/accounts",
+    "kind": null,
+    "endOfLifeDate": "2024-02-29",
+    "announcementUrl": "https://learn.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-migrate-gen1-to-gen2"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.Media/mediaservices",
+    "kind": null,
+    "endOfLifeDate": "2024-06-30",
+    "announcementUrl": "https://learn.microsoft.com/en-us/previous-versions/azure/media-services/latest/azure-media-services-retirement"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.TimeSeriesInsights/environments",
+    "kind": null,
+    "endOfLifeDate": "2025-03-31",
+    "announcementUrl": "https://azure.microsoft.com/en-us/updates?id=we-ll-retire-azure-time-series-insights-on-31-of-march-2025"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.ClassicStorage/storageAccounts",
+    "kind": null,
+    "endOfLifeDate": "2024-08-31",
+    "announcementUrl": "https://learn.microsoft.com/en-us/azure/storage/common/classic-account-migration-overview"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.ClassicNetwork/virtualNetworks",
+    "kind": null,
+    "endOfLifeDate": "2024-08-31",
+    "announcementUrl": "https://learn.microsoft.com/en-us/azure/reliability/asm-retirement"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.MachineLearning/workspaces",
+    "kind": null,
+    "endOfLifeDate": "2024-08-31",
+    "announcementUrl": "https://learn.microsoft.com/en-us/lifecycle/products/machine-learning-studio-classic"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.MachineLearning/webServices",
+    "kind": null,
+    "endOfLifeDate": "2024-08-31",
+    "announcementUrl": "https://learn.microsoft.com/en-us/lifecycle/products/machine-learning-studio-classic"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.CognitiveServices/accounts",
+    "kind": "QnAMaker",
+    "endOfLifeDate": "2025-03-31",
+    "announcementUrl": "https://azure.microsoft.com/updates/azure-qna-maker-will-be-retired-on-31-march-2025/"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.DBforMariaDB/servers",
+    "kind": null,
+    "endOfLifeDate": "2025-09-19",
+    "announcementUrl": "https://azure.microsoft.com/en-us/updates?id=azure-database-for-mariadb-will-be-retired-on-19-september-2025-migrate-to-azure-database-for-mysql-flexible-server"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.CognitiveServices/accounts",
+    "kind": "LUIS",
+    "endOfLifeDate": "2026-03-31",
+    "announcementUrl": "https://learn.microsoft.com/en-us/previous-versions/azure/ai-services/luis/what-is-luis"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.CognitiveServices/accounts",
+    "kind": "LUIS.Authoring",
+    "endOfLifeDate": "2026-03-31",
+    "announcementUrl": "https://learn.microsoft.com/en-us/previous-versions/azure/ai-services/luis/what-is-luis"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.CognitiveServices/accounts",
+    "kind": "Personalizer",
+    "endOfLifeDate": "2026-10-01",
+    "announcementUrl": "https://learn.microsoft.com/en-us/azure/ai-services/personalizer/what-is-personalizer"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.CognitiveServices/accounts",
+    "kind": "AnomalyDetector",
+    "endOfLifeDate": "2026-10-01",
+    "announcementUrl": "https://learn.microsoft.com/en-us/azure/ai-services/anomaly-detector/overview"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.CognitiveServices/accounts",
+    "kind": "MetricsAdvisor",
+    "endOfLifeDate": "2026-10-01",
+    "announcementUrl": "https://learn.microsoft.com/en-us/azure/ai-services/metrics-advisor/overview"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.CognitiveServices/accounts",
+    "kind": "ContentModerator",
+    "endOfLifeDate": "2027-03-15",
+    "announcementUrl": "https://learn.microsoft.com/en-us/azure/ai-services/content-moderator/overview"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.DataFactory/dataFactories",
+    "kind": null,
+    "endOfLifeDate": "2023-08-31",
+    "announcementUrl": "https://azure.microsoft.com/en-us/updates?id=migrate-your-azure-data-factory-version-1-to-2-service"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.Media/mediaservices/streamingEndpoints",
+    "kind": null,
+    "endOfLifeDate": "2024-06-30",
+    "announcementUrl": "https://learn.microsoft.com/en-us/previous-versions/azure/media-services/latest/azure-media-services-retirement"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.Web/hostingEnvironments",
+    "kind": "ASEV2",
+    "endOfLifeDate": "2024-08-31",
+    "announcementUrl": "https://learn.microsoft.com/en-us/lifecycle/products/app-service-environment-version-1-and-2"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.Logic/integrationServiceEnvironments",
+    "kind": null,
+    "endOfLifeDate": "2024-08-31",
+    "announcementUrl": "https://azure.microsoft.com/en-us/updates?id=integration-services-environment-will-be-retired-on-31-august-2024-transition-to-logic-apps-standard"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.TimeSeriesInsights/environments/eventsources",
+    "kind": null,
+    "endOfLifeDate": "2025-03-31",
+    "announcementUrl": "https://azure.microsoft.com/en-us/updates?id=we-ll-retire-azure-time-series-insights-on-31-of-march-2025"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.MixedReality/remoteRenderingAccounts",
+    "kind": null,
+    "endOfLifeDate": "2025-09-30",
+    "announcementUrl": "https://azure.microsoft.com/updates/v2/azure-remote-rendering-retirement/"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.AppPlatform/Spring",
+    "kind": null,
+    "endOfLifeDate": "2028-03-31",
+    "announcementUrl": "https://learn.microsoft.com/en-us/azure/spring-apps/basic-standard/retirement-announcement"
+  },
+  {
+    "cloud": "Azure",
+    "resourceType": "Microsoft.Cache/redis",
+    "kind": null,
+    "endOfLifeDate": "2028-09-30",
+    "announcementUrl": "https://learn.microsoft.com/en-us/azure/azure-cache-for-redis/retirement-faq"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "Amazon Lumberyard",
+    "kind": "service",
+    "endOfLifeDate": "2021-05-01",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS Mobile Hub",
+    "kind": "service",
+    "endOfLifeDate": "2021-10-31",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "Amazon WorkLink",
+    "kind": "service",
+    "endOfLifeDate": "2021-11-30",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "Amazon RDS on VMware",
+    "kind": "service",
+    "endOfLifeDate": "2022-05-01",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS IoT Things Graph",
+    "kind": "service",
+    "endOfLifeDate": "2022-11-09",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "Amazon Sumerian",
+    "kind": "service",
+    "endOfLifeDate": "2023-03-01",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS Server Migration Service",
+    "kind": "service",
+    "endOfLifeDate": "2023-04-01",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "Amazon WorkSpaces Application Manager",
+    "kind": "service",
+    "endOfLifeDate": "2023-09-01",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS DeepLens",
+    "kind": "service",
+    "endOfLifeDate": "2024-01-31",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS Snowmobile",
+    "kind": "service",
+    "endOfLifeDate": "2024-03-14",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS IoT RoboRunner",
+    "kind": "service",
+    "endOfLifeDate": "2024-03-14",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::OpsWorks::Stack",
+    "kind": null,
+    "endOfLifeDate": "2024-05-01",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::OpsWorksCM::Server",
+    "kind": null,
+    "endOfLifeDate": "2024-05-01",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::NimbleStudio::Studio",
+    "kind": null,
+    "endOfLifeDate": "2024-06-30",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::CodeStar::GitHubRepository",
+    "kind": null,
+    "endOfLifeDate": "2024-07-25",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::IoT1Click::Project",
+    "kind": null,
+    "endOfLifeDate": "2025-01-29",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "Amazon WorkDocs",
+    "kind": "service",
+    "endOfLifeDate": "2025-04-25",
+    "announcementUrl": "https://aws.amazon.com/blogs/storage/on-demand-archival-and-retrieval-of-documents-from-amazon-workdocs-to-amazon-s3/"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS Private 5G",
+    "kind": "service",
+    "endOfLifeDate": "2025-05-20",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::QLDB::Ledger",
+    "kind": null,
+    "endOfLifeDate": "2025-07-31",
+    "announcementUrl": "https://aws.amazon.com/qldb/"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS BugBust",
+    "kind": "service",
+    "endOfLifeDate": "2025-08-13",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::RoboMaker::RobotApplication",
+    "kind": null,
+    "endOfLifeDate": "2025-09-10",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS DeepComposer",
+    "kind": "service",
+    "endOfLifeDate": "2025-09-17",
+    "announcementUrl": "https://aws.amazon.com/blogs/machine-learning/support-for-aws-deepcomposer-ending-soon/"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS NICE EnginFrame",
+    "kind": "service",
+    "endOfLifeDate": "2025-09-25",
+    "announcementUrl": "https://aws.amazon.com/blogs/hpc/discontinuation-of-nice-enginframe-effective-september-25th-2025/"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::LookoutMetrics::AnomalyDetector",
+    "kind": null,
+    "endOfLifeDate": "2025-10-10",
+    "announcementUrl": "https://aws.amazon.com/blogs/machine-learning/transitioning-off-amazon-lookout-for-metrics/"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::Evidently::Project",
+    "kind": null,
+    "endOfLifeDate": "2025-10-17",
+    "announcementUrl": "https://aws.amazon.com/blogs/mt/support-for-amazon-cloudwatch-evidently-ending-soon/"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::LookoutVision::Project",
+    "kind": null,
+    "endOfLifeDate": "2025-10-31",
+    "announcementUrl": "https://aws.amazon.com/blogs/machine-learning/exploring-alternatives-and-seamlessly-migrating-data-from-amazon-lookout-for-vision/"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::MediaStore::Container",
+    "kind": null,
+    "endOfLifeDate": "2025-11-12",
+    "announcementUrl": "https://aws.amazon.com/blogs/media/support-for-aws-elemental-mediastore-ending-soon/"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::ElasticTranscoder::Pipeline",
+    "kind": null,
+    "endOfLifeDate": "2025-11-13",
+    "announcementUrl": "https://aws.amazon.com/blogs/media/support-for-amazon-elastic-transcoder-ending-soon/"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS Application Discovery Service (Discovery Connector)",
+    "kind": "service",
+    "endOfLifeDate": "2025-11-17",
+    "announcementUrl": "https://aws.amazon.com/blogs/migration-and-modernization/deprecation-of-aws-application-discovery-service-discovery-connector/"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::IoTAnalytics::Channel",
+    "kind": null,
+    "endOfLifeDate": "2025-12-15",
+    "announcementUrl": "https://aws.amazon.com/blogs/iot/unlocking-scalable-iot-analytics-on-aws/"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::KinesisAnalytics::Application",
+    "kind": null,
+    "endOfLifeDate": "2026-01-27",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::SimSpaceWeaver::Simulation",
+    "kind": null,
+    "endOfLifeDate": "2026-03-31",
+    "announcementUrl": "https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+  },
+  {
+    "cloud": "AWS",
+    "resourceType": "AWS::AppMesh::Mesh",
+    "kind": null,
+    "endOfLifeDate": "2026-09-30",
+    "announcementUrl": "https://docs.aws.amazon.com/app-mesh/latest/userguide/what-is-app-mesh.html"
+  }
+]

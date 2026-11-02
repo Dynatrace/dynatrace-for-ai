@@ -2,7 +2,7 @@
   "$schema": "https://antigravity.google/schemas/v1/plugin.json",
   "name": "dynatrace",
   "displayName": "Dynatrace",
-  "version": "8.0.1",
+  "version": "10.0.0",
   "description": "Investigate production issues with real Dynatrace data: problems and root causes, logs, metrics, traces, and vulnerabilities, via skills and the MCP server.",
   "logo": "Dynatrace_Logo_color_positive.png",
   "suggestedPrompts": [

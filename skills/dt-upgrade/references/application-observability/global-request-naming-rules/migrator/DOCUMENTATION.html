@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>glob-name-migrator — How it works</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1d212b;
+    --ink: #e7ebf0;
+    --muted: #9aa4b2;
+    --accent: #5db0ff;
+    --accent-2: #7ee0b8;
+    --warn: #ffcf6b;
+    --bad: #ff8a8a;
+    --line: #2a2f3a;
+    --code: #d6e1ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 40px 24px 120px; }
+  h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: -0.3px; }
+  h2 {
+    font-size: 23px; margin: 56px 0 14px; padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+  h3 { font-size: 18px; margin: 30px 0 8px; color: var(--accent); }
+  h4 { font-size: 15px; margin: 22px 0 6px; color: var(--accent-2); text-transform: uppercase; letter-spacing: 0.6px; }
+  p { margin: 10px 0; }
+  .lede { color: var(--muted); font-size: 17px; }
+  code {
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 13.5px; color: var(--code);
+    background: #11151c; padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--line);
+  }
+  pre {
+    background: #0b0e13;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12.8px; line-height: 1.5;
+    color: #cdd6e4;
+  }
+  pre.diagram { border-left-color: var(--accent-2); }
+  pre b { color: #fff; font-weight: 600; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 4px 22px 18px;
+    margin: 18px 0;
+  }
+  .note {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--warn);
+    border-radius: 8px;
+    padding: 12px 16px; margin: 16px 0;
+    color: #e4e9f0; font-size: 14.5px;
+  }
+  .note b { color: var(--warn); }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--panel-2); color: var(--accent); font-weight: 600; }
+  td code { font-size: 12.5px; }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .muted { color: var(--muted); }
+  .tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700;
+    padding: 1px 8px; border-radius: 20px; vertical-align: middle;
+    letter-spacing: 0.4px;
+  }
+  .tag.a { background: #16324a; color: #8fd0ff; }
+  .tag.b { background: #16402f; color: #8ff0c4; }
+  .tag.c { background: #3a2c4a; color: #d6b6ff; }
+  .toc {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 20px; margin: 24px 0 8px;
+    column-count: 2; column-gap: 32px;
+  }
+  .toc a { color: var(--ink); text-decoration: none; font-size: 14.5px; }
+  .toc a:hover { color: var(--accent); }
+  .toc li { margin: 3px 0; }
+  .filemap { font-size: 13.5px; }
+  .filemap td:first-child { white-space: nowrap; }
+  .verdict { font-weight: 700; }
+  .verdict.ok { color: var(--accent-2); }
+  .verdict.warn { color: var(--warn); }
+  .verdict.bad { color: var(--bad); }
+  .footer { margin-top: 70px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>glob-name-migrator</h1>
+<p class="lede">A command-line tool that rewrites Dynatrace <b>global request naming rules</b> so they no longer rely on conditions that are removed in Phase 3 of the cluster upgrade. It reads each existing rule, queries live data in Grail to discover replacement conditions that match the same services and endpoints, verifies the match is exact, and emits proposed replacement rules.</p>
+
+<div class="note">
+This document was written by reading the source under <code>src/glob_name_migrator/</code>. It describes what the code actually does; it is the only prose documentation the tool ships. All four commands, including <code>run</code> and <code>apply</code>, are fully implemented.
+</div>
+
+<div class="toc">
+<ul style="list-style:none;padding:0;margin:0;">
+<li><a href="#what">1. What problem it solves</a></li>
+<li><a href="#commands">2. The four commands</a></li>
+<li><a href="#config">3. Configuration &amp; auth</a></li>
+<li><a href="#bigpicture">4. The pipeline at a glance</a></li>
+<li><a href="#classify">5. Classification (Case A/C)</a></li>
+<li><a href="#translate">6. Translation to DQL</a></li>
+<li><a href="#queries">7. Querying live data</a></li>
+<li><a href="#candidates">8. Finding candidates</a></li>
+<li><a href="#verify">9. Verification loop</a></li>
+<li><a href="#report">10. Reports &amp; output</a></li>
+<li><a href="#apply">11. apply: uploading rules</a></li>
+<li><a href="#files">12. Module map</a></li>
+</ul>
+</div>
+
+<h2 id="what">1. What problem it solves</h2>
+<p>A request naming rule decides how Dynatrace labels requests. Each rule has a list of <b>conditions</b> and an optional <b>management-zones</b> filter. Three condition kinds disappear in Phase 3 and must be replaced:</p>
+<ul>
+  <li><code>managementZones</code> — the whole rule-level field.</li>
+  <li><code>SERVICE_TAG</code> — always deprecated.</li>
+  <li><code>PROCESS_GROUP_TAG</code> — deprecated <em>unless</em> <b>every</b> one of its tag keys starts with <code>primary_tags.</code>. A condition carrying only primary tags survives Phase 3 untouched. One that <em>mixes</em> a primary and an ordinary tag is <b>not a valid rule at all</b> — request naming cannot evaluate it correctly, validators block it, and a rule containing one is a product bug (see below). The migrator marks such a condition deprecated so the rule stays visible, then reports the whole rule unmigratable.</li>
+</ul>
+<p><b>Primary tags are not a pass-through.</b> They survive Phase 3, but are evaluated on the <b>span</b> side — against the entry-point span's <code>primary_tags.*</code> resource attributes with exact, case-sensitive string equality — not against the process-group entity's tag array. Three consequences run through the whole pipeline:</p>
+<ul>
+  <li><b>They are also candidate <em>sources</em>.</b> The tenant's <code>primary_tags.*</code> span columns are discovered once per run (<code>fieldsSnapshot spans</code>) and projected into each rule's span query, so they can be scored as replacements for deprecated conditions. Emitted shape: <code>PROCESS_GROUP_TAG</code> + a <code>TAG</code> <code>comparisonInfo</code> carrying a <code>TagDto</code>.</li>
+  <li><b>Deduplication is key-level, not attribute-level.</b> This is the surprising rule. For every other attribute, a surviving condition on it blocks it as a candidate. For primary tags, a surviving condition on <code>primary_tags.team</code> must <em>not</em> block <code>primary_tags.stage</code> — different keys are independent axes. Candidate identity therefore carries the key as a composite <code>PROCESS_GROUP_TAG@primary_tags.team</code>, split back apart only when the Config v1 body is written.</li>
+  <li><b>Scalar strings only.</b> The runtime type-guards on <code>String</code> before comparing, so an array-valued (multi-value) primary tag can never match. Such a key is discarded as a candidate with reason <code>array_valued</code> — the key is dropped, never the rule.</li>
+</ul>
+<p><b>Negation never occurs for a primary tag, in either direction.</b> <code>TagComparisonDto</code> has no <code>NOT_EQUALS</code>, and the equivalent <code>EQUALS</code> + <code>negate: true</code> is refused too: <code>MethodAttribute.PROCESS_GROUP_TAG</code> declares <code>isIndexCondition()</code>, and <code>ConditionSpecificationValidator.noNegationForMEIndex</code> rejects negation on every ME-index attribute. Both have been in place since the Config v1 request-naming API was introduced (same commit, 2019-12-28), and that API is the only write path for a global rule with conditions — so a negated PG tag condition cannot exist in a tenant. The migrator therefore treats one as unmigratable on read, and fails loudly rather than emit one. (Note for backend readers: <code>NamingRuleEvaluation</code> does carry a <code>negated</code> flag on its <code>PgTagCondition</code> and applies it, but no rule can be created that sets it — that branch is unreachable.)</p>
+<p>A condition <em>mixing</em> a primary and an ordinary tag in one any-of is <b>not supported by request naming</b> and is being blocked at the API — such a condition means "PG tagged <code>team:ck</code> <em>or</em> span carrying <code>primary_tags.env=prod</code>", a disjunction across an entity attribute and a span attribute that neither the runtime nor this pipeline can express (both AND their entity- and span-side evaluation). It therefore has no well-defined set of matched services — not just for the migrator to reproduce, but for the feature itself: <b>request naming cannot evaluate such a condition correctly either.</b> Validators prevent it from being created, so a rule that contains one is a bug in the feature, not an input the migrator should try to interpret. The migrator classifies it as <em>deprecated</em>, so the rule is never silently skipped as "nothing deprecated", and then reports the <b>whole rule</b> unmigratable (any unmigratable condition stops the rule before the query stage) with a reason telling the customer to rewrite it. No automatic migration is planned.</p>
+<p>The migrator's job: for every rule that uses a deprecated condition, find a set of <b>surviving</b> attributes (URL path, application name, service type, endpoint name, …) whose values — read from real entities and spans — select <b>exactly the same</b> services and endpoints the original rule did. If it can, it writes out a ready-to-POST replacement rule. The original is never changed by <code>run</code>.</p>
+
+<h2 id="commands">2. The four commands</h2>
+<p>Defined in <code>cli.py</code>. Every command shares the auth/tenant flags described in §3.</p>
+<table>
+  <tr><th>Command</th><th>What it does</th><th>Touches tenant?</th></tr>
+  <tr><td><code>list-rules</code></td><td>Lists every request-naming rule stub (id + name) from Config v1.</td><td>Read-only</td></tr>
+  <tr><td><code>dql-smoke</code></td><td>Runs one trivial DQL query end-to-end to prove the token + storage-query stack works. Default: <code>fetch dt.entity.service | fields id | limit 1</code>.</td><td>Read-only</td></tr>
+  <tr><td><code>run</code></td><td>The full migration pipeline (§4–§10). Writes all artifacts into the working directory.</td><td>Read-only</td></tr>
+  <tr><td><code>apply</code></td><td>Reads a completed <code>run</code> workdir and uploads the discovered replacements as <b>disabled</b> rules positioned just above each original (§11).</td><td><b>Writes</b></td></tr>
+</table>
+
+<h2 id="config">3. Configuration &amp; auth</h2>
+<p>Resolved in <code>config.py</code>. Two host URLs are tracked because the classic Config v1 API and the platform DQL API usually live on different domains:</p>
+<pre class="diagram">  --tenant https://abc.dynatrace.com
+        │
+        ├─ classic_url  →  https://abc.dynatrace.com            (Config v1 REST)
+        └─ platform_url →  https://abc.<b>apps</b>.dynatrace.com       (DQL storage query)
+
+  Only one URL is needed; the other is derived by inserting / removing
+  the ".apps." infix. Either can be overridden with --classic-url / --platform-url.</pre>
+<p>A <b>single</b> platform token (<code>dt0s16.*</code>) is used for both APIs — sent as an <code>Api-Token</code> header to Config v1 and as a <code>Bearer</code> token to the storage query API. The token must carry <code>ReadConfig</code> + <code>storage:*:read</code> scopes (and <code>WriteConfig</code> for <code>apply</code>). Classic <code>dt0c01.*</code> tokens are rejected. The token is masked in <code>AppConfig.__repr__</code> so it can't leak into logs.</p>
+<p>Flags fall back to env vars: <code>DT_TENANT</code>, <code>DT_CLASSIC_URL</code>, <code>DT_PLATFORM_URL</code>, <code>DT_PLATFORM_TOKEN</code>, <code>GNM_OUTPUT_DIR</code>. The output directory defaults to a timestamped <code>./workdir/run-YYYYMMDD-HHMMSS/</code>.</p>
+
+<h2 id="bigpicture">4. The pipeline at a glance</h2>
+<p><code>orchestrator.run()</code> drives everything. It lists the target rules, then runs each one through the same per-rule pipeline, and finally writes an aggregate summary and HTML report.</p>
+
+<div class="panel">
+<pre class="diagram">                       ┌─────────────────────────────────────────────┐
+   run command  ──────▶ │  orchestrator.run()                          │
+                        └─────────────────────────────────────────────┘
+                                          │
+                         list-rules (Config v1)  or  --rule-ids
+                                          │
+                                          ▼
+                        ╔═════════════  for each rule  ═══════════════╗
+                        ║                                             ║
+   Config v1 get_rule ─▶║  1. hydrate rule body → Rule (pydantic)     ║
+                        ║                                             ║
+                        ║  2. SKIP if disabled                        ║
+                        ║  3. SKIP if no deprecated condition         ║
+                        ║        (cheap classify() probe)             ║
+                        ║                                             ║
+                        ║  4. classify  → Case A / C + buckets        ║  §5
+                        ║  5. compute cache keys (entity_key,span_key)║
+                        ║  6. translate each condition → DQL fragment ║  §6
+                        ║         → write derived/&lt;id&gt;.json (sidecar)  ║
+                        ║                                             ║
+                        ║      if NOTHING unmigratable & DQL present: ║
+                        ║  7. execute entity + span queries (Grail)   ║  §7
+                        ║         → write cache/*.json                ║
+                        ║  8. score replacement candidates            ║  §8
+                        ║         + substring rescue pass             ║
+                        ║         → write derived/&lt;id&gt;_candidates.json ║
+                        ║  9. overselect VERIFICATION loop            ║  §9
+                        ║         → write derived/&lt;id&gt;_verdict.json    ║
+                        ║                                             ║
+                        ║ 10. build per-rule report                  ║  §10
+                        ║         → write report/&lt;id&gt;.json            ║
+                        ╚═════════════════════════════════════════════╝
+                                          │
+                                          ▼
+                        write report/summary.json  +  report/report.html</pre>
+</div>
+
+<p>Two early skips keep the run cheap: <b>disabled rules</b> are dropped unconditionally, and enabled rules whose conditions are all surviving (no deprecated condition) are dropped after a fast classification probe — they need no migration. Both are recorded in the summary so nothing silently disappears.</p>
+<p>A rule only reaches the query/candidate/verify stages if <b>every</b> condition translated successfully (<code>unmigratable_count == 0</code>) and a DQL client is available. If any condition is unmigratable, the rule stops after the sidecar with its reasons recorded.</p>
+
+<h2 id="classify">5. Classification — Case A / C</h2>
+<p><code>rules/classifier.py</code> sorts a rule's conditions into a 2×2 grid — <b>entity-side vs span-side</b> (decided per condition by <code>condition_side()</code>, which consults the attribute mapping and, for <code>PROCESS_GROUP_TAG</code>, the tag keys themselves) and <b>surviving vs deprecated</b> — and then assigns a case based on where conditions live:</p>
+
+<table>
+  <tr><th>Case</th><th>Where conditions live</th><th>Consequence for querying</th></tr>
+  <tr><td><span class="tag a">A</span></td><td>Entity-side only (incl. a non-empty <code>managementZones</code>)</td><td>Entity query only; span query is a fallback</td></tr>
+  <tr><td><span class="tag c">C</span></td><td>Both entity-side and span-side</td><td>Entity query first, span query second</td></tr>
+</table>
+<p>Only Cases A and C are migratable: every Phase-3 deprecated condition (<code>managementZones</code>, <code>SERVICE_TAG</code>, non-<code>primary_tags.</code> <code>PROCESS_GROUP_TAG</code>) is entity-side, so any rule that needs migration always carries entity-side content. A span-only rule is therefore never deprecated and is skipped before any case-dependent code runs. An attribute whose mapping is unknown is treated as entity-side so it stays visible to later stages. The one exception is the mixed primary/ordinary PG tag condition described in §1: it is both deprecated <em>and</em> span-side, so a rule containing nothing else is a deprecated Case C rule with no entity-side content — harmless, because it is unmigratable and stops at the sidecar before any case-dependent code runs.</p>
+<p><b>Primary tags shift the case.</b> Because a surviving <code>primary_tags.*</code> condition is span-side, a rule whose only non-<code>managementZones</code> condition is a primary tag classifies as <b>Case C</b>, not A — it cannot be verified without a span query. Case C consequently tolerates a rule whose span side holds only <em>surviving</em> conditions, with no deprecated span condition at all. Side is decided per condition by <code>classifier.condition_side()</code>, which is also what <code>cache.split_conditions()</code> uses: <code>PROCESS_GROUP_TAG</code> is a single mapping row serving both primary and ordinary tags, so if the two disagreed, the sidecar would file a condition span-side while the cache key filed it entity-side, silently sharing cache entries between rules that are not equivalent.</p>
+
+<h4>Cache keys</h4>
+<p><code>cache.py</code> derives two stable keys per rule, each a <code>SHA-256[:12]</code> of canonical JSON (keys sorted recursively, lists sorted by element):</p>
+<ul>
+  <li><code>entity_key</code> — over <code>managementZones</code> + the entity-level conditions.</li>
+  <li><code>span_key</code> — over <code>entity_key</code> + the span-level conditions.</li>
+</ul>
+<p>Two rules with the same entity shape share cached entity rows; same entity <em>and</em> span shape share span rows too. Cache files are named after these keys, so re-runs are idempotent and rules with identical shapes don't re-query.</p>
+
+<h2 id="translate">6. Translation to DQL</h2>
+<p><code>rules/translator.py</code> turns one Config v1 condition into one DQL filter fragment — a pure function. Each result is a <code>Translation</code> carrying <b>either</b> a DQL string <b>or</b> an <code>unmigratable_reason</code>.</p>
+<pre class="diagram">  Condition                                  DQL fragment
+  ─────────────────────────────────────────  ─────────────────────────────────────
+  STRING EQUALS "foo"                    →    key == "foo"
+  STRING BEGINS_WITH "foo"               →    startsWith(key, "foo")
+  STRING EQUALS_ANY_OF [a,b]             →    in(key, {"a", "b"})
+  NUMBER GREATER_THAN 5                  →    key &gt; 5
+  BOOLEAN EQUALS true                    →    key == true
+  APPLICATION_* (array&lt;string&gt;)          →    in(key, {"v"})        (array idiom)
+  TAG EQUALS {key,value}                 →    matchesValue(tags, "*key:value")
+  TAG_KEY_EQUALS "k"                     →    matchesValue(tags, {"k", "k:*"})
+  HTTP_STATUS_CLASS C_4XX                →    http.response.status_code div 100 == 4
+  IS_KEY_REQUEST == false                →    ...is_non_key_requests... == true
+  managementZones [z1,z2]                →    matchesValue(managementZones, {"z1","z2"})
+  negate=true                            →    not ( ... )
+
+  REGEX_MATCHES, REQUEST_ATTRIBUTE,      →    UNMIGRATABLE (reason recorded)
+  ONE_AGENT_ATTRIBUTE, IS_KEY_REQUEST==true</pre>
+<p>The translator also enforces per-attribute restriction tables: some attributes forbid negation, some forbid <code>EXISTS</code>. A violation makes the condition unmigratable rather than producing wrong DQL. It deliberately does <b>not</b> add the <code>isExternalService != true</code> pre-filter or projection lists — those belong to the query builders.</p>
+
+<h2 id="queries">7. Querying live data</h2>
+<p><code>query_executor.py</code> issues the entity and span queries, dispatching by case. The goal of this stage is to compute the rule's <b>original target sets</b> from live data:</p>
+<ul>
+  <li><b>S_super</b> — services matching the rule's entity-side conditions.</li>
+  <li><b>S_orig</b> — the services that actually have matching endpoint spans.</li>
+  <li><b>E_orig</b> — the (service, endpoint) pairs matched by the rule.</li>
+</ul>
+
+<pre class="diagram"><b>Case A</b>  (entity only)
+  A.1  fetch dt.entity.service | filter &lt;svc conds&gt; | fields id, serviceType, …
+            → S_super   →  cache/&lt;entity_key&gt;_s_super.json
+
+<b>Case C</b>  (both)
+  C.1  fetch dt.entity.service | filter &lt;svc conds&gt;        → S_super
+  C.2  fetch spans | filter &lt;span conds&gt; and in(service, S_super_ids)
+            → E_orig, S_orig
+
+  PG branch:  if conditions target process groups, the entity step runs a
+              two-query plan — fetch process_group ids first, then substitute
+              them into the service query (in(runs_on[...], {PG ids})).
+
+  A.2 fallback:  see below.</pre>
+
+<p>The entity query always projects <code>id</code> + <code>serviceType</code> plus every candidate-eligible service attribute (so the next stage has columns to mine). The span query groups by <code>dt.smartscape.service</code> + <code>endpoint.name</code> plus every candidate-eligible span key, and adds a synthetic <code>dt_webrequest_url</code> column reconstructed from <code>server.address</code> + optional <code>:port</code> + <code>url.path</code>.</p>
+
+<div class="note">
+<b>Span retry.</b> Spans are short-lived. In Case C, if the constrained span query returns nothing, the executor retries with time-shifted windows (up to 3 attempts, each stepping ~6 h further back) before giving up with <code>rule_matching_no_data</code>. Read-limit and other DQL errors abort just that rule and are recorded as a <code>failure_reason</code>.
+</div>
+
+<h4>Case A span fallback (A.2)</h4>
+<p>A Case A rule has no span conditions, so normally only the entity query runs. But if entity-side scoring (§8) finds <b>no usable candidate</b>, the orchestrator runs an extra no-condition span query constrained to S_super's service IDs, re-derives S_orig/E_orig from the spans, and re-scores in full mode. This rescues Case A rules that can only be distinguished at the endpoint level.</p>
+
+<h2 id="candidates">8. Finding replacement candidates</h2>
+<p><code>analysis/candidates.py</code> is pure post-processing of the cached rows — no new DQL. For every column in the result it asks: <em>"could a filter on this attribute replace the deprecated condition?"</em></p>
+
+<pre class="diagram">  for each DQL column in the cached rows (excluding structural id/service/endpoint):
+       │
+       ├─ resolve column → API attribute   (scope-aware: may depend on serviceType)
+       │
+       ├─ DROP if attribute is a surviving condition already      (no point)
+       ├─ DROP if attribute is unmigratable-as-candidate
+       ├─ DROP if any row has a null value for this column        (would under-match)
+       │
+       └─ count distinct values:
+              1 distinct value      →  kind = "full"            key == "v"
+              ≤ partial_cap (5) and
+                matcher supports ANY_OF  →  "partial_promoted"  in(key, {v1,v2,…})
+              &gt; cap or no ANY_OF     →  DISCARD (recorded with reason)
+
+  → sort (full before partial), de-duplicate by value-set (entity side wins)
+  → entity_candidates[] , span_candidates[] , discarded_for_report[]</pre>
+
+<h4>Scope-aware resolution</h4>
+<p>Some DQL keys map to different API attributes depending on the service's type (e.g. web vs. messaging). <code>resolve_api_attribute()</code> consults the mapping's scope partitions and a per-service <code>serviceType</code> index; depending on the configured <code>mixed_behavior</code> it picks a default, lets the narrower type win, or marks the column unmigratable when types are mixed across rows.</p>
+
+<h4>Substring rescue</h4>
+<p><code>analysis/substring_candidate_rescue.py</code> then augments the artifact. When a string column has several distinct values, an exact match won't generalise — so it looks for a shared <b>longest common prefix</b> (→ <code>BEGINS_WITH</code>) or <b>suffix</b> (→ <code>ENDS_WITH</code>), each at least 4 characters. As a last resort, if no candidate of any kind exists on either side, it tries a shared <b>longest common substring</b> (→ <code>CONTAINS</code>). These are tagged <code>substring_full</code>.</p>
+
+<h4>Good vs. suboptimal</h4>
+<p>Each candidate's quality comes from the mapping (<code>good</code> or <code>suboptimal</code>). The verification loop starts with good candidates only and keeps the suboptimal ones as an escalation pool.</p>
+
+<h2 id="verify">9. The overselect verification loop</h2>
+<p><code>analysis/overselect_loop.py</code> is the heart of the tool. It drives a state machine to a terminal verdict, running real DQL queries (cached per filter+window) and comparing the candidate filter's result against the original target sets. The principle: a replacement is only valid if it selects <b>exactly</b> what the original did — not more (over-select), not less (under-select).</p>
+
+<p>When span data exists the loop runs in two phases; an entity-only rule runs just the first.</p>
+
+<div class="panel">
+<pre class="diagram">  ┌─ PHASE 1 · ENTITY PRE-PHASE ────────────────────────────────────────┐
+  │  run entity query with entity candidate + surviving fragments       │
+  │  compare matched services  S_cand   vs   S_orig                     │
+  │                                                                     │
+  │     S_cand == S_orig   →  EXACT   → service_filter = S_cand ✓        │
+  │     S_cand  ⊂ S_orig   →  UNDER   → drop filter, let span phase cover│
+  │     S_cand  ⊃ S_orig   →  OVER    → greedy negation, retry           │
+  │                                     (exhausted → keep as filter)     │
+  └─────────────────────────────────────────────────────────────────────┘
+                                  │  service_filter
+                                  ▼
+  ┌─ PHASE 2 · SPAN LOOP ───────────────────────────────────────────────┐
+  │  run span query with span fragments + in(service, service_filter)   │
+  │  compare (S_cand, E_cand)  vs  (S_orig, E_orig)                      │
+  │                                                                     │
+  │     exact               →  ✅ EXACT_MATCH                            │
+  │     under-select        →  shift window earlier & retry (≤1×)        │
+  │                            then accept as best-effort                │
+  │     over-select         →  escalation ladder ↓                       │
+  │                                                                     │
+  │        1. greedy set-cover NEGATIONS (not key == "v")               │
+  │           — only applied if they fully cover the excess rows        │
+  │        2. SUBSTRING DEMOTION — turn a BEGINS_WITH candidate back     │
+  │           into in(key, {exact values}); reset & retry               │
+  │        3. SUBOPTIMAL ESCALATION — add one suboptimal candidate;      │
+  │           reset & retry                                             │
+  │        4. all exhausted   →  ❌ NO_REPLACEMENT                        │
+  └─────────────────────────────────────────────────────────────────────┘</pre>
+</div>
+
+<h4>Greedy negation</h4>
+<p>When the candidate filter matches a few too many rows, the loop finds attribute=value pairs that appear <b>only</b> in the over-selected rows (never in legitimate rows) and adds them as negations — choosing the pairs that drop the most excess rows first (a single-pass set cover), bounded by a per-attribute cap (default 5) and the mapping's "negation forbidden" list.</p>
+
+<h4>Terminal verdicts</h4>
+<table>
+  <tr><th>Verdict</th><th>Meaning</th></tr>
+  <tr><td><span class="verdict ok">exact_match</span></td><td>Candidates select exactly S_orig / E_orig.</td></tr>
+  <tr><td><span class="verdict ok">exact_match_after_under_select_retry</span></td><td>Exact after a window shift, or accepted best-effort when only under-selecting remained.</td></tr>
+  <tr><td><span class="verdict bad">no_replacement</span></td><td>Over-select could not be resolved by any negation / demotion / escalation (<code>refinement_exhausted</code> or <code>substring_demotion_exhausted</code>).</td></tr>
+</table>
+<p>The verdict — including the final condition list, the negations, the demotions, and the full iteration history — is written to <code>derived/&lt;rule_id&gt;_verdict.json</code>. A safety guard turns a 0-row verification query into a hard error, because by construction the candidate filter must match at least the original set.</p>
+
+<h2 id="report">10. Reports &amp; output</h2>
+<p><code>report/builder.py</code> assembles a per-rule report from the sidecar, the candidates artifact, and the verdict. Its most important output is <code>replacement_rule_body</code> — a complete Config v1 <code>RequestNamingDto</code> built by copying the original rule, emptying <code>managementZones</code>, and replacing <code>conditions</code> with the verified ones (candidate conditions reconstructed into <code>comparisonInfo</code> objects, negations emitted as <code>NOT_EQUALS</code>, surviving conditions copied verbatim). This body is what <code>apply</code> later POSTs.</p>
+<p><code>report/html.py</code> reads all per-rule reports and writes a self-contained <code>report/report.html</code> that buckets rules into:</p>
+<table>
+  <tr><td>✅ <b>Replacement found</b></td><td>exact match — including those reached only after negations / demotions / window retry (the per-rule <code>neg</code>/<code>dem</code> counts remain visible in each rule's detail)</td></tr>
+  <tr><td>⚠️ <b>No safe replacement</b></td><td>no replacement found — manual migration required</td></tr>
+  <tr><td>⏸️ <b>No traffic data</b></td><td>rule not observed in live traffic across the queried windows</td></tr>
+  <tr><td>💥 <b>Failures</b></td><td>a stage errored out</td></tr>
+</table>
+<p>Empty buckets are omitted entirely (no zero-count rows), and the summary table links to each populated section.</p>
+
+<h4>Working-directory layout</h4>
+<pre class="diagram">  &lt;output-dir&gt;/
+  ├── cache/      raw DQL responses keyed by entity_key / span_key / verify_key
+  │                 &lt;entity_key&gt;_s_super.json   &lt;span_key&gt;_e_orig.json
+  │                 &lt;span_key&gt;_s_orig.json      &lt;verify_key&gt;_verify_{e,s}.json
+  ├── derived/    per-rule sidecars
+  │                 &lt;id&gt;.json  &lt;id&gt;_candidates.json  &lt;id&gt;_verdict.json
+  └── report/     &lt;id&gt;.json (per rule)  summary.json  report.html
+                    apply_log.json   (written by the apply command)</pre>
+
+<h2 id="apply">11. The <code>apply</code> command — uploading replacements</h2>
+<p><code>upload_replacements.py</code> takes a finished <code>run</code> workdir (<code>--run-dir</code>) and pushes the discovered replacements to the tenant. It is the only part of the tool that writes to Dynatrace.</p>
+<pre class="diagram">  read report/summary.json  → rules whose verification_status is an exact match
+  read report/&lt;id&gt;.json      → replacement_rule_body for each
+        │
+        ├─ list live rules (Config v1) — validate the original still exists
+        ├─ skip rules with no replacement / original missing
+        │
+   for each target:
+        └─ POST replacement as a DISABLED rule        → new rule id
+        │
+        ▼
+   reorder ALL rules so each new rule sits directly ABOVE its original
+        │
+        ▼
+   write report/apply_log.json</pre>
+<p>Replacements are uploaded <b>disabled</b> and placed just above the original in the global evaluation order — so a human can review and enable them. <b>Originals are never modified.</b> If the POSTs succeed but the reorder call fails, the tool raises <code>ApplyReorderError</code> listing the new rule IDs that need manual reordering, and still writes the apply log.</p>
+
+<h2 id="files">12. Module map</h2>
+<table class="filemap">
+  <tr><th>File</th><th>Responsibility</th></tr>
+  <tr><td><code>cli.py</code></td><td>Argument parsing; dispatches the four commands.</td></tr>
+  <tr><td><code>config.py</code></td><td>CLI/env → <code>AppConfig</code>; URL derivation; secret masking; workdir creation.</td></tr>
+  <tr><td><code>orchestrator.py</code></td><td>The per-rule pipeline + summary assembly.</td></tr>
+  <tr><td><code>auth/api_token.py</code></td><td>Builds the <code>Api-Token</code> header for Config v1.</td></tr>
+  <tr><td><code>clients/config_v1.py</code></td><td>REST client: list / get / post / reorder request-naming rules.</td></tr>
+  <tr><td><code>clients/utils.py</code></td><td>Shared HTTP-client helpers (safe error hints that never echo a token).</td></tr>
+  <tr><td><code>clients/dql.py</code></td><td>Sync wrapper over the async DQL execute/poll/cancel API; typed read-limit &amp; timeout errors.</td></tr>
+  <tr><td><code>rules/models.py</code></td><td>Pydantic models for the rule payload (lenient — preserves unknown fields).</td></tr>
+  <tr><td><code>rules/classifier.py</code></td><td>Case A/C; entity/span × surviving/deprecated buckets.</td></tr>
+  <tr><td><code>rules/translator.py</code></td><td>Condition → DQL fragment; unmigratable detection.</td></tr>
+  <tr><td><code>rules/mapping.py</code></td><td>Hardcoded attribute table: DQL keys, matchers, quality, scope rules, restriction lists. Also the composite <code>BASE@tag_key</code> attribute helpers.</td></tr>
+  <tr><td><code>rules/tags.py</code></td><td>Uniform parsing of tag-valued <code>comparisonInfo</code> payloads (TagDto and bare-string forms, <code>value</code> and <code>values</code>); primary-tag detection.</td></tr>
+  <tr><td><code>cache.py</code></td><td>Stable <code>entity_key</code> / <code>span_key</code> derivation.</td></tr>
+  <tr><td><code>query_executor.py</code></td><td>Runs entity + span queries by case; span retry; A.2 fallback.</td></tr>
+  <tr><td><code>queries/entity.py</code></td><td>Builds entity-side DQL (incl. process-group two-query plan).</td></tr>
+  <tr><td><code>queries/span.py</code></td><td>Builds span-side DQL (group-by + synthetic URL column).</td></tr>
+  <tr><td><code>queries/verification.py</code></td><td>Builds verification queries; deterministic verify cache keys.</td></tr>
+  <tr><td><code>analysis/candidates.py</code></td><td>Scores columns into candidates; scope-aware resolution.</td></tr>
+  <tr><td><code>analysis/substring_candidate_rescue.py</code></td><td>Adds prefix/suffix/contains candidates.</td></tr>
+  <tr><td><code>analysis/overselect_loop.py</code></td><td>The verification state machine.</td></tr>
+  <tr><td><code>report/builder.py</code></td><td>Per-rule report + ready-to-POST replacement body.</td></tr>
+  <tr><td><code>report/html.py</code></td><td>Aggregate <code>report.html</code>.</td></tr>  <tr><td><code>upload_replacements.py</code></td><td>The <code>apply</code> command: POST disabled replacements + reorder.</td></tr>
+</table>
+
+<div class="footer">
+Generated from the source of <code>glob-name-migrator</code> under <code>src/glob_name_migrator/</code>. The behaviour described is read directly from the code.
+</div>
+
+</div>
+</body>
+</html>

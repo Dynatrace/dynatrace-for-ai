@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "description": "Classic cloud metric prefixes and entity types for cloud integration migration detection. Authoritative source — edit this file to add new services; migration-lookup.ts loads it via loadDetectionPatterns().",
+  "providers": {
+    "aws": {
+      "classic_metric_prefixes": [
+        "dt.cloud.aws.",
+        "builtin:cloud.aws.",
+        "ext:cloud.aws.",
+        "cloud.aws."
+      ],
+      "metric_streams_re": "^cloud\\.aws\\.[a-z][a-z0-9_]*\\.[a-z][a-zA-Z0-9]*By[A-Z][a-zA-Z0-9]*$",
+      "classic_entity_types": [
+        "ec2_instance",
+        "ebs_volume",
+        "aws_lambda_function",
+        "auto_scaling_group",
+        "aws_application_load_balancer",
+        "aws_network_load_balancer",
+        "elastic_load_balancer",
+        "relational_database_service",
+        "dynamo_db_table"
+      ]
+    },
+    "azure": {
+      "classic_metric_prefixes": [
+        "dt.cloud.azure.",
+        "builtin:cloud.azure.",
+        "ext:cloud.azure.",
+        "cloud.azure.microsoft_"
+      ],
+      "metric_streams_re": null,
+      "classic_entity_types": [
+        "azure_vm",
+        "azure_vm_scale_set",
+        "azure_load_balancer",
+        "azure_event_hub_namespace",
+        "azure_event_hub",
+        "azure_redis_cache",
+        "azure_function_app",
+        "azure_storage_account",
+        "azure_cosmos_db",
+        "azure_web_app",
+        "azure_sql_server",
+        "azure_sql_database"
+      ]
+    },
+    "gcp": {
+      "classic_metric_prefixes": [
+        "cloud.gcp.",
+        "builtin:cloud.gcp."
+      ],
+      "metric_streams_re": null,
+      "classic_entity_types": [
+        "custom_device"
+      ]
+    }
+  }
+}

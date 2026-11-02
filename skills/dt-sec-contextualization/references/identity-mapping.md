@@ -3,86 +3,71 @@
 ## Contents
 
 - [Mapping Primitive](#mapping-primitive)
+- [Supported Identity Fields](#supported-identity-fields)
+- [2-Way Match Strategy](#2-way-match-strategy)
+- [Path 1 — Direct Smartscape ID](#path-1--direct-smartscape-id)
+- [Path 2 — Container Image Digest → CONTAINER → Workload/Host](#path-2--container-image-digest--container--workloadhost)
+  - [Single supplied digest → workload](#single-supplied-digest--workload)
+- [Path 3 — AI Service → Runtime Process (`GENAI_SERVICE → SERVICE → PROCESS`)](#path-3--ai-service--runtime-process-genai_service--service--process)
+- [Host-by-IP Resolution](#host-by-ip-resolution)
+  - [Single supplied host IP → HOST](#single-supplied-host-ip--host)
+- [Level Selection Guide](#level-selection-guide)
+- [Entity-Key Bundle (required for correlation)](#entity-key-bundle-required-for-correlation)
 - [Data Model](#data-model)
-
+- [Typed Smartscape Fields (`dt.smartscape.*`)](#typed-smartscape-fields-dtsmartscape)
+- [K8s Co-projected Fields](#k8s-co-projected-fields)
+- [RVA / Native Entity Fields](#rva--native-entity-fields)
+- [ID Generation Notes](#id-generation-notes)
 
 ---
 
 ## Mapping Primitive
 
+For a SUPPLIED identifier or small supplied set (container-image digest, host IP, Smartscape id,
+GenAI process), or any row set carrying entity-identity fields, resolve it to Smartscape entities at
+a requested level. This is the only file to load for that shape. A finding STREAM needing per-entity
+aggregation (risk counts, top-N) goes to [entity-enrichment.md](entity-enrichment.md) instead.
 
-Given any row set carrying entity-identity fields, resolve it to Smartscape
-entities at a requested level. Accepts findings, IoC match rows, or raw
-Smartscape nodes as input.
+> **The pre-flight scan applies to finding streams; skip it when the caller supplies the
+> identifier(s).** It lives in [entity-enrichment.md](entity-enrichment.md#pre-flight-check--identifier-availability).
 
-> **This is a pure mapping primitive — no finding-schema semantics.**
-> Fields such as `finding.*`, `vulnerability.*`, `compliance.*`, or
-> `dt.security.risk.level` belong in **dt-sec-insights** consumers that call
-> this primitive. Input rows need only carry at least one identity field from
-> the three paths below.
-
----
-
-## Contents
-
-- [Supported Identity Fields](#supported-identity-fields)
-- [3-Way Match Strategy (K8s Workload / Host)](#3-way-match-strategy)
-- [Path 1 — Direct Smartscape ID](#path-1--direct-smartscape-id)
-- [Path 2 — Container Image Digest → CONTAINER → Workload/Host](#path-2--container-image-digest--container--workloadhost)
-- [Path 3 — Container Image ID → Workload](#path-3--container-image-id--workload)
-- [Path 4 — AI Service → Runtime Process (`GENAI_SERVICE → SERVICE → PROCESS`)](#path-4--ai-service--runtime-process-genai_service--service--process)
-- [Pre-flight Check — Identifier Availability](#pre-flight-check--identifier-availability)
-- [Host-by-IP Resolution](#host-by-ip-resolution)
-- [Level Selection Guide](#level-selection-guide)
-- [Entity-Key Bundle (required for correlation)](#entity-key-bundle-required-for-correlation)
+> **Pure mapping primitive — no finding-schema semantics** (`finding.*`, `vulnerability.*`,
+> `compliance.*`, `dt.security.risk.level` belong to the **dt-sec-insights** consumers). Input rows
+> need only carry one identity field from the paths below.
 
 ---
 
 ## Supported Identity Fields
 
-| Field | Type | Used by path |
-|---|---|---|
-| `dt.smartscape_source.id` | Smartscape node ID (2nd or 3rd gen) | Path 1 |
-| `dt.smartscape_source.type` | Entity type string (granularity check) | Path 1 pre-flight |
-| `container_image.digest` | SHA256 image digest string | Path 2 |
-| `container_image.id` | OCI image ID string | Path 3 |
-| `container_image.repository` | Image registry URL | (supplemental) |
-| `artifact.repository` | Alternative registry URL (some providers) | (supplemental) |
-| `host.ip` | IP address or array | Host-by-IP |
-| `dt.entity.host` | Classic entity ID (HOST-...) | Path 1 / entity-scoping |
-| `dt.entity.process_group` | Classic entity ID (PROCESS_GROUP-...) | Path 1 / entity-scoping |
-| `dt.entity.container_group_instance` | Classic entity ID (CGI) | Path 3 |
-| `k8s.cluster.name` | Kubernetes cluster name | Tier-3 context |
-| `k8s.namespace.name` | Kubernetes namespace name | Tier-3 context |
-| `k8s.node.name` | Kubernetes node name (pod-co-projected) | Tier-2 topology |
-| `k8s.workload.name` | Kubernetes workload name | Tier-2 topology |
+| Field | Used by path / notes |
+|---|---|
+| `dt.smartscape_source.id` | Path 1. Smartscape node ID (3rd-gen when available); may point to workload, cluster, namespace, or cloud resource |
+| `dt.smartscape_source.type` | Path 1 granularity check: K8s workload types, `HOST`, `KUBERNETES_CLUSTER`, `KUBERNETES_NAMESPACE`, or cloud-resource types |
+| `container_image.digest` | Path 2. SHA256 digest on the finding; immutable and registry-independent (Amazon ECR, Google Artifact Registry, Microsoft Defender). The node side spells it `container.image.digest` (dot separator) |
+| `container_image.repository` / `.registry` / `.tags`, `artifact.repository` | Supplemental repository path, registry host, tag array; `coalesce(artifact.repository, container_image.repository)` for the registry URL. The node-side `container.image.name` includes the pull host |
+| `host.ip` | Host-by-IP. IP address or array |
+| `dt.smartscape.host` / `.process` / `.container` | Path 1 / Path 2 entity-scoping |
+| `k8s.cluster.name`, `k8s.namespace.name` / `k8s.node.name`, `k8s.workload.name` | Tier-3 context / Tier-2 topology |
 
 ---
 
-## 3-Way Match Strategy
+## 2-Way Match Strategy
 
-Three independent paths resolve external findings or artifact attributes to
-Smartscape entities. For K8s workloads and hosts, all three are combined with
-`append` to maximize match rate across providers:
+Two independent paths resolve findings or artifact attributes to Smartscape entities; over a finding
+stream they are combined with `append`
+([entity-enrichment.md](entity-enrichment.md#k8s-workload-enrichment-paths-1--2)). Path 1 matches
+`dt.smartscape_source.id` directly against a K8s workload or HOST node. Path 2 goes
+`container_image.digest` → CONTAINER node → `references[is_part_of.*]` → parent workload, or
+`runs_on.host` → HOST.
 
-| Path | Match key | Resolution mechanism | Level |
-|---|---|---|---|
-| 1 | `dt.smartscape_source.id` | Direct join on K8s workload / host Smartscape ID | Workload or HOST |
-| 2 | `container_image.digest` | CONTAINER smartscapeNode → `references[is_part_of.*]` → parent workload or `runs_on.host` → HOST | Workload or HOST |
-| 3 | `container_image.id` | `dt.entity.container_group_instance` → `belongs_to[dt.entity.cloud_application]` → workload | Workload |
+> **Path 1 granularity constraint.** Path 1 matches only when `dt.smartscape_source.id` identifies a
+> K8s **workload** node (`K8S_DEPLOYMENT`, `K8S_DAEMONSET`, `K8S_STATEFULSET`, `K8S_CRONJOB`, `K8S_JOB`,
+> `K8S_REPLICASET`) or a HOST. Providers often populate it at coarser granularity (namespace,
+> cluster, cloud resources), where Path 1 returns 0 although the field is non-null. Check
+> `dt.smartscape_source.type` first.
 
-> **Path 1 granularity constraint.** Path 1 matches only when
-> `dt.smartscape_source.id` identifies a K8s **workload** node
-> (`K8S_DEPLOYMENT`, `K8S_DAEMONSET`, `K8S_STATEFULSET`, `K8S_CRONJOB`,
-> `K8S_JOB`, `K8S_REPLICASET`) or a HOST. External providers commonly populate
-> this field at coarser granularity — the namespace, the cluster, or cloud
-> resources (EC2, VM, S3, container registry) — in which case Path 1 returns 0
-> even though the field is non-null. Always run the pre-flight check first.
-
-> **Path 2 is the reliable artifact→runtime path.** When `dt.smartscape_source.id`
-> is absent or points to the wrong granularity, `container_image.digest` →
-> `smartscapeNodes CONTAINER` → workload resolves the running instance from the
-> build artifact with no pre-enrichment required.
+> **Path 2 is the reliable artifact→runtime path** and needs no pre-enrichment (verified: ECR and
+> Artifact Registry findings for 8 images, 7 days, all resolved to running workloads).
 
 ---
 
@@ -110,24 +95,29 @@ Join rows directly on `dt.smartscape_source.id` to K8s workload or HOST nodes.
 
 ## Path 2 — Container Image Digest → CONTAINER → Workload/Host
 
-Resolves a build artifact (`container_image.digest`) to the running Smartscape
-CONTAINER node, then traverses the `is_part_of.*` reference to the parent
-workload, or `runs_on.host` to the HOST.
+Resolves a build artifact (`container_image.digest`) to the running Smartscape CONTAINER node, then
+follows `is_part_of.*` to the parent workload, or `runs_on.host` to the HOST. Project the
+[Entity-Key Bundle](#entity-key-bundle-required-for-correlation) on the resolved rows; resolved
+workload name and ids alone are not the finished result. Over a finding stream, run the pre-flight
+in entity-enrichment.md first; for a supplied digest skip it and use the single-digest form below.
 
 ```dql-snippet
 // Path 2: digest → CONTAINER → parent workload
 | join [
     smartscapeNodes CONTAINER, from:now()-2h
     | expand dt.k8s.workload.id=coalesce(references[is_part_of.k8s_deployment],
-                             coalesce(references[is_part_of.k8s_daemonset],
-                               coalesce(references[is_part_of.k8s_cronjob],
-                                 coalesce(references[is_part_of.k8s_statefulset],
-                                   coalesce(references[is_part_of.k8s_job],
-                                     references[is_part_of.k8s_replicaset])))))
+        coalesce(references[is_part_of.k8s_daemonset],
+        coalesce(references[is_part_of.k8s_cronjob],
+        coalesce(references[is_part_of.k8s_statefulset],
+        coalesce(references[is_part_of.k8s_job],
+        references[is_part_of.k8s_replicaset])))))
     | filter isNotNull(dt.k8s.workload.id)
     | fieldsAdd dt.smartscape_source.id=dt.k8s.workload.id
+    | lookup [
+        smartscapeNodes {K8S_DEPLOYMENT, K8S_CRONJOB, K8S_DAEMONSET, K8S_JOB, K8S_STATEFULSET, K8S_REPLICASET}, from:now()-2h
+      ], sourceField:dt.smartscape_source.id, lookupField:id, fields:{classic_entity.id=id_classic}
   ], kind:leftOuter, on:{left[container_image.digest]==right[container.image.digest]},
-     fields:{dt.smartscape_source.id, classic_entity.id=id_classic, workloadName=k8s.workload.name}
+     fields:{dt.smartscape_source.id, classic_entity.id, workloadName=k8s.workload.name}
 ```
 
 ```dql-snippet
@@ -145,32 +135,62 @@ workload, or `runs_on.host` to the HOST.
      fields:{hostName, dt.smartscape_source.id, host.classic.id}
 ```
 
----
+> **The HOST variant needs a `runs_on` edge on the CONTAINER node**, which only some tenants have
+> (see [entity-enrichment.md § Host Enrichment by Entity](entity-enrichment.md#host-enrichment-by-entity-paths-1--2));
+> where it is absent the join returns no match.
 
-## Path 3 — Container Image ID → Workload
+> **Digest match is registry-independent** (an Artifact Registry finding resolved to containers pulled
+> from `ghcr.io`); never join on image names: the node name carries the pull host, the finding
+> repository is the path only. `classic_entity.id` is the **workload's** classic ID, so rows stay one
+> per workload.
 
-Resolves via the `dt.entity.container_group_instance` classic entity table, which
-carries `containerImageId`, then looks up the workload Smartscape ID via `id_classic`.
+### Single supplied digest → workload
 
-```dql-snippet
-// Path 3: container_image.id → CGI → workload → Smartscape ID
-| join [
-    fetch dt.entity.container_group_instance, from:now()-2h
-    | fieldsAdd containerImageId, workload.id=belongs_to[dt.entity.cloud_application], workloadName
-    | lookup [
-        smartscapeNodes {K8S_DEPLOYMENT, K8S_CRONJOB, K8S_DAEMONSET, K8S_JOB, K8S_STATEFULSET, K8S_REPLICASET}, from:now()-2h
-      ], sourceField:workload.id, lookupField:id_classic, fields:{dt.smartscape_source.id=id}
-  ], kind:leftOuter, on:{left[container_image.id]==right[containerImageId]},
-     fields:{dt.smartscape_source.id, classic_entity.id=workload.id, workloadName}
+One digest in, one row per running workload out. Starts from the CONTAINER nodes (no
+`security.events` scan, no pre-flight) and projects the entity-key bundle.
+
+**Placeholders**
+
+| Placeholder | Meaning | Example | Where to get it |
+|---|---|---|---|
+| `<container-image-digest>` | Full image digest (string, quoted) | `sha256:9236406e43f6c6aadaf679f73c85e900bd7d8601fababf0f03be4bdf0e1e13ad` | The finding's `container_image.digest`, or the user prompt |
+
+```dql-template
+smartscapeNodes CONTAINER, from:now()-2h
+| filter container.image.digest == "<container-image-digest>"
+| expand dt.k8s.workload.id=coalesce(references[is_part_of.k8s_deployment],
+    coalesce(references[is_part_of.k8s_daemonset],
+    coalesce(references[is_part_of.k8s_cronjob],
+    coalesce(references[is_part_of.k8s_statefulset],
+    coalesce(references[is_part_of.k8s_job],
+    references[is_part_of.k8s_replicaset])))))
+| filter isNotNull(dt.k8s.workload.id)
+| lookup [
+    smartscapeNodes {K8S_DEPLOYMENT, K8S_CRONJOB, K8S_DAEMONSET, K8S_JOB, K8S_STATEFULSET, K8S_REPLICASET}, from:now()-2h
+  ], sourceField:dt.k8s.workload.id, lookupField:id,
+     fields:{workloadName=k8s.workload.name, classic_entity.id=id_classic, workloadType=type}
+| dedup dt.k8s.workload.id
+| fields container.image.digest,
+         entityKey.smartscape_id = dt.k8s.workload.id,
+         entityKey.classic_id    = classic_entity.id,
+         entityKey.name          = workloadName,
+         entityKey.type          = workloadType,
+         entityKey.k8s.cluster   = k8s.cluster.name,
+         entityKey.k8s.namespace = k8s.namespace.name
 ```
 
+An empty result means no running CONTAINER carries that digest in the window (scanned in a registry
+but not running, or replaced): report it as unresolved via the Path 2 digest join, never as a
+fabricated workload. Null `entityKey.name` / `entityKey.classic_id` means the workload node is
+outside the 2h Smartscape window (about half of the containers on a large tenant): keep the id and
+say the name is unresolved.
+
 ---
 
-## Path 4 — AI Service → Runtime Process (`GENAI_SERVICE → SERVICE → PROCESS`)
+## Path 3 — AI Service → Runtime Process (`GENAI_SERVICE → SERVICE → PROCESS`)
 
-This path scopes any process-level finding stream to AI/GenAI workloads, or
-resolves a process back to its owning AI service. `GENAI_SERVICE` entities are
-created by Dynatrace AI Observability (OpenLLMetry instrumentation).
+Scopes any process-level finding stream to AI/GenAI workloads, or resolves a process back to its
+owning AI service (`GENAI_SERVICE` entities come from Dynatrace AI Observability).
 
 **Forward — AI services → their processes.** Use to scope a finding stream to AI:
 
@@ -183,9 +203,8 @@ smartscapeNodes "GENAI_SERVICE", from:now()-2h
 | dedup dt.smartscape.process
 ```
 
-Adjust `from:now()-2h` and `now()-2h` together to match the investigation window.
-Avoid `$dt_timeframe_from` in standalone DQL snippets unless the query is embedded in a
-dashboard/notebook context that defines that variable.
+Adjust `from:now()-2h` and `now()-2h` together to match the investigation window (avoid
+`$dt_timeframe_from` outside dashboards/notebooks).
 
 Inner-join the result against a findings stream on `dt.smartscape.process`.
 
@@ -200,55 +219,16 @@ smartscapeEdges "*", from:-2h
     | filter source_type == "SERVICE" AND target_type == "PROCESS"
     | fields process.id = target_id, service.id = source_id
   ], on:{service.id}, fields:{process.id}
-```
-
-Join back to findings on `left[dt.smartscape.process] == right[process.id]`.
-Resolve the service display name with:
-
-```dql-snippet
 | lookup [ smartscapeNodes GENAI_SERVICE, from:-2h ],
     sourceField:genai_service.id, lookupField:id, fields:{genai_service.name = name}
 ```
 
+The final `lookup` resolves the AI service display name (`genai_service.name`) in the same query;
+keep it in the final DQL. Join back to findings on `left[dt.smartscape.process] == right[process.id]`.
+
 > **Duplicate rows on multi-service processes.** A process reachable via multiple
 > `GENAI_SERVICE` nodes can appear more than once — dedup on `dt.smartscape.process`
 > (forward) or on `{genai_service.id, …}` (reverse) as appropriate.
-
----
-
-## Pre-flight Check — Identifier Availability
-
-Before running the full 3-way enrichment, confirm the input rows carry
-resolvable identifiers. External providers vary — many scope to cloud resources
-(EC2, S3, IAM), not K8s workloads. If no identifier path is populated, skip
-the append chain and report the gap explicitly.
-
-```dql
-// Step 1: check identifier presence across providers
-fetch security.events, from:now()-24h
-| filterOut event.provider == "Dynatrace" or product.vendor == "Dynatrace"
-| filter in(event.type, {"VULNERABILITY_FINDING", "DETECTION_FINDING", "COMPLIANCE_FINDING"})
-| summarize {
-    findings = count(),
-    `has container_image.digest`  = countIf(isNotNull(container_image.digest)),
-    `has container_image.id`      = countIf(isNotNull(container_image.id)),
-    `has dt.smartscape_source.id` = countIf(isNotNull(dt.smartscape_source.id))
-  }, by: {event.provider, product.name}
-```
-
-```dql
-// Step 2 (if has dt.smartscape_source.id > 0): check entity granularity
-fetch security.events, from:now()-24h
-| filterOut event.provider == "Dynatrace" or product.vendor == "Dynatrace"
-| filter isNotNull(dt.smartscape_source.id)
-| summarize Count=count(), by:{event.provider, dt.smartscape_source.type}
-| sort Count desc
-```
-
-**Interpretation:**
-- `dt.smartscape_source.type` is a K8s workload type → Path 1 will yield matches.
-- `dt.smartscape_source.type` is a namespace, cluster, or cloud-resource type → Path 1 returns 0; use Path 2/3.
-- All three identifier counts are 0 → no K8s workload mapping possible; report this and use host-by-IP if applicable.
 
 ---
 
@@ -267,25 +247,48 @@ to HOST smartscapeNodes by IP address.
   ], on:{left[host.ip]==right[ip]}, fields:{host.id=id, host.name=name}
 ```
 
+### Single supplied host IP → HOST
+
+One IP in, one row per HOST out. Reads `smartscapeNodes HOST` only (no `security.events` scan, no
+join) and projects the entity-key bundle.
+
+**Placeholders**
+
+| Placeholder | Meaning | Example | Where to get it |
+|---|---|---|---|
+| `<host-ip>` | IPv4/IPv6 address (string, quoted); a host with several IPs matches on any of them | `172.31.88.27` | The finding's `host.ip` (expand the array first), or the user prompt |
+
+```dql-template
+smartscapeNodes HOST, from:now()-2h
+| expand ip
+| filter ip == ip("<host-ip>")
+| dedup id
+| fields entityKey.smartscape_id = id,
+         entityKey.classic_id    = id_classic,
+         entityKey.name          = name,
+         entityKey.type          = "HOST",
+         host.ip                 = ip
+```
+
+An empty result means no monitored HOST reports that IP: report it as unresolved via the host-by-IP
+match, never as a fabricated host.
+
 ---
 
 ## Level Selection Guide
 
-Choose the resolution level based on the question:
-
 | Requested level | Use | Notes |
 |---|---|---|
-| K8s workload (deployment/daemonset/statefulset) | Path 1+2+3 → `K8S_DEPLOYMENT` etc. | Primary level for external VULNERABILITY/DETECTION findings |
-| K8s node | Pod→node traversal (via `k8s.node.name` or Smartscape edge) | See `correlation-and-coverage.md` § Pod→Node Topology |
+| K8s workload | Path 1+2 → `K8S_DEPLOYMENT` etc. | Primary level for external findings |
+| K8s node | Pod→node traversal (via `k8s.node.name` or Smartscape edge) | See `correlation.md` § Pod→Node Topology |
 | HOST | Path 1+2 → `HOST` smartscapeNodes | Or host-by-IP when only IP is available |
 | Cloud entity (EC2, S3, VM, etc.) | Path 1 → `smartscapeNodes "*" \| filter exists(cloud.provider)` | Cloud entities only need Path 1 |
-| Container (running instance) | `smartscapeNodes CONTAINER` direct lookup by digest | Used as intermediate step in Path 2 |
 
 ---
 
 ## Entity-Key Bundle (required for correlation)
 
-Every leg in a multi-leg hunt or enrichment flow must project an **entity-key bundle** — a minimal set of fields sufficient to join across legs without data loss:
+Every leg in a multi-leg hunt or enrichment flow projects an **entity-key bundle**, the minimal fields needed to join across legs:
 
 ```dql-snippet
 | fieldsAdd entityKey.smartscape_id = dt.smartscape_source.id,
@@ -297,152 +300,81 @@ Every leg in a multi-leg hunt or enrichment flow must project an **entity-key bu
             entityKey.k8s.node      = k8s.node.name    // if available (pod co-projection)
 ```
 
-These keys are the input to the tiered correlation logic in
-[correlation-and-coverage.md](correlation-and-coverage.md). Without them, cross-leg matching falls back
-to Tier 3 (same cluster) at best — which is non-scoring.
-
+These keys feed the tiered correlation in [correlation.md](correlation.md); without them cross-leg
+matching falls back to Tier 3 (same cluster), which is non-scoring.
 
 ---
 
 ## Data Model
 
-
-Reference for the entity-identity fields used by the mapping primitive,
-enrichment, and correlation recipes. These fields exist across all security
-finding types and Smartscape nodes.
-
-> **Finding-schema fields** (`finding.*`, `vulnerability.*`, `compliance.*`,
-> `dt.security.risk.level`, `actor.*`, `threat.attack.*`) live in
-> `dt-sec-insights/references/data-model.md`. This file covers only the
-> **entity-identity slice** shared across dt-sec-contextualization.
+Typed, K8s, and RVA entity fields used by the mapping primitive, enrichment, and correlation. Finding-schema
+fields (`finding.*`, `vulnerability.*`, `compliance.*`, `dt.security.risk.level`, `actor.*`,
+`threat.attack.*`) live in `dt-sec-insights/references/data-model.md`.
 
 ---
 
-## Contents
+## Typed Smartscape Fields (`dt.smartscape.*`)
 
-- [Smartscape Source Fields (cross-provider findings)](#smartscape-source-fields-cross-provider-findings)
-- [Classic Entity Fields (`dt.entity.*`)](#classic-entity-fields-dtentity)
-- [K8s Co-projected Fields](#k8s-co-projected-fields)
-- [Container Image Fields](#container-image-fields)
-- [RVA / Native Entity Fields](#rva--native-entity-fields)
-- [ID Generation Notes](#id-generation-notes)
-
----
-
-## Smartscape Source Fields (cross-provider findings)
-
-Present on cross-provider findings (`VULNERABILITY_FINDING`, `DETECTION_FINDING`,
-`COMPLIANCE_FINDING`) injected by external integrations.
+Typed (`smartscape_id`) 3rd-gen Smartscape IDs. Present on cross-provider findings
+and on Dynatrace scan/detection events. **Not populated on DT RVA state/change
+events** — those use `affected_entity.*` instead.
 
 | Field | Type | Notes |
 |---|---|---|
-| `dt.smartscape_source.id` | Smartscape node ID | 3rd-gen ID when available. May point to workload, cluster, namespace, or cloud resource — check `type` before assuming workload granularity |
-| `dt.smartscape_source.type` | string | Entity type: `K8S_DEPLOYMENT`, `K8S_DAEMONSET`, `K8S_STATEFULSET`, `K8S_CRONJOB`, `K8S_JOB`, `K8S_REPLICASET`, `HOST`, `KUBERNETES_CLUSTER`, `KUBERNETES_NAMESPACE`, or cloud-resource types |
+| `dt.smartscape.host` | HOST-... ID | On Dynatrace scans populated only for non-K8s processes — do not rely on it alone |
+| `dt.smartscape.process` | PROCESS-... ID | Equals `dt.smartscape_source.id` on Dynatrace scans and detections |
+| `dt.smartscape.container` | CONTAINER-... ID | Containerized processes only |
+| `dt.smartscape.k8s_cluster` | K8S_CLUSTER-... ID | Cluster-level scope (`k8s.cluster.name` for the name) |
+| `dt.smartscape.k8s_node` / `k8s_namespace` / `k8s_pod` | K8S_NODE / K8S_NAMESPACE / K8S_POD-... ID | Node, namespace, pod scope (`k8s.*.name` for names) |
 
-> **Granularity check required.** A non-null `dt.smartscape_source.id` does not
-> guarantee workload-level resolution. Always check `dt.smartscape_source.type`
-> before treating it as a K8s workload match (Path 1). Cloud-resource types
-> (EC2, VM, S3, container registry) are common even when only K8s findings were
-> expected.
+`dt.smartscape.k8s_workload` is empty — use `k8s.workload.name` for the workload.
 
----
+> **No typed process-group field on events.** `dt.smartscape.process` is process-instance
+> granularity. For group-level scoping or rollups, resolve it through `smartscapeNodes PROCESS`
+> (`dt.process_group.id`, `dt.process_group.detected_name`); the attribute is set on only part of the
+> PROCESS nodes, so a null group means "unresolved", not "no group".
 
-## Classic Entity Fields (`dt.entity.*`)
-
-2nd-generation classic entity IDs. Present on cross-provider findings and on
-some scan events. **Not populated on DT RVA events** — those use
-`affected_entity.*` instead.
-
-| Field | Type | Notes |
-|---|---|---|
-| `dt.entity.host` | HOST-... ID | 2nd-gen host entity reference |
-| `dt.entity.process_group` | PROCESS_GROUP-... ID | 2nd-gen process group reference |
-| `dt.entity.process_group_instance` | PGI-... ID | Process group instance; used in scan coverage events |
-| `dt.entity.container_group_instance` | CGI ID | Used in Path 3 (container_image.id resolution) |
-| `dt.entity.cloud_application` | cloud application ID | Workload entity in cloud-application topology |
-| `dt.entity.kubernetes_cluster` | K8s cluster ID | Cluster-level scope |
-| `dt.entity.cloud_application_namespace` | namespace ID | K8s namespace entity |
+> `dt.entity.*` fields and `fetch dt.entity.*` tables are deprecated — do not use them.
+> Use the typed `dt.smartscape.*` fields above and `smartscapeNodes`.
 
 ---
 
 ## K8s Co-projected Fields
 
-Present on `smartscapeNodes K8S_POD` and some cross-provider findings.
-These are native string fields (not entity IDs) — they are used for name-based
-Tier-2 correlation and pod→node topology resolution.
-
-| Field | Type | Notes |
-|---|---|---|
-| `k8s.cluster.name` | string | Kubernetes cluster name |
-| `k8s.namespace.name` | string | Kubernetes namespace |
-| `k8s.node.name` | string | Node name — **co-projected** on K8S_POD smartscapeNodes; not available on all finding types |
-| `k8s.pod.name` | string | Pod name (on K8S_POD smartscapeNodes) |
-| `k8s.workload.name` | string | Workload name (on K8S_POD and workload smartscapeNodes) |
-| `k8s.pod.uid` | string | Pod UID |
-
----
-
-## Container Image Fields
-
-Used for artifact→runtime resolution (Path 2 and Path 3).
-
-| Field | Type | Notes |
-|---|---|---|
-| `container_image.digest` | string (sha256:...) | Strongly recommended over `container_image.id`; digest is immutable and unique across registries |
-| `container_image.id` | string | OCI image ID; less stable than digest |
-| `container_image.repository` | string | Image registry URL (some providers) |
-| `artifact.repository` | string | Alternative registry URL field (other providers) — use `coalesce(artifact.repository, container_image.repository)` |
-| `container.image.digest` | string | Same digest, but on `smartscapeNodes CONTAINER` — note the dot separator vs. underscore |
-
-> **Field name difference.** Security findings use `container_image.digest`
-> (underscore separator). `smartscapeNodes CONTAINER` uses `container.image.digest`
-> (dot separator). The join condition in Path 2 bridges these:
-> `on:{left[container_image.digest]==right[container.image.digest]}`.
+Native strings (not entity IDs) on `smartscapeNodes K8S_POD` and some findings, used for Tier-2
+name correlation and pod→node resolution: `k8s.cluster.name`, `k8s.namespace.name`, `k8s.node.name`
+(co-projected on pods; not on all finding types), `k8s.pod.name`, `k8s.workload.name`, `k8s.pod.uid`.
 
 ---
 
 ## RVA / Native Entity Fields
 
 DT RVA events (`VULNERABILITY_STATE_REPORT_EVENT`, `VULNERABILITY_STATUS_CHANGE_EVENT`,
-`VULNERABILITY_TRACKING_LINK_CHANGE_EVENT`) use a separate entity namespace.
-**`dt.smartscape_source.*` and `dt.entity.*` are null on these events.**
+`VULNERABILITY_TRACKING_LINK_CHANGE_EVENT`) use a separate entity namespace. **`dt.smartscape_source.*`
+and `dt.smartscape.*` are null on these events**; scope by `affected_entity.id` and `related_entities.*`.
 
 | Field | Type | Notes |
 |---|---|---|
-| `affected_entity.id` | entity ID | Primary entity reference on RVA events (typically PROCESS_GROUP-...) |
-| `affected_entity.name` | string | Display name of the affected entity |
-| `affected_entity.type` | string | Entity type: `PROCESS_GROUP`, `KUBERNETES_NODE`, `HOST`, etc. |
-| `related_entities.hosts.ids` | array | Related HOST entity IDs (typed array — expand before join) |
-| `related_entities.hosts.names` | array | Related HOST names |
-| `related_entities.kubernetes_workloads.ids` | array | Related K8s workload entity IDs |
-| `related_entities.kubernetes_workloads.names` | array | Related K8s workload names |
-| `related_entities.services.ids` | array | Related service entity IDs |
-| `related_entities.services.names` | array | Related service names |
+| `affected_entity.id` / `.name` / `.type` | entity ID / string / string | Primary entity reference (typically `PROCESS_GROUP-...`; also `KUBERNETES_NODE`, `HOST`, ...) |
+| `related_entities.hosts.ids` / `.names` | array | Related HOST ids / names (typed arrays, expand before join) |
+| `related_entities.kubernetes_workloads.ids` / `.names` | array | Related K8s workload ids / names |
+| `related_entities.services.ids` / `.names` | array | Related service ids / names |
 
-> **Do not use `dt.smartscape.*` or `dt.entity.*` for RVA scoping.** They are
-> null on RVA state/change events. Use `affected_entity.id` and
-> `related_entities.*` instead. This is the cross-provider vs. RVA namespace split.
+> **RVA process groups resolve to processes.** An `affected_entity.id` of type `PROCESS_GROUP` equals
+> `dt.process_group.id` on `smartscapeNodes PROCESS`, giving the member `PROCESS-…` IDs.
+
+> **Resolving RVA ids to Smartscape.** These ids are 2nd-gen: `expand` the typed
+> `related_entities.<group>.ids` array, then `lookup`/`join` `smartscapeNodes` on
+> `lookupField: id_classic`. Full patterns: [rva-entity-resolution.md](rva-entity-resolution.md).
+> Rankings and the vulnerabilities of one known entity stay in **dt-sec-insights**
+> (`vulnerabilities-rankings.md`, `vulnerabilities-dynatrace.md` § One known entity).
 
 ---
 
 ## ID Generation Notes
 
-| Generation | Format | Used in |
-|---|---|---|
-| 2nd-gen (classic) | `HOST-ABC123`, `PROCESS_GROUP-DEF456`, ... | `dt.entity.*` fields, `dt.entity.*` tables (`fetch dt.entity.host`), `id_classic` column on smartscapeNodes |
-| 3rd-gen (Smartscape) | UUID-like string (no type prefix) | `smartscapeNodes` `id` column, `dt.smartscape_source.id` |
-
-The `id_classic` field on `smartscapeNodes` is the bridge between the two
-generations:
-
-```dql-snippet
-// Bridge: 3rd-gen Smartscape ID → 2nd-gen classic ID
-smartscapeNodes HOST, from:now()-2h
-| fields id, id_classic, name
-// id      = 3rd-gen Smartscape ID (matches dt.smartscape_source.id)
-// id_classic = 2nd-gen classic ID (matches dt.entity.host)
-```
-
-Use `id_classic` in lookup conditions when joining smartscapeNodes to classic
-entity tables (`fetch dt.entity.*`) or when matching `affected_entity.id` (which
-is 2nd-gen) against a Smartscape node.
+2nd-gen (classic) ids look like `HOST-ABC123` / `PROCESS_GROUP-DEF456` and appear in RVA
+`affected_entity.*` / `related_entities.*` and in `id_classic` on `smartscapeNodes`. 3rd-gen
+(Smartscape) ids look like `<TYPE>-<HEX>` and appear in `smartscapeNodes` `id`,
+`dt.smartscape_source.id`, and `dt.smartscape.*`. Use `id_classic` in a lookup only when matching
+the 2nd-gen RVA fields; everything else joins on `id`.

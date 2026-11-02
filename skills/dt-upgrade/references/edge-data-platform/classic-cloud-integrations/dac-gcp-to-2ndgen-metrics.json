@@ -1,0 +1,92 @@
+[
+  {
+    "classicMetricKeyPrefix": "cloud.gcp.compute_googleapis_com.",
+    "newMetricKeyPrefix": "cloud.gcp.gce_instance.compute_googleapis_com.",
+    "gcpService": "Google Compute Engine (GCE)",
+    "gcpApi": "compute.googleapis.com",
+    "resourceType": "gce_instance",
+    "status": "confirmed",
+    "notes": "Classic keys use cloud.gcp.compute_googleapis_com.*; new keys add gce_instance. resource-type segment"
+  },
+  {
+    "classicMetricKeyPrefix": "cloud.gcp.container_googleapis_com.",
+    "newMetricKeyPrefix": "cloud.gcp.k8s_cluster.container_googleapis_com.",
+    "gcpService": "Google Kubernetes Engine (GKE)",
+    "gcpApi": "container.googleapis.com",
+    "resourceType": "k8s_cluster",
+    "status": "confirmed",
+    "notes": "GKE uses k8s_cluster resource type prefix in new connection"
+  },
+  {
+    "classicMetricKeyPrefix": "cloud.gcp.cloudsql_googleapis_com.",
+    "newMetricKeyPrefix": "cloud.gcp.cloudsql_database.cloudsql_googleapis_com.",
+    "gcpService": "Cloud SQL",
+    "gcpApi": "cloudsql.googleapis.com",
+    "resourceType": "cloudsql_database",
+    "status": "confirmed",
+    "notes": "Cloud SQL uses cloudsql_database resource type in new connection"
+  },
+  {
+    "classicMetricKeyPrefix": "cloud.gcp.storage_googleapis_com.",
+    "newMetricKeyPrefix": "cloud.gcp.gcs_bucket.storage_googleapis_com.",
+    "gcpService": "Cloud Storage",
+    "gcpApi": "storage.googleapis.com",
+    "resourceType": "gcs_bucket",
+    "status": "confirmed",
+    "notes": "GCS uses gcs_bucket resource type in new connection"
+  },
+  {
+    "classicMetricKeyPrefix": "cloud.gcp.pubsub_googleapis_com.",
+    "newMetricKeyPrefix": null,
+    "gcpService": "Cloud Pub/Sub",
+    "gcpApi": "pubsub.googleapis.com",
+    "resourceType": null,
+    "status": "no-mapping",
+    "notes": "New-connection resource type for Pub/Sub not confirmed in available spec. Manual review required."
+  },
+  {
+    "classicMetricKeyPrefix": "cloud.gcp.monitoring_googleapis_com.",
+    "newMetricKeyPrefix": null,
+    "gcpService": "Cloud Monitoring",
+    "gcpApi": "monitoring.googleapis.com",
+    "resourceType": null,
+    "status": "no-mapping",
+    "notes": "Monitoring API metrics used in classic custom device context. New-connection equivalent not confirmed."
+  },
+  {
+    "classicMetricKeyPrefix": "cloud.gcp.run_googleapis_com.",
+    "newMetricKeyPrefix": "cloud.gcp.cloud_run_revision.run_googleapis_com.",
+    "gcpService": "Cloud Run",
+    "gcpApi": "run.googleapis.com",
+    "resourceType": "cloud_run_revision",
+    "status": "partial",
+    "notes": "Cloud Run resource type inferred from Dynatrace documentation; verify against live tenant"
+  },
+  {
+    "classicMetricKeyPrefix": "cloud.gcp.cloudfunctions_googleapis_com.",
+    "newMetricKeyPrefix": "cloud.gcp.cloud_function.cloudfunctions_googleapis_com.",
+    "gcpService": "Cloud Functions",
+    "gcpApi": "cloudfunctions.googleapis.com",
+    "resourceType": "cloud_function",
+    "status": "partial",
+    "notes": "Cloud Functions resource type inferred; verify against live tenant"
+  },
+  {
+    "classicMetricKeyPrefix": "cloud.gcp.bigquery_googleapis_com.",
+    "newMetricKeyPrefix": null,
+    "gcpService": "BigQuery",
+    "gcpApi": "bigquery.googleapis.com",
+    "resourceType": null,
+    "status": "no-mapping",
+    "notes": "BigQuery new-connection resource type not confirmed. Manual review required."
+  },
+  {
+    "classicMetricKeyPrefix": "cloud.gcp.spanner_googleapis_com.",
+    "newMetricKeyPrefix": "cloud.gcp.spanner_instance.spanner_googleapis_com.",
+    "gcpService": "Cloud Spanner",
+    "gcpApi": "spanner.googleapis.com",
+    "resourceType": "spanner_instance",
+    "status": "partial",
+    "notes": "Spanner resource type inferred; verify against live tenant"
+  }
+]

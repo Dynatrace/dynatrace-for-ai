@@ -1,0 +1,5 @@
+Title,ID,Min version
+Anypoint MQ,com.dynatrace.extension.mulesoft-mq,2.1.0
+Microsoft SQL Server,com.dynatrace.extension.sql-server,4.1.3
+Microsoft SQL Server (local),com.dynatrace.extension.sql-server.wmi,3.0.1
+MongoDB (local or remote monitoring),com.dynatrace.mongo-db-tls,3.2.2

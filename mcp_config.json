@@ -4,7 +4,7 @@
       "serverUrl": "${DT_ENVIRONMENT}/platform-reserved/mcp-gateway/v0.1/servers/dynatrace-mcp/mcp",
       "headers": {
         "Authorization": "Bearer ${DT_PLATFORM_TOKEN}",
-        "Dt-External-Source": "dynatrace-for-ai/8.0.1"
+        "Dt-External-Source": "dynatrace-for-ai/10.0.0"
       },
       "variables": [
         {

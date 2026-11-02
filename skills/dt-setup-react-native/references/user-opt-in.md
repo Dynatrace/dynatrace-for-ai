@@ -18,6 +18,18 @@ Ask the user two questions:
 
 The second argument to `UserPrivacyOptions` is `crashReportingOptedIn`. Default: `true` (crash reports sent). Set `false` to suppress crash reports.
 
+## Session Replay Consent
+
+If the user enabled Session Replay in Step 9, the call must also carry `screenRecordOptedIn` (third argument), and the level must be `DataCollectionLevel.UserBehavior` — replay does not record at `Performance`. If the user wants `Performance`, tell them replay will not record and ask whether to switch.
+
+```ts
+Dynatrace.applyUserPrivacyOptions(
+  new UserPrivacyOptions(DataCollectionLevel.UserBehavior, true, true),
+);
+```
+
+In a consent-screen flow, set the third argument from the user's actual choice, not a hardcoded `true`. If Session Replay was not enabled, omit it (the default is `false`).
+
 ## Placement Options
 
 ### Option 1 — User-facing consent screen (recommended for production)
@@ -80,4 +92,4 @@ Dynatrace.applyUserPrivacyOptions(
 
 ## After Placing the Call
 
-Apply the chosen placement to the relevant file. Confirm with the user which option they chose so it is reflected in the Step 10 summary.
+Apply the chosen placement to the relevant file. Confirm with the user which option they chose so it is reflected in the Step 11 summary.

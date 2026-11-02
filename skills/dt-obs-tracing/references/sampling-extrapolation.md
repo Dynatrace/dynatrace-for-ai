@@ -116,6 +116,7 @@ Extrapolated database calls per service:
 fetch spans
 | filter span.kind == "client" and isNotNull(db.namespace)
 | fieldsAdd getNodeName(dt.smartscape.service)
+| fieldsAdd db.system.name = coalesce(db.system.name, db.system)
 
 // Calculate multiplicity
 | fieldsAdd sampling.probability = (power(2, 56) - coalesce(sampling.threshold, 0)) * power(2, -56)
@@ -126,7 +127,7 @@ fetch spans
 
 | summarize {
     db_calls = sum(multiplicity)
-  }, by: { dt.smartscape.service.name, code.function, db.system, db.namespace, db.query.text }
+  }, by: { dt.smartscape.service.name, code.function, db.system.name, db.namespace, db.query.text }
 | sort db_calls desc
 | limit 100
 ```
