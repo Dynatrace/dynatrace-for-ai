@@ -43,6 +43,12 @@ When bumping the version, update all of the following to match:
 
 Run `node scripts/check-versions.js` to verify — CI also enforces this on every PR.
 
+When a PR that changes the `version` in `.claude-plugin/plugin.json` merges to `main`,
+`.github/workflows/release.yml` creates the `vX.Y.Z` tag and a GitHub release with auto-generated
+notes (covering everything since the previous published release), then starts the MCP registry
+publish described below. Edit the notes afterwards with `gh release edit vX.Y.Z` if they need a
+user-facing summary. To release manually instead, push the tag yourself.
+
 Pushing the `vX.Y.Z` tag also publishes `server.json` to the
 [official MCP registry](https://registry.modelcontextprotocol.io) via
 `.github/workflows/publish-mcp.yml`. The workflow authenticates with GitHub OIDC, which grants
