@@ -10,6 +10,10 @@ entity scoping. Use this as the field dictionary when building any DQL query aga
 > `dt.system.bucket == "..."` filters in default queries (add one only when the user
 > explicitly names a bucket to search).
 
+> **Distinguish between built-in Dynatrace events and externally ingested events.** Events produced by Dynatrace
+> can be filtered for via `dt.openpipeline.source == "built-in-security-events"`, all events not matching
+> this filter criterion are ingested via OpenPipeline and produced by third party tools.
+
 > **Verification basis.** Field names and enums below were checked against the Semantic Dictionary
 > (SD, `main`) **and** against live `security.events` data from Dynatrace demo environments (24 h–7 d windows;
 > Automated Detections and `THREAT_REPORT` are not present in every tenant and were checked where available). Where runtime
