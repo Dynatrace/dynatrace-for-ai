@@ -50,6 +50,48 @@ smartscapeNodes "*"
 ```
 
 **CRITICAL:** Wrong node types return empty results (no error). Always validate for unfamiliar entities.
+For `CUSTOM_*` / `EXT_*` types an empty result is **ambiguous** — see "Custom node types" below.
+
+### Built-in types are broader than the examples above
+
+The built-in set is large — a single environment commonly carries well over a hundred types, most of
+them cloud-provider resources. Beyond the compute/Kubernetes types used as examples throughout this
+file, an environment typically also has `ACTIVEGATE`, `FRONTEND` (web and mobile, distinguished by
+`frontend.type`), `SYNTHETIC_LOCATION`, `BROWSER_MONITOR` / `BROWSER_MONITOR_STEP`, `HTTP_MONITOR` /
+`HTTP_MONITOR_STEP`, `CONTAINER`, `DISK`, and the `K8S_*` family. Run the discovery query above rather
+than working from any list — including this one.
+
+**`id_classic` bridges to classic entity IDs.** Nodes carry the classic ID alongside the Smartscape
+ID, which is what makes incremental migration off `dt.entity.*` possible:
+
+```dql
+smartscapeNodes "FRONTEND"
+| fields type, id, id_classic, name
+// id = FRONTEND-297F397B6836BBC8 , id_classic = APPLICATION-D9D748AC453CA045
+```
+
+### Custom node types
+
+Node types are not limited to the platform's built-in set. OpenPipeline can extract user-defined nodes
+and edges from ingested signals, so an environment may contain node types that exist nowhere in this
+reference.
+
+- Custom type names **must begin with `CUSTOM_` or `EXT_`** and must be unique in the environment.
+- They are queried exactly like built-in types: `smartscapeNodes "CUSTOM_APP_CONNECTOR"`.
+- Discover what actually exists rather than assuming:
+
+```dql
+smartscapeNodes "CUSTOM_*"
+| dedup type
+| fields type
+```
+
+**Empty result ≠ invalid type.** For a `CUSTOM_*` / `EXT_*` type, zero rows most often means the
+extraction pipeline has not produced a node yet — not that the type name is wrong. Distinguish the two
+by listing the types that do exist (query above) before concluding the name is bad.
+
+See [Smartscape node and edge extraction in OpenPipeline](https://docs.dynatrace.com/docs/platform/openpipeline/concepts/smartscape-extraction)
+for how these are produced. Configuring the pipeline is out of scope for this skill.
 
 ### Tags and Labels
 
